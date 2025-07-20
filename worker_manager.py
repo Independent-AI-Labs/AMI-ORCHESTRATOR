@@ -6,8 +6,8 @@ import json
 import os
 import sys
 
-from sda.core.bpmn_models import Agent, AgentType, AgentStatus
-from sda.services.dgraph_client import DgraphClient
+from orchestrator.models.bpmn_models import Agent, AgentType, AgentStatus
+from orchestrator.dgraph.dgraph_client import DgraphClient
 
 logging.basicConfig(level=logging.INFO, format='[%(asctime)s] [%(levelname)s] %(message)s')
 
@@ -32,7 +32,7 @@ class WorkerManager:
 
             command = [
                 sys.executable,
-                os.path.join(os.path.dirname(__file__), '..\', 'sda', 'services', 'worker_agent.py'),
+                os.path.join("C:/Users/vdonc/AMI-SDA/sda/services/worker_agent.py"),
                 worker_id
             ]
 

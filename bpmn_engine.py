@@ -3,8 +3,8 @@ import asyncio
 import json
 from datetime import datetime
 
-from sda.core.bpmn_models import Process, Task, Event, Gateway, ProcessStatus, TaskStatus, EventType, GatewayType
-from sda.services.dgraph_client import DgraphClient
+from orchestrator.models.bpmn_models import Process, Task, Event, Gateway, ProcessStatus, TaskStatus, EventType, GatewayType, AgentStatus
+from orchestrator.dgraph.dgraph_client import DgraphClient
 
 class BPMNEngine:
     def __init__(self, dgraph_client: DgraphClient, active_processes: dict, worker_clients: dict, redis_client, dead_letter_queue_stream: str):

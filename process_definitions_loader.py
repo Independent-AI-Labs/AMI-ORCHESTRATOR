@@ -2,9 +2,9 @@ import logging
 import uuid
 import json
 
-from sda.core.bpmn_models import Process, Task, Event, Gateway, ProcessStatus, TaskType, EventType, GatewayType, SequenceFlow
-from sda.services.dgraph_client import DgraphClient
-from sda.core.process_definitions import ProcessDefinition
+from orchestrator.models.bpmn_models import Process, Task, Event, Gateway, ProcessStatus, TaskType, EventType, GatewayType, SequenceFlow
+from orchestrator.dgraph.dgraph_client import DgraphClient
+from orchestrator.models.process_definitions import ProcessDefinition
 
 logging.basicConfig(level=logging.INFO, format='[%(asctime)s] [%(levelname)s] %(message)s')
 
