@@ -1,5 +1,6 @@
 import sys
 import os
+import base64
 
 def read_file(file_path: str, mode: str = 'text', encoding: str = 'utf-8'):
     try:
@@ -33,11 +34,16 @@ def write_file(file_path: str, content, mode: str = 'text', encoding: str = 'utf
         print(f"Error writing to file {file_path}: {e}")
         sys.exit(1)
 
-def replace_content(file_path: str, old_content, new_content, mode: str = 'text', encoding: str = 'utf-8', count: int = 0):
+def replace_content(file_path: str, old_content_b64, new_content_b64, mode: str = 'text', encoding: str = 'utf-8', count: int = 0):
     try:
+        old_content = base64.b64decode(old_content_b64)
+        new_content = base64.b64decode(new_content_b64)
+
         current_content = read_file(file_path, mode, encoding)
 
         if mode == 'text':
+            old_content = old_content.decode(encoding)
+            new_content = new_content.decode(encoding)
             if not isinstance(old_content, str) or not isinstance(new_content, str):
                 raise ValueError("old_content and new_content must be strings in text mode.")
             if count == 0:
@@ -71,7 +77,7 @@ if __name__ == "__main__":
         print("Commands:")
         print("  read <file_path> [mode] [encoding]")
         print("  write <file_path> <content> [mode] [encoding]")
-        print("  replace <file_path> <old_content> <new_content> [mode] [encoding] [count]")
+        print("  replace <file_path> <old_content_b64> <new_content_b64> [mode] [encoding] [count]")
         sys.exit(1)
 
     command = sys.argv[1]
@@ -90,20 +96,16 @@ if __name__ == "__main__":
         mode = sys.argv[4] if len(sys.argv) > 4 else 'text'
         encoding = sys.argv[5] if len(sys.argv) > 5 else 'utf-8'
         if mode == 'binary':
-            content = content.encode(encoding) # Assume content is base64 encoded string for binary
+            content = base64.b64decode(content) # Decode base64 for binary write
         write_file(file_path, content, mode, encoding)
     elif command == 'replace':
-        old_content = sys.argv[3]
-        new_content = sys.argv[4]
+        old_content_b64 = sys.argv[3]
+        new_content_b64 = sys.argv[4]
         mode = sys.argv[5] if len(sys.argv) > 5 else 'text'
         encoding = sys.argv[6] if len(sys.argv) > 6 else 'utf-8'
         count = int(sys.argv[7]) if len(sys.argv) > 7 else 0
 
-        if mode == 'binary':
-            old_content = old_content.encode(encoding)
-            new_content = new_content.encode(encoding)
-
-        replace_content(file_path, old_content, new_content, mode, encoding, count)
+        replace_content(file_path, old_content_b64, new_content_b64, mode, encoding, count)
     else:
         print(f"Error: Unknown command {command}")
         sys.exit(1)
