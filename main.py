@@ -4,6 +4,9 @@ import os
 import time
 import win32process
 import win32con
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Define the path to the log file
 LOG_FILE = "uvicorn_startup.log"

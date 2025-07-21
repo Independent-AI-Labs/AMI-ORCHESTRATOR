@@ -21,7 +21,7 @@ def bpmn_engine(mock_dgraph_client):
 
 @pytest.mark.asyncio
 async def test_process_start_event(bpmn_engine, mock_dgraph_client):
-    process = Process(id="proc1", name="Test Process", status=ProcessStatus.RUNNING, current_elements_ids=["start_event_1"], sequence_flows=[
+    process = Process(id="proc1", name="Test Process", process_definition_id="test_def", version=1, status=ProcessStatus.RUNNING, current_elements_ids=["start_event_1"], sequence_flows=[
         SequenceFlow(id="flow1", source_ref="start_event_1", target_ref="task1")
     ])
     start_event = Event(id="start_event_1", name="Start Event", event_type=EventType.START_EVENT, status=TaskStatus.READY, process_id="proc1")
@@ -42,7 +42,7 @@ async def test_process_start_event(bpmn_engine, mock_dgraph_client):
 
 @pytest.mark.asyncio
 async def test_process_end_event(bpmn_engine, mock_dgraph_client):
-    process = Process(id="proc2", name="Test Process", status=ProcessStatus.RUNNING, current_elements_ids=["end_event_1"], sequence_flows=[])
+    process = Process(id="proc2", name="Test Process", process_definition_id="test_def", version=1, status=ProcessStatus.RUNNING, current_elements_ids=["end_event_1"], sequence_flows=[])
     end_event = Event(id="end_event_1", name="End Event", event_type=EventType.END_EVENT, status=TaskStatus.READY, process_id="proc2")
 
     mock_dgraph_client.get_bpmn_element.return_value = end_event
@@ -63,7 +63,7 @@ async def test_process_end_event(bpmn_engine, mock_dgraph_client):
 
 @pytest.mark.asyncio
 async def test_process_task_ready_no_worker(bpmn_engine, mock_dgraph_client):
-    process = Process(id="proc3", name="Test Process", status=ProcessStatus.RUNNING, current_elements_ids=["task1"])
+    process = Process(id="proc3", name="Test Process", process_definition_id="test_def", version=1, status=ProcessStatus.RUNNING, current_elements_ids=["task1"])
     task = Task(id="task1", name="Test Task", status=TaskStatus.READY, task_type=TaskType.SERVICE_TASK, process_id="proc3")
 
     mock_dgraph_client.get_bpmn_element.return_value = task
@@ -77,7 +77,7 @@ async def test_process_task_ready_no_worker(bpmn_engine, mock_dgraph_client):
 
 @pytest.mark.asyncio
 async def test_process_task_ready_with_worker(bpmn_engine, mock_dgraph_client):
-    process = Process(id="proc4", name="Test Process", status=ProcessStatus.RUNNING, current_elements_ids=["task1"])
+    process = Process(id="proc4", name="Test Process", process_definition_id="test_def", version=1, status=ProcessStatus.RUNNING, current_elements_ids=["task1"])
     task = Task(id="task1", name="Test Task", status=TaskStatus.READY, task_type=TaskType.SERVICE_TASK, process_id="proc4")
     worker_agent = Agent(id="worker1", name="Worker 1", agent_type=AgentType.WORKER, status=AgentStatus.IDLE)
     mock_worker_client = AsyncMock()
@@ -104,7 +104,7 @@ async def test_process_task_ready_with_worker(bpmn_engine, mock_dgraph_client):
 
 @pytest.mark.asyncio
 async def test_handle_worker_task_completion_success(bpmn_engine, mock_dgraph_client):
-    process = Process(id="proc5", name="Test Process", status=ProcessStatus.RUNNING, current_elements_ids=["task1"], sequence_flows=[
+    process = Process(id="proc5", name="Test Process", process_definition_id="test_def", version=1, status=ProcessStatus.RUNNING, current_elements_ids=["task1"], sequence_flows=[
         SequenceFlow(id="flow2", source_ref="task1", target_ref="end_event_1")
     ])
     task = Task(id="task1", name="Test Task", status=TaskStatus.IN_PROGRESS, assigned_agent_id="worker1", process_id="proc5", task_type=TaskType.SERVICE_TASK)
@@ -132,7 +132,7 @@ async def test_handle_worker_task_completion_success(bpmn_engine, mock_dgraph_cl
 
 @pytest.mark.asyncio
 async def test_handle_worker_task_completion_failure_retry(bpmn_engine, mock_dgraph_client):
-    process = Process(id="proc6", name="Test Process", status=ProcessStatus.RUNNING, current_elements_ids=["task1"])
+    process = Process(id="proc6", name="Test Process", process_definition_id="test_def", version=1, status=ProcessStatus.RUNNING, current_elements_ids=["task1"])
     task = Task(id="task1", name="Test Task", status=TaskStatus.IN_PROGRESS, assigned_agent_id="worker1", process_id="proc6", retry_count=0, max_retries=2, task_type=TaskType.SERVICE_TASK)
     worker_agent = Agent(id="worker1", name="Worker 1", agent_type=AgentType.WORKER, status=AgentStatus.BUSY, current_task_id="task1")
 
@@ -156,7 +156,7 @@ async def test_handle_worker_task_completion_failure_retry(bpmn_engine, mock_dgr
 
 @pytest.mark.asyncio
 async def test_handle_worker_task_completion_failure_permanent(bpmn_engine, mock_dgraph_client):
-    process = Process(id="proc7", name="Test Process", status=ProcessStatus.RUNNING, current_elements_ids=["task1"])
+    process = Process(id="proc7", name="Test Process", process_definition_id="test_def", version=1, status=ProcessStatus.RUNNING, current_elements_ids=["task1"])
     task = Task(id="task1", name="Test Task", status=TaskStatus.IN_PROGRESS, assigned_agent_id="worker1", process_id="proc7", retry_count=1, max_retries=1, task_type=TaskType.SERVICE_TASK)
     worker_agent = Agent(id="worker1", name="Worker 1", agent_type=AgentType.WORKER, status=AgentStatus.BUSY, current_task_id="task1")
 
@@ -183,7 +183,7 @@ async def test_handle_worker_task_completion_failure_permanent(bpmn_engine, mock
 
 @pytest.mark.asyncio
 async def test_process_exclusive_gateway_condition_true(bpmn_engine, mock_dgraph_client):
-    process = Process(id="proc8", name="Test Process", status=ProcessStatus.RUNNING, current_elements_ids=["gateway1"], sequence_flows=[
+    process = Process(id="proc8", name="Test Process", process_definition_id="test_def", version=1, status=ProcessStatus.RUNNING, current_elements_ids=["gateway1"], sequence_flows=[
         SequenceFlow(id="flowA", source_ref="task_prev", target_ref="gateway1"),
         SequenceFlow(id="flowB", source_ref="gateway1", target_ref="task_valid", condition_expression="data_valid == True"),
         SequenceFlow(id="flowC", source_ref="gateway1", target_ref="task_invalid", condition_expression="data_valid == False")
@@ -207,7 +207,7 @@ async def test_process_exclusive_gateway_condition_true(bpmn_engine, mock_dgraph
 
 @pytest.mark.asyncio
 async def test_process_exclusive_gateway_condition_false(bpmn_engine, mock_dgraph_client):
-    process = Process(id="proc9", name="Test Process", status=ProcessStatus.RUNNING, current_elements_ids=["gateway1"], sequence_flows=[
+    process = Process(id="proc9", name="Test Process", process_definition_id="test_def", version=1, status=ProcessStatus.RUNNING, current_elements_ids=["gateway1"], sequence_flows=[
         SequenceFlow(id="flowA", source_ref="task_prev", target_ref="gateway1"),
         SequenceFlow(id="flowB", source_ref="gateway1", target_ref="task_valid", condition_expression="data_valid == True"),
         SequenceFlow(id="flowC", source_ref="gateway1", target_ref="task_invalid", condition_expression="data_valid == False")
@@ -231,7 +231,7 @@ async def test_process_exclusive_gateway_condition_false(bpmn_engine, mock_dgrap
 
 @pytest.mark.asyncio
 async def test_process_parallel_gateway(bpmn_engine, mock_dgraph_client):
-    process = Process(id="proc10", name="Test Process", status=ProcessStatus.RUNNING, current_elements_ids=["gateway1"], sequence_flows=[
+    process = Process(id="proc10", name="Test Process", process_definition_id="test_def", version=1, status=ProcessStatus.RUNNING, current_elements_ids=["gateway1"], sequence_flows=[
         SequenceFlow(id="flowA", source_ref="gateway1", target_ref="taskA"),
         SequenceFlow(id="flowB", source_ref="gateway1", target_ref="taskB")
     ])
@@ -252,7 +252,7 @@ async def test_process_parallel_gateway(bpmn_engine, mock_dgraph_client):
 
 @pytest.mark.asyncio
 async def test_process_error_event(bpmn_engine, mock_dgraph_client):
-    process = Process(id="proc12", name="Test Process", status=ProcessStatus.RUNNING, current_elements_ids=["error_event_1"], sequence_flows=[])
+    process = Process(id="proc12", name="Test Process", process_definition_id="test_def", version=1, status=ProcessStatus.RUNNING, current_elements_ids=["error_event_1"], sequence_flows=[])
     error_event = Event(id="error_event_1", name="Error Event", event_type=EventType.ERROR_EVENT, status=TaskStatus.READY, process_id="proc12")
 
     mock_dgraph_client.get_bpmn_element.return_value = error_event
@@ -272,7 +272,7 @@ async def test_process_error_event(bpmn_engine, mock_dgraph_client):
 
 @pytest.mark.asyncio
 async def test_process_timer_event_not_completed(bpmn_engine, mock_dgraph_client):
-    process = Process(id="proc13", name="Test Process", status=ProcessStatus.RUNNING, current_elements_ids=["timer_event_1"], sequence_flows=[
+    process = Process(id="proc13", name="Test Process", process_definition_id="test_def", version=1, status=ProcessStatus.RUNNING, current_elements_ids=["timer_event_1"], sequence_flows=[
         SequenceFlow(id="flowE", source_ref="timer_event_1", target_ref="taskC")
     ])
     timer_event = Event(id="timer_event_1", name="Timer Event", event_type=EventType.TIMER_EVENT, status=TaskStatus.READY, process_id="proc13", input_data=json.dumps({"duration": 5}))
@@ -292,7 +292,7 @@ async def test_process_timer_event_not_completed(bpmn_engine, mock_dgraph_client
 
 @pytest.mark.asyncio
 async def test_process_timer_event_completed(bpmn_engine, mock_dgraph_client):
-    process = Process(id="proc14", name="Test Process", status=ProcessStatus.RUNNING, current_elements_ids=["timer_event_1"], sequence_flows=[
+    process = Process(id="proc14", name="Test Process", process_definition_id="test_def", version=1, status=ProcessStatus.RUNNING, current_elements_ids=["timer_event_1"], sequence_flows=[
         SequenceFlow(id="flowF", source_ref="timer_event_1", target_ref="taskD")
     ])
     # Simulate that the timer started 10 seconds ago

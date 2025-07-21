@@ -44,7 +44,7 @@ class FileManipulationServer:
             logging.error(f"Failed to send response: {e}")
 
     def _send_error(self, message, request_id=None, code=-32602):
-        """Send a JSON-RPC error response."""
+        """Send a JSON-RPC error response and raise an exception."""
         logging.error(f"Error response: {message} (request_id: {request_id})")
         error_response = {
             "jsonrpc": "2.0",
@@ -56,6 +56,7 @@ class FileManipulationServer:
         if request_id:
             error_response["id"] = request_id
         self._send_response(error_response)
+        raise Exception(message)
 
     def _validate_file_path(self, file_path: str) -> str:
         """Validate and normalize file path for security."""
@@ -592,7 +593,7 @@ class FileManipulationServer:
                         "result": {
                             "protocolVersion": "2025-06-18",
                             "serverInfo": {
-                                "name": "FileManipulationServer",
+                                "name": "Local Files",
                                 "version": "1.0.0"
                             },
                             "capabilities": {

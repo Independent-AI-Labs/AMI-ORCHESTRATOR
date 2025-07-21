@@ -9,6 +9,9 @@ import pydgraph
 from orchestrator.models.bpmn_models import Process, Task, Event, Gateway, Agent, BPMNElementType, ProcessStatus, TaskType, TaskStatus, EventType, GatewayType, AgentType, SequenceFlow
 
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 class DgraphClient:
     def __init__(self):
@@ -80,11 +83,25 @@ class DgraphClient:
         data_copy.pop("uid", None)
 
         # Convert string representations back to Enum or datetime if necessary
-        for k, v in data_copy.items():
+        for k, v in list(data_copy.items()):
             if k == "status" and hasattr(model_type, 'status') and isinstance(model_type.status, Enum):
                 data_copy[k] = model_type.status.__class__(v)
             elif k == "task_type" and hasattr(model_type, 'task_type') and isinstance(model_type.task_type, Enum):
                 data_copy[k] = model_type.task_type.__class__(v)
+            elif model_type == Task:
+                if "process_id" not in data_copy:
+                    data_copy["process_id"] = "unknown_process"
+                if "task_type" not in data_copy:
+                    data_copy["task_type"] = TaskType.SERVICE_TASK.value
+            elif model_type == Process:
+                if "process_definition_id" not in data_copy:
+                    data_copy["process_definition_id"] = "unknown_definition"
+                if "version" not in data_copy:
+                    data_copy["version"] = 0
+                if "process_id" not in data_copy:
+                    data_copy["process_id"] = "unknown_process"
+                if "task_type" not in data_copy:
+                    data_copy["task_type"] = TaskType.SERVICE_TASK.value
             elif k == "event_type" and hasattr(model_type, 'event_type') and isinstance(model_type.event_type, Enum):
                 data_copy[k] = model_type.event_type.__class__(v)
             elif k == "gateway_type" and hasattr(model_type, 'gateway_type') and isinstance(model_type.gateway_type, Enum):
@@ -129,7 +146,7 @@ class DgraphClient:
 
     async def get_node(self, obj_id: str, model_type: type) -> Optional[Any]:
         query = f"{{ q(func: eq(id, \"{obj_id}\")) {{ expand(_all_) }} }}"
-        res = await self.query(query)
+        res = self.query(query)
         if res and res[0]:
             return await self._from_dgraph_json(res[0], model_type)
         return None
@@ -160,11 +177,11 @@ class DgraphClient:
                 }}
             }}'''
         
-        res = await self.query(query)
+        res = self.query(query)
         if not res:
             return []
         
-        return [await self._from_dgraph_json(p, Process) for p in res]
+        return [self._from_dgraph_json(p, Process) for p in res]
 
     async def update_process_status(self, process_id: str, status: ProcessStatus) -> bool:
         """
@@ -174,7 +191,7 @@ class DgraphClient:
         try:
             # First, get the UID of the process
             query = f"{{ q(func: eq(id, \"{process_id}\")) {{ uid }} }}"
-            res = await self.query(query)
+            res = self.query(query)
             
             if not res or not res[0]:
                 print(f"[DgraphClient] Process with ID {process_id} not found.")
@@ -190,11 +207,43 @@ class DgraphClient:
             }
             
             request = txn.create_request(mutations=[mu], commit_now=True)
-            await txn.do_request(request)
+            txn.do_request(request)
             print(f"[DgraphClient] Updated process {process_id} status to {status.value}")
             return True
         except Exception as e:
             print(f"[DgraphClient] Error updating process status: {e}")
+            return False
+        finally:
+            if txn:
+                txn.discard()
+
+    async def update_task_status(self, task_id: str, status: TaskStatus) -> bool:
+        """
+        Update the status of a task instance.
+        """
+        txn = self.client.txn()
+        try:
+            query = f"{{{{ q(func: eq(id, \"{task_id}\")) {{ uid }} }}}}"
+            res = self.query(query) # Use synchronous query here
+            
+            if not res or not res[0]:
+                print(f"[DgraphClient] Task with ID {task_id} not found.")
+                return False
+            
+            task_uid = res[0]["uid"]
+            
+            mu = pydgraph.Mutation()
+            mu.set_obj = {
+                "uid": task_uid,
+                "status": status.value
+            }
+            
+            request = txn.create_request(mutations=[mu], commit_now=True)
+            txn.do_request(request) # Use synchronous do_request
+            print(f"[DgraphClient] Updated task {task_id} status to {status.value}")
+            return True
+        except Exception as e:
+            print(f"[DgraphClient] Error updating task status: {e}")
             return False
         finally:
             if txn:
@@ -216,6 +265,38 @@ class DgraphClient:
         print(f"[DgraphClient] Upserting Gateway: {gateway.name} (ID: {gateway.id})")
         return await self.upsert_node(gateway)
 
+    async def update_agent_status(self, agent_id: str, status: 'AgentStatus') -> bool:
+        """
+        Update the status of an agent.
+        """
+        txn = self.client.txn()
+        try:
+            query = f"{{ q(func: eq(id, \"{agent_id}\")) {{ uid }} }}"
+            res = self.query(query)
+            
+            if not res or not res[0]:
+                print(f"[DgraphClient] Agent with ID {agent_id} not found.")
+                return False
+            
+            agent_uid = res[0]["uid"]
+            
+            mu = pydgraph.Mutation()
+            mu.set_obj = {
+                "uid": agent_uid,
+                "status": status.value
+            }
+            
+            request = txn.create_request(mutations=[mu], commit_now=True)
+            txn.do_request(request)
+            print(f"[DgraphClient] Updated agent {agent_id} status to {status.value}")
+            return True
+        except Exception as e:
+            print(f"[DgraphClient] Error updating agent status: {e}")
+            return False
+        finally:
+            if txn:
+                txn.discard()
+
     async def upsert_agent(self, agent: Agent) -> str:
         print(f"[DgraphClient] Upserting Agent: {agent.name} (ID: {agent.id})")
         return await self.upsert_node(agent)
@@ -234,10 +315,10 @@ class DgraphClient:
         if gateway: return gateway
         return None
 
-    async def query(self, query_str: str) -> List[Dict[str, Any]]:
+    def query(self, query_str: str) -> List[Dict[str, Any]]:
         txn = self.client.txn(read_only=True)
         try:
-            response = await txn.query(query_str)
+            response = txn.query(query_str)
             return json.loads(response.json).get("q", [])
         finally:
             txn.discard()

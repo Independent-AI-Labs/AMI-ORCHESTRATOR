@@ -1,0 +1,8 @@
+python-dotenv
+pydgraph
+uvicorn
+fastapi
+python-multipart
+llama-index
+pytest
+pytest-asyncio
