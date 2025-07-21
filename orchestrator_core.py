@@ -173,9 +173,14 @@ class OrchestratorCore:
                     for stream, message_list in messages:
                         for message_id, message_data in message_list:
                             parsed_message = json.loads(message_data['message'])
-                            # Assuming the message from worker_agent.py will contain a 'worker_id'
-                            worker_id = parsed_message.get("worker_id", "unknown_worker")
-                            await self.bpmn_engine.handle_worker_task_completion(worker_id, parsed_message.get("params", {}).get("task_id"), parsed_message.get("params", {}).get("success"), parsed_message.get("params", {}).get("output_data"))
+                            # Extract data directly from the parsed message
+                            task_id = parsed_message.get("task_id")
+                            success = parsed_message.get("success")
+                            output_data = parsed_message.get("output_data")
+                            # The worker_id is not directly in the result_payload, but can be inferred or passed if needed.
+                            # For now, we'll assume the worker_id is not strictly necessary for handle_worker_task_completion
+                            # as the task object itself contains the assigned_agent_id.
+                            await self.bpmn_engine.handle_worker_task_completion(None, task_id, success, output_data)
 
             except asyncio.CancelledError:
                 logging.info("[ORCHESTRATOR] Worker message processing loop cancelled.")

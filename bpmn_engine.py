@@ -1,7 +1,7 @@
 import logging
 import asyncio
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from orchestrator.models.bpmn_models import Process, Task, Event, Gateway, ProcessStatus, TaskStatus, EventType, GatewayType, AgentStatus
 from orchestrator.dgraph.dgraph_client import DgraphClient
@@ -69,74 +69,199 @@ class BPMNEngine:
             else:
                 logging.info(f"[ORCHESTRATOR][BPMN_ENGINE] No idle worker available for task {task.id}. Retrying later.")
 
+        elif task.status == TaskStatus.COMPLETED:
+            # Task is completed, advance the process
+            await self._advance_process(process, task.id)
+        elif task.status == TaskStatus.FAILED:
+            # Task failed, handle accordingly (e.g., move to error handling or end process)
+            logging.error(f"[ORCHESTRATOR][BPMN_ENGINE] Task '{task.name}' (ID: {task.id}) FAILED. Process {process.id} will be marked as failed.")
+            process.status = ProcessStatus.FAILED
+            process.end_time = datetime.now()
+            await self.dgraph_client.upsert_process(process)
+            self.active_processes.pop(process.id, None)
+
     async def _process_event(self, process: Process, event: Event):
-        # Basic event processing: just mark as completed and advance
-        if event.event_type == EventType.START_EVENT and event.status != TaskStatus.COMPLETED:
+        if event.status == TaskStatus.COMPLETED:
+            return
+
+        if event.event_type == EventType.START_EVENT:
             logging.info(f"[ORCHESTRATOR][BPMN_ENGINE] Processing Start Event '{event.name}' (ID: {event.id}).")
-            event.status = TaskStatus.COMPLETED # Using TaskStatus.COMPLETED for events for simplicity
+            event.status = TaskStatus.COMPLETED
             await self.dgraph_client.upsert_event(event)
-            # Advance to next elements based on sequence flows
-            outgoing_flows = [flow for flow in process.sequence_flows if flow.source_ref == event.id]
-            if outgoing_flows:
-                for flow in outgoing_flows:
-                    process.current_elements_ids.append(flow.target_ref)
-                logging.info(f"[ORCHESTRATOR][BPMN_ENGINE] Event {event.id} completed. Advancing to next elements: {process.current_elements_ids}")
-            else:
+            await self._advance_process(process, event.id)
+        elif event.event_type == EventType.END_EVENT:
+            logging.info(f"[ORCHESTRATOR][BPMN_ENGINE] Processing End Event '{event.name}' (ID: {event.id}).")
+            event.status = TaskStatus.COMPLETED
+            await self.dgraph_client.upsert_event(event)
+            process.current_elements_ids.remove(event.id) # Remove the end event from current elements
+            if not process.current_elements_ids: # If no other active elements, process is completed
                 process.status = ProcessStatus.COMPLETED
                 process.end_time = datetime.now()
-                logging.info(f"[ORCHESTRATOR][BPMN_ENGINE] Process '{process.name}' (ID: {process.id}) COMPLETED (no outgoing flows from event {event.id}).")
+                logging.info(f"[ORCHESTRATOR][BPMN_ENGINE] Process '{process.name}' (ID: {process.id}) COMPLETED.")
+                await self.dgraph_client.upsert_process(process)
+                self.active_processes.pop(process.id, None)
+        elif event.event_type == EventType.ERROR_EVENT:
+            logging.info(f"[ORCHESTRATOR][BPMN_ENGINE] Processing Error Event '{event.name}' (ID: {event.id}).")
+            event.status = TaskStatus.COMPLETED
+            await self.dgraph_client.upsert_event(event)
+            process.status = ProcessStatus.FAILED # Mark process as failed on error
+            process.end_time = datetime.now()
+            logging.info(f"[ORCHESTRATOR][BPMN_ENGINE] Process '{process.name}' (ID: {process.id}) FAILED due to Error Event {event.id}.")
             await self.dgraph_client.upsert_process(process)
-            if process.status == ProcessStatus.COMPLETED:
+            self.active_processes.pop(process.id, None)
+        elif event.event_type == EventType.TIMER_EVENT:
+            logging.info(f"[ORCHESTRATOR][BPMN_ENGINE] Processing Timer Event '{event.name}' (ID: {event.id}).")
+            # Assuming event.input_data contains 'duration' in seconds for simplicity
+            # In a real scenario, this would be more sophisticated (e.g., cron expressions)
+            if event.status == TaskStatus.READY: # Only process if not already triggered
+                if event.start_time is None:
+                    event.start_time = datetime.now() # Record when timer started
+                    await self.dgraph_client.upsert_event(event)
+                    logging.info(f"[ORCHESTRATOR][BPMN_ENGINE] Timer Event {event.id} started at {event.start_time}.")
+                    return # Not yet completed
+
+                duration_seconds = 0
+                try:
+                    if event.input_data:
+                        input_data = json.loads(event.input_data)
+                        duration_seconds = input_data.get("duration", 0)
+                except json.JSONDecodeError:
+                    logging.warning(f"[ORCHESTRATOR][BPMN_ENGINE] Timer Event {event.id} input_data is not valid JSON. Assuming duration 0.")
+
+                if datetime.now() >= (event.start_time + timedelta(seconds=duration_seconds)):
+                    event.status = TaskStatus.COMPLETED
+                    await self.dgraph_client.upsert_event(event)
+                    logging.info(f"[ORCHESTRATOR][BPMN_ENGINE] Timer Event {event.id} completed after {duration_seconds} seconds.")
+                    await self._advance_process(process, event.id)
+                else:
+                    logging.info(f"[ORCHESTRATOR][BPMN_ENGINE] Timer Event {event.id} not yet completed. Remaining: {(event.start_time + timedelta(seconds=duration_seconds) - datetime.now()).total_seconds():.2f}s")
+        else:
+            logging.warning(f"[ORCHESTRATOR][BPMN_ENGINE] Unsupported Event Type: {event.event_type} for event {event.id}.")
+
+    async def _advance_process(self, process: Process, completed_element_id: str, next_elements_ids: list = None):
+        if completed_element_id in process.current_elements_ids:
+            process.current_elements_ids.remove(completed_element_id)
+
+        if next_elements_ids:
+            for element_id in next_elements_ids:
+                if element_id not in process.current_elements_ids:
+                    process.current_elements_ids.append(element_id)
+            logging.info(f"[ORCHESTRATOR][BPMN_ENGINE] Advancing process {process.id}. Next elements: {process.current_elements_ids}")
+        else:
+            # If no specific next elements are provided, find outgoing flows from the completed element
+            outgoing_flows = [flow for flow in process.sequence_flows if flow.source_ref == completed_element_id]
+            if outgoing_flows:
+                for flow in outgoing_flows:
+                    if flow.target_ref not in process.current_elements_ids:
+                        process.current_elements_ids.append(flow.target_ref)
+                logging.info(f"[ORCHESTRATOR][BPMN_ENGINE] Advancing process {process.id}. Next elements from outgoing flows: {process.current_elements_ids}")
+            elif not process.current_elements_ids: # No outgoing flows and no other active elements
+                process.status = ProcessStatus.COMPLETED
+                process.end_time = datetime.now()
+                logging.info(f"[ORCHESTRATOR][BPMN_ENGINE] Process '{process.name}' (ID: {process.id}) COMPLETED (no outgoing flows from {completed_element_id} and no other active elements).")
                 self.active_processes.pop(process.id, None)
 
-    async def _process_gateway(self, process: Process, gateway: Gateway):
-        if gateway.gateway_type == GatewayType.EXCLUSIVE_GATEWAY and gateway.status != TaskStatus.COMPLETED:
-            logging.info(f"[ORCHESTRATOR][BPMN_ENGINE] Processing Exclusive Gateway '{gateway.name}' (ID: {gateway.id}).")
-            # For exclusive gateway, we need to evaluate conditions of outgoing sequence flows
-            # For now, let's assume a simple decision based on a preceding task's output
-            # This needs to be much more sophisticated in a real BPMN engine
+        await self.dgraph_client.upsert_process(process)
 
-            # Find the preceding task that led to this gateway
-            preceding_task_id = None
-            for flow in process.sequence_flows:
-                if flow.target_ref == gateway.id:
-                    preceding_task_id = flow.source_ref
+    async def _process_gateway(self, process: Process, gateway: Gateway):
+        if gateway.status == TaskStatus.COMPLETED:
+            return
+
+        logging.info(f"[ORCHESTRATOR][BPMN_ENGINE] Processing Gateway '{gateway.name}' (ID: {gateway.id}, Type: {gateway.gateway_type}).")
+
+        outgoing_flows = [flow for flow in process.sequence_flows if flow.source_ref == gateway.id]
+        next_elements_to_activate = []
+
+        if gateway.gateway_type == GatewayType.EXCLUSIVE_GATEWAY:
+            # For exclusive gateway, evaluate conditions and take the first true path
+            taken_path = False
+            for flow in outgoing_flows:
+                # Placeholder for condition evaluation. This needs to be dynamic.
+                # For now, let's assume a simple condition based on flow.condition_expression
+                # In a real scenario, this would involve evaluating data from preceding tasks/process variables
+                condition_met = True # Default to true if no condition specified
+                if flow.condition_expression:
+                    # This is where a more sophisticated expression evaluator would go
+                    # For demonstration, let's assume a simple check for 'data_valid' in a preceding task's output
+                    preceding_task_id = None
+                    for incoming_flow in process.sequence_flows:
+                        if incoming_flow.target_ref == gateway.id:
+                            preceding_task_id = incoming_flow.source_ref
+                            break
+
+                    if preceding_task_id:
+                        preceding_task = await self.dgraph_client.get_task(preceding_task_id)
+                        if preceding_task and preceding_task.output_data:
+                            try:
+                                output_data = json.loads(preceding_task.output_data)
+                                # Example: evaluate 'flow.condition_expression' against 'output_data'
+                                # This is a very basic example and needs a proper expression engine
+                                if flow.condition_expression == "data_valid == True":
+                                    condition_met = output_data.get("data_valid") == True
+                                elif flow.condition_expression == "data_valid == False":
+                                    condition_met = output_data.get("data_valid") == False
+                                else:
+                                    condition_met = False # Unknown condition, don't take this path
+                            except json.JSONDecodeError:
+                                logging.warning(f"[ORCHESTRATOR][BPMN_ENGINE] Preceding task {preceding_task_id} output data is not valid JSON for gateway {gateway.id}.")
+                                condition_met = False
+                        else:
+                            condition_met = False # No output data to evaluate condition
+                    else:
+                        condition_met = False # No preceding task to evaluate condition
+
+                if condition_met and not taken_path:
+                    next_elements_to_activate.append(flow.target_ref)
+                    taken_path = True
+                    logging.info(f"[ORCHESTRATOR][BPMN_ENGINE] Exclusive Gateway {gateway.id} took path to {flow.target_ref} based on condition.")
+                elif condition_met and taken_path:
+                    logging.warning(f"[ORCHESTRATOR][BPMN_ENGINE] Exclusive Gateway {gateway.id} has multiple true paths. Taking only the first one.")
+
+        elif gateway.gateway_type == GatewayType.PARALLEL_GATEWAY:
+            # For parallel gateway, activate all outgoing flows
+            for flow in outgoing_flows:
+                next_elements_to_activate.append(flow.target_ref)
+            logging.info(f"[ORCHESTRATOR][BPMN_ENGINE] Parallel Gateway {gateway.id} activating all outgoing paths.")
+
+        elif gateway.gateway_type == GatewayType.INCLUSIVE_GATEWAY:
+            # For inclusive gateway, wait for all incoming flows to complete
+            # and then activate all outgoing flows whose conditions are met.
+            incoming_flows = [flow for flow in process.sequence_flows if flow.target_ref == gateway.id]
+            all_incoming_completed = True
+            for flow in incoming_flows:
+                source_element = await self.dgraph_client.get_bpmn_element(flow.source_ref)
+                if not source_element or source_element.status != TaskStatus.COMPLETED:
+                    all_incoming_completed = False
                     break
 
-            if preceding_task_id:
-                preceding_task = await self.dgraph_client.get_task(preceding_task_id)
-                if preceding_task and preceding_task.output_data:
-                    try:
-                        output_data = json.loads(preceding_task.output_data)
-                        # Example condition: if 'data_valid' is true, take the 'valid' path
-                        if output_data.get("data_valid") == True:
-                            # Find the sequence flow for 'Handle Valid Data' task
-                            target_flow = next((flow for flow in process.sequence_flows if flow.source_ref == gateway.id and flow.target_ref == "task_handle_valid"), None)
-                            if target_flow:
-                                process.current_elements_ids.append(target_flow.target_ref)
-                                logging.info(f"[ORCHESTRATOR][BPMN_ENGINE] Gateway {gateway.id} evaluated to 'Handle Valid Data'.")
-                        else:
-                            # Find the sequence flow for 'Handle Invalid Data' task
-                            target_flow = next((flow for flow in process.sequence_flows if flow.source_ref == gateway.id and flow.target_ref == "task_handle_invalid"), None)
-                            if target_flow:
-                                process.current_elements_ids.append(target_flow.target_ref)
-                                logging.info(f"[ORCHESTRATOR][BPMN_ENGINE] Gateway {gateway.id} evaluated to 'Handle Invalid Data'.")
-                    except json.JSONDecodeError:
-                        logging.warning(f"[ORCHESTRATOR][BPMN_ENGINE] Preceding task {preceding_task_id} output data is not valid JSON.")
-                else:
-                    logging.warning(f"[ORCHESTRATOR][BPMN_ENGINE] No preceding task output data for gateway {gateway.id}.")
+            if all_incoming_completed:
+                logging.info(f"[ORCHESTRATOR][BPMN_ENGINE] Inclusive Gateway {gateway.id}: All incoming flows completed. Activating all outgoing flows.")
+                for flow in outgoing_flows:
+                    next_elements_to_activate.append(flow.target_ref)
             else:
-                logging.warning(f"[ORCHESTRATOR][BPMN_ENGINE] No preceding task found for gateway {gateway.id}. Cannot evaluate condition.")
+                logging.info(f"[ORCHESTRATOR][BPMN_ENGINE] Inclusive Gateway {gateway.id}: Waiting for all incoming flows to complete.")
 
-            gateway.status = TaskStatus.COMPLETED # Mark gateway as completed after evaluation
+        else:
+            logging.warning(f"[ORCHESTRATOR][BPMN_ENGINE] Unsupported Gateway Type: {gateway.gateway_type} for gateway {gateway.id}.")
+
+        if next_elements_to_activate:
+            gateway.status = TaskStatus.COMPLETED
             await self.dgraph_client.upsert_gateway(gateway)
-            await self.dgraph_client.upsert_process(process)
+            await self._advance_process(process, gateway.id, next_elements_to_activate)
+        else:
+            logging.warning(f"[ORCHESTRATOR][BPMN_ENGINE] Gateway {gateway.id} did not activate any outgoing flows.")
+            # If no path is taken, the gateway remains active or process might stall. Needs proper error handling.
 
-    async def handle_worker_task_completion(self, worker_id: str, task_id: str, success: bool, result: str):
-        logging.info(f"[ORCHESTRATOR][BPMN_ENGINE] Worker {worker_id} reported task {task_id} completion (Success: {success}).")
+    async def handle_worker_task_completion(self, task_id: str, success: bool, result: str):
+        logging.info(f"[ORCHESTRATOR][BPMN_ENGINE] Task {task_id} completion (Success: {success}).")
         task = await self.dgraph_client.get_task(task_id)
         if not task:
             logging.error(f"[ORCHESTRATOR][BPMN_ENGINE_ERROR] Task {task_id} not found for completion handling.")
+            return
+
+        worker_id = task.assigned_agent_id
+        if not worker_id:
+            logging.error(f"[ORCHESTRATOR][BPMN_ENGINE_ERROR] Task {task_id} has no assigned worker.")
             return
 
         worker_agent = await self.dgraph_client.get_agent(worker_id)
@@ -173,31 +298,19 @@ class BPMNEngine:
         worker_agent.current_task_id = None
         await self.dgraph_client.upsert_agent(worker_agent)
 
-        if task.status == TaskStatus.COMPLETED or task.status == TaskStatus.FAILED:
+        if task.status == TaskStatus.COMPLETED:
             process = await self.dgraph_client.get_process(task.process_id)
             if process:
-                if task.id in process.current_elements_ids:
-                    process.current_elements_ids.remove(task.id)
-
-                if task.status == TaskStatus.COMPLETED:
-                    outgoing_flows = [flow for flow in process.sequence_flows if flow.source_ref == task.id]
-                    if outgoing_flows:
-                        for flow in outgoing_flows:
-                            process.current_elements_ids.append(flow.target_ref)
-                        logging.info(f"[ORCHESTRATOR][BPMN_ENGINE] Task {task.id} completed. Advancing to next elements: {process.current_elements_ids}")
-                    else:
-                        process.status = ProcessStatus.COMPLETED
-                        process.end_time = datetime.now()
-                        logging.info(
-                            f"[ORCHESTRATOR][BPMN_ENGINE] Process '{process.name}' (ID: {process.id}) COMPLETED (no outgoing flows from task {task.id}).")
-                    await self.dgraph_client.upsert_process(process)
-                    if process.status == ProcessStatus.COMPLETED:
-                        self.active_processes.pop(process.id, None)
-                elif task.status == TaskStatus.FAILED:
-                    process.status = ProcessStatus.FAILED
-                    process.end_time = datetime.now()
-                    await self.dgraph_client.upsert_process(process)
-                    logging.info(f"[ORCHESTRATOR][BPMN_ENGINE] Process '{process.name}' (ID: {process.id}) FAILED due to task {task.id}.")
-                    self.active_processes.pop(process.id, None)
+                await self._advance_process(process, task.id)
             else:
                 logging.error(f"[ORCHESTRATOR][BPMN_ENGINE_ERROR] Process {task.process_id} not found for task completion.")
+        elif task.status == TaskStatus.FAILED:
+            process = await self.dgraph_client.get_process(task.process_id)
+            if process:
+                process.status = ProcessStatus.FAILED
+                process.end_time = datetime.now()
+                await self.dgraph_client.upsert_process(process)
+                logging.info(f"[ORCHESTRATOR][BPMN_ENGINE] Process '{process.name}' (ID: {process.id}) FAILED due to task {task.id}.")
+                self.active_processes.pop(process.id, None)
+            else:
+                logging.error(f"[ORCHESTRATOR][BPMN_ENGINE_ERROR] Process {task.process_id} not found for task failure.")

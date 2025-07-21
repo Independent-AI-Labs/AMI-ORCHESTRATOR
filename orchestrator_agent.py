@@ -60,8 +60,92 @@ class OrchestratorAgent:
             FunctionTool.from_defaults(fn=self.list_agents, name="list_agents", description="Lists all agents in the system."),
             FunctionTool.from_defaults(fn=self.start_bpmn_process, name="start_bpmn_process", description="Starts a BPMN process given its process definition ID."),
             FunctionTool.from_defaults(fn=self.stop_orchestrator, name="stop_orchestrator", description="Stops the orchestrator gracefully."),
-            # Add more tools as needed based on orchestrator logic
+            FunctionTool.from_defaults(fn=self.update_task_status, name="update_task_status", description="Updates the status of a specific task."),
+            FunctionTool.from_defaults(fn=self.update_process_status, name="update_process_status", description="Updates the status of a specific process."),
+            FunctionTool.from_defaults(fn=self.update_agent_status, name="update_agent_status", description="Updates the status of a specific agent."),
+            FunctionTool.from_defaults(fn=self.get_process_history, name="get_process_history", description="Retrieves the history of a process, including its tasks, events, and gateways."),
         ]
+
+    async def update_task_status(self, task_id: str, new_status: str) -> str:
+        logging.info(f"[OrchestratorAgent][Tool] Updating task {task_id} status to {new_status}.")
+        try:
+            task = await self.dgraph_client.get_task(task_id)
+            if not task:
+                return f"Task {task_id} not found."
+            task.status = new_status
+            await self.dgraph_client.upsert_task(task)
+            return f"Task {task_id} status updated to {new_status}."
+        except Exception as e:
+            logging.error(f"[OrchestratorAgent][Tool] Error updating task status: {e}")
+            return f"Error updating task status: {e}"
+
+    async def update_process_status(self, process_id: str, new_status: str) -> str:
+        logging.info(f"[OrchestratorAgent][Tool] Updating process {process_id} status to {new_status}.")
+        try:
+            process = await self.dgraph_client.get_process(process_id)
+            if not process:
+                return f"Process {process_id} not found."
+            process.status = new_status
+            await self.dgraph_client.upsert_process(process)
+            return f"Process {process_id} status updated to {new_status}."
+        except Exception as e:
+            logging.error(f"[OrchestratorAgent][Tool] Error updating process status: {e}")
+            return f"Error updating process status: {e}"
+
+    async def update_agent_status(self, agent_id: str, new_status: str) -> str:
+        logging.info(f"[OrchestratorAgent][Tool] Updating agent {agent_id} status to {new_status}.")
+        try:
+            agent = await self.dgraph_client.get_agent(agent_id)
+            if not agent:
+                return f"Agent {agent_id} not found."
+            agent.status = new_status
+            await self.dgraph_client.upsert_agent(agent)
+            return f"Agent {agent_id} status updated to {new_status}."
+        except Exception as e:
+            logging.error(f"[OrchestratorAgent][Tool] Error updating agent status: {e}")
+            return f"Error updating agent status: {e}"
+
+    async def get_process_history(self, process_id: str) -> str:
+        logging.info(f"[OrchestratorAgent][Tool] Retrieving history for process {process_id}.")
+        try:
+            query = f'''{{
+                process(func: uid({process_id})) {{
+                    uid
+                    name
+                    status
+                    start_time
+                    end_time
+                    current_elements_ids
+                    tasks {{
+                        uid
+                        name
+                        status
+                        task_type
+                        start_time
+                        end_time
+                        output_data
+                    }}
+                    events {{
+                        uid
+                        name
+                        event_type
+                        status
+                    }}
+                    gateways {{
+                        uid
+                        name
+                        gateway_type
+                        status
+                    }}
+                }}
+            }}'''
+            results = await self.dgraph_client.query(query)
+            if not results or not results.get("process"):
+                return f"Process {process_id} not found or has no history."
+            return json.dumps(results.get("process")[0])
+        except Exception as e:
+            logging.error(f"[OrchestratorAgent][Tool] Error retrieving process history: {e}")
+            return f"Error retrieving process history: {e}"
 
         self.agent = ReActAgent.from_tools(self.tools, llm=self.llm, verbose=True)
 

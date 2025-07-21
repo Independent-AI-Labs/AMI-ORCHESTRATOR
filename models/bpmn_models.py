@@ -25,6 +25,8 @@ class EventType(str, Enum):
     END_EVENT = "EndEvent"
     INTERMEDIATE_CATCH_EVENT = "IntermediateCatchEvent"
     INTERMEDIATE_THROW_EVENT = "IntermediateThrowEvent"
+    ERROR_EVENT = "ErrorEvent"
+    TIMER_EVENT = "TimerEvent"
 
 class EventStatus(str, Enum):
     TRIGGERED = "TRIGGERED"
@@ -49,10 +51,11 @@ class AgentStatus(str, Enum):
     OFFLINE = "OFFLINE"
 
 class SequenceFlow:
-    def __init__(self, id: str, source_ref: str, target_ref: str):
+    def __init__(self, id: str, source_ref: str, target_ref: str, condition_expression: Optional[str] = None):
         self.id = id
         self.source_ref = source_ref
         self.target_ref = target_ref
+        self.condition_expression = condition_expression
 
 class BPMNElement:
     id: str
@@ -86,6 +89,8 @@ class Task(BPMNElement):
         self.assigned_agent_id = assigned_agent_id
         self.input_data = input_data
         self.output_data = output_data
+        self.retry_count = retry_count
+        self.max_retries = max_retries
 
 class Event(BPMNElement):
     def __init__(
@@ -96,6 +101,8 @@ class Event(BPMNElement):
         event_type: EventType,
         status: EventStatus = EventStatus.TRIGGERED,
         triggered_by_id: Optional[str] = None,
+        input_data: Optional[str] = None,
+        start_time: Optional[datetime] = None,
     ):
         self.id = id
         self.name = name
@@ -103,6 +110,8 @@ class Event(BPMNElement):
         self.event_type = event_type
         self.status = status
         self.triggered_by_id = triggered_by_id
+        self.input_data = input_data
+        self.start_time = start_time
 
 class Gateway(BPMNElement):
     def __init__(
