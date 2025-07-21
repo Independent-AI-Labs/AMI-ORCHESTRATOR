@@ -9,6 +9,7 @@ class FileManipulationServer:
             "read_file": self.read_file,
             "write_file": self.write_file,
             "replace_content": self.replace_content,
+            "replace_lines": self.replace_lines,
         }
 
     def _send_response(self, response):
@@ -95,6 +96,31 @@ class FileManipulationServer:
                 return "No changes made (content not found or already replaced)"
 
             self._write_file_content(file_path, new_file_content, mode, encoding)
+            return "Success"
+        except Exception as e:
+            self._send_error(str(e))
+            return None
+
+    def replace_lines(self, file_path: str, start_line: int, end_line: int, new_content: str, encoding: str = 'utf-8'):
+        try:
+            if start_line <= 0 or end_line <= 0 or start_line > end_line:
+                raise ValueError("Invalid line numbers. start_line and end_line must be positive and start_line <= end_line.")
+
+            lines = self._read_file_content(file_path, 'text', encoding).splitlines(keepends=True)
+
+            if start_line > len(lines) + 1 or end_line > len(lines) + 1:
+                raise ValueError(f"Line numbers out of range. File has {len(lines)} lines.")
+
+            # Adjust for 0-based indexing
+            start_idx = start_line - 1
+            end_idx = end_line
+
+            new_content_lines = new_content.splitlines(keepends=True)
+
+            # Replace the specified range of lines
+            modified_lines = lines[:start_idx] + new_content_lines + lines[end_idx:]
+
+            self._write_file_content(file_path, "".join(modified_lines), 'text', encoding)
             return "Success"
         except Exception as e:
             self._send_error(str(e))

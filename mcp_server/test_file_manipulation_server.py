@@ -105,3 +105,45 @@ def test_replace_content_error(file_server, tmp_path):
         mock_stdout.write.assert_called_once()
         output_json = json.loads(mock_stdout.write.call_args[0][0])
         assert "File not found" in output_json["error"]
+
+@pytest.mark.parametrize("start_line, end_line, new_content, expected_content", [
+    (1, 1, "New first line.\n", "New first line.\nThis is a test.\n"),
+    (2, 2, "Replaced second line.\n", "Hello, world!\nReplaced second line.\n"),
+    (1, 2, "New content for both lines.\n", "New content for both lines.\n"),
+    (1, 2, "", ""), # Replace with empty content
+    (1, 3, "Line 1.\nLine 2.\nLine 3.\n", "Line 1.\nLine 2.\nLine 3.\n"), # Replace all lines
+    (3, 3, "New third line.\n", "Hello, world!\nThis is a test.\nNew third line.\n"), # Add a new line at the end
+])
+def test_replace_lines(file_server, tmp_path, start_line, end_line, new_content, expected_content):
+    file_path = tmp_path / "replace_lines_test.txt"
+    initial_content = "Hello, world!\nThis is a test.\n"
+    with open(file_path, "w") as f:
+        f.write(initial_content)
+
+    result = file_server.replace_lines(str(file_path), start_line, end_line, new_content)
+    assert result == "Success"
+
+    with open(file_path, "r") as f:
+        assert f.read() == expected_content
+
+def test_replace_lines_out_of_range(file_server, temp_file):
+    with patch('sys.stdout', new=MagicMock()) as mock_stdout:
+        result = file_server.replace_lines(temp_file, 10, 10, "some content")
+        assert result is None
+        output_json = json.loads(mock_stdout.write.call_args[0][0])
+        assert "Line numbers out of range" in output_json["error"]
+
+def test_replace_lines_invalid_range(file_server, temp_file):
+    with patch('sys.stdout', new=MagicMock()) as mock_stdout:
+        result = file_server.replace_lines(temp_file, 2, 1, "some content")
+        assert result is None
+        output_json = json.loads(mock_stdout.write.call_args[0][0])
+        assert "Invalid line numbers" in output_json["error"]
+
+def test_replace_lines_file_not_found(file_server, tmp_path):
+    non_existent_file = tmp_path / "non_existent.txt"
+    with patch('sys.stdout', new=MagicMock()) as mock_stdout:
+        result = file_server.replace_lines(str(non_existent_file), 1, 1, "some content")
+        assert result is None
+        output_json = json.loads(mock_stdout.write.call_args[0][0])
+        assert "File not found" in output_json["error"]
