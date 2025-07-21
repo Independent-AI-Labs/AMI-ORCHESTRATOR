@@ -1,6 +1,8 @@
 type Process {
   id: ID!
   name: String! @index(exact)
+  definitionId: String! @index(exact)
+  version: Int! @index(int)
   status: String! @index(exact)
   startTime: DateTime! @index(hour)
   endTime: DateTime

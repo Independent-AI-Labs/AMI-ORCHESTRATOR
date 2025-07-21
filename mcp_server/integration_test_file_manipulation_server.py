@@ -35,6 +35,7 @@ def mcp_server_process():
             os.killpg(os.getpgid(process.pid), 9) # SIGKILL
         process.wait()
 
+
 def send_mcp_request(process, tool_name: str, **tool_args):
     request = {"tool_name": tool_name, "tool_args": tool_args}
     process.stdin.write((json.dumps(request) + '\n').encode('utf-8'))
@@ -84,7 +85,7 @@ def test_mcp_write_file_binary(mcp_server_process, tmp_path):
 def test_mcp_replace_content_text(mcp_server_process, temp_integration_file):
     old_c = "Line 2"
     new_c = "Replaced Line 2"
-    response = send_mcp_request(mcp_server_process, "replace_content", file_path=temp_integration_file, old_content=base64.b64encode(old_c.encode()).decode(), new_content=base64.b64encode(new_c.encode()).decode(), mode="text")
+    response = send_mcp_request(mcp_server_process, "replace_content", file_path=temp_integration_file, old_content=old_c, new_content=new_c, mode="text")
     assert response["result"] == "Success"
     with open(temp_integration_file, "r") as f:
         assert f.read() == "Line 1\nReplaced Line 2\nLine 3\n"

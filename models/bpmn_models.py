@@ -148,6 +148,8 @@ class Process:
         self,
         id: str,
         name: str,
+        process_definition_id: str,  # New field
+        version: int,  # New field
         status: ProcessStatus = ProcessStatus.RUNNING,
         start_time: Optional[datetime] = None,
         end_time: Optional[datetime] = None,
@@ -156,6 +158,8 @@ class Process:
     ):
         self.id = id
         self.name = name
+        self.process_definition_id = process_definition_id
+        self.version = version
         self.status = status
         self.start_time = start_time if start_time else datetime.now()
         self.end_time = end_time

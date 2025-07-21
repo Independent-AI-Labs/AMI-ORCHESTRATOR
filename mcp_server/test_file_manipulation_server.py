@@ -41,11 +41,11 @@ def test_read_file(file_server, temp_file, mode, encoding, expected_content):
 def test_read_file_not_found(file_server, tmp_path):
     non_existent_file = tmp_path / "non_existent.txt"
     with patch('sys.stdout', new=MagicMock()) as mock_stdout:
-        result = file_server.read_file(str(non_existent_file))
-        assert result is None
-        mock_stdout.write.assert_called_once()
-        output_json = json.loads(mock_stdout.write.call_args[0][0])
-        assert "File not found" in output_json["error"]
+        with patch('sys.stdout', new=MagicMock()) as mock_stdout:
+            file_server.read_file(str(non_existent_file))
+            mock_stdout.write.assert_called_once()
+            output_json = json.loads(mock_stdout.write.call_args[0][0])
+            assert "File not found" in output_json["error"]
 
 @pytest.mark.parametrize("mode, encoding, content_to_write, expected_file_content", [
     ("text", "utf-8", "New content.", "New content."),
@@ -67,10 +67,10 @@ def test_write_file_error(file_server):
     # Attempt to write to a read-only directory or invalid path
     invalid_path = "/invalid_path/test.txt"
     with patch('sys.stdout', new=MagicMock()) as mock_stdout:
-        result = file_server.write_file(invalid_path, "some content")
-        assert result is None
+        file_server.write_file(invalid_path, "some content")
         mock_stdout.write.assert_called_once()
-        assert "Error writing to file" in mock_stdout.write.call_args[0][0]
+        output_json = json.loads(mock_stdout.write.call_args[0][0])
+        assert "Error writing to file" in output_json["error"]
 
 @pytest.mark.parametrize("mode, encoding, old_c, new_c, count, expected_content", [
     ("text", "utf-8", "world", "universe", 0, "Hello, universe!\nThis is a test.\n"),
@@ -100,8 +100,7 @@ def test_replace_content_not_found(file_server, temp_file):
 def test_replace_content_error(file_server, tmp_path):
     non_existent_file = tmp_path / "non_existent.txt"
     with patch('sys.stdout', new=MagicMock()) as mock_stdout:
-        result = file_server.replace_content(str(non_existent_file), "old", "new")
-        assert result is None
+        file_server.replace_content(str(non_existent_file), "old", "new")
         mock_stdout.write.assert_called_once()
         output_json = json.loads(mock_stdout.write.call_args[0][0])
         assert "File not found" in output_json["error"]
@@ -128,22 +127,42 @@ def test_replace_lines(file_server, tmp_path, start_line, end_line, new_content,
 
 def test_replace_lines_out_of_range(file_server, temp_file):
     with patch('sys.stdout', new=MagicMock()) as mock_stdout:
-        result = file_server.replace_lines(temp_file, 10, 10, "some content")
-        assert result is None
+        file_server.replace_lines(temp_file, 10, 10, "some content")
+        mock_stdout.write.assert_called_once()
         output_json = json.loads(mock_stdout.write.call_args[0][0])
         assert "Line numbers out of range" in output_json["error"]
 
 def test_replace_lines_invalid_range(file_server, temp_file):
     with patch('sys.stdout', new=MagicMock()) as mock_stdout:
-        result = file_server.replace_lines(temp_file, 2, 1, "some content")
-        assert result is None
+        file_server.replace_lines(temp_file, 2, 1, "some content")
+        mock_stdout.write.assert_called_once()
         output_json = json.loads(mock_stdout.write.call_args[0][0])
         assert "Invalid line numbers" in output_json["error"]
 
 def test_replace_lines_file_not_found(file_server, tmp_path):
     non_existent_file = tmp_path / "non_existent.txt"
     with patch('sys.stdout', new=MagicMock()) as mock_stdout:
-        result = file_server.replace_lines(str(non_existent_file), 1, 1, "some content")
-        assert result is None
+        file_server.replace_lines(str(non_existent_file), 1, 1, "some content")
+        mock_stdout.write.assert_called_once()
         output_json = json.loads(mock_stdout.write.call_args[0][0])
         assert "File not found" in output_json["error"]
+
+def test_list_tools(file_server):
+    tools = file_server._list_tools()
+    assert isinstance(tools, list)
+    assert len(tools) == 4
+
+    tool_names = [tool["name"] for tool in tools]
+    assert "read_file" in tool_names
+    assert "write_file" in tool_names
+    assert "replace_content" in tool_names
+    assert "replace_lines" in tool_names
+
+    # Verify structure of a sample tool (read_file)
+    read_file_tool = next(tool for tool in tools if tool["name"] == "read_file")
+    assert read_file_tool["description"] == "Reads content from a file."
+    assert "parameters" in read_file_tool
+    assert "file_path" in read_file_tool["parameters"]["properties"]
+    assert "mode" in read_file_tool["parameters"]["properties"]
+    assert "encoding" in read_file_tool["parameters"]["properties"]
+    assert "file_path" in read_file_tool["parameters"]["required"]

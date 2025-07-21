@@ -142,6 +142,64 @@ class DgraphClient:
         print(f"[DgraphClient] Getting Process with ID: {process_id}")
         return await self.get_node(process_id, Process)
 
+    async def get_process_instances(self, definition_id: str, version: Optional[int] = None) -> List[Process]:
+        """        
+        Get all process instances for a given process definition ID and optional version.
+        """
+        print(f"[DgraphClient] Getting process instances for definition ID: {definition_id} and version: {version}")
+        if version is not None:
+            query = f'''{{
+                q(func: eq(definitionId, "{definition_id}")) @filter(eq(version, {version})) {{
+                    expand(_all_)
+                }}
+            }}'''
+        else:
+            query = f'''{{
+                q(func: eq(definitionId, "{definition_id}")) {{
+                    expand(_all_)
+                }}
+            }}'''
+        
+        res = await self.query(query)
+        if not res:
+            return []
+        
+        return [await self._from_dgraph_json(p, Process) for p in res]
+
+    async def update_process_status(self, process_id: str, status: ProcessStatus) -> bool:
+        """
+        Update the status of a process instance.
+        """
+        txn = self.client.txn()
+        try:
+            # First, get the UID of the process
+            query = f"{{ q(func: eq(id, \"{process_id}\")) {{ uid }} }}"
+            res = await self.query(query)
+            
+            if not res or not res[0]:
+                print(f"[DgraphClient] Process with ID {process_id} not found.")
+                return False
+            
+            process_uid = res[0]["uid"]
+            
+            # Create a mutation to update the status
+            mu = pydgraph.Mutation()
+            mu.set_obj = {
+                "uid": process_uid,
+                "status": status.value
+            }
+            
+            request = txn.create_request(mutations=[mu], commit_now=True)
+            await txn.do_request(request)
+            print(f"[DgraphClient] Updated process {process_id} status to {status.value}")
+            return True
+        except Exception as e:
+            print(f"[DgraphClient] Error updating process status: {e}")
+            return False
+        finally:
+            if txn:
+                txn.discard()
+
     async def upsert_task(self, task: Task) -> str:
         print(f"[DgraphClient] Upserting Task: {task.name} (ID: {task.id})")
         return await self.upsert_node(task)
@@ -179,7 +237,7 @@ class DgraphClient:
     async def query(self, query_str: str) -> List[Dict[str, Any]]:
         txn = self.client.txn(read_only=True)
         try:
-            response = txn.query(query_str)
+            response = await txn.query(query_str)
             return json.loads(response.json).get("q", [])
         finally:
             txn.discard()

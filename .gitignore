@@ -154,4 +154,6 @@ bak/
 data
 pytorch
 modelcache
-commit_message*
+
+*agent*
+*commit_message*

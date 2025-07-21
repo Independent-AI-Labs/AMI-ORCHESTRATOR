@@ -1,5 +1,6 @@
 import logging
 import json
+from typing import Optional
 from llama_index.core.agent import ReActAgent
 from llama_index.core.tools import FunctionTool
 from llama_index.llms.gemini import Gemini
@@ -64,7 +65,19 @@ class OrchestratorAgent:
             FunctionTool.from_defaults(fn=self.update_process_status, name="update_process_status", description="Updates the status of a specific process."),
             FunctionTool.from_defaults(fn=self.update_agent_status, name="update_agent_status", description="Updates the status of a specific agent."),
             FunctionTool.from_defaults(fn=self.get_process_history, name="get_process_history", description="Retrieves the history of a process, including its tasks, events, and gateways."),
+            FunctionTool.from_defaults(fn=self.get_process_instances, name="get_process_instances", description="Retrieves all process instances for a given process definition ID and optional version.")
         ]
+
+    async def get_process_instances(self, process_definition_id: str, version: Optional[str] = None) -> str:
+        logging.info(f"[OrchestratorAgent][Tool] Retrieving process instances for definition ID: {process_definition_id} and version: {version}")
+        try:
+            instances = await self.dgraph_client.get_process_instances(process_definition_id, version)
+            if not instances:
+                return f"No process instances found for definition ID: {process_definition_id} and version: {version}"
+            return json.dumps([instance.__dict__ for instance in instances], default=str)
+        except Exception as e:
+            logging.error(f"[OrchestratorAgent][Tool] Error retrieving process instances: {e}")
+            return f"Error retrieving process instances: {e}"
 
     async def update_task_status(self, task_id: str, new_status: str) -> str:
         logging.info(f"[OrchestratorAgent][Tool] Updating task {task_id} status to {new_status}.")

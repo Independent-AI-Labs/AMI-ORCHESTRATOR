@@ -10,6 +10,8 @@ class DgraphSchemaManager:
     EMBEDDED_SCHEMA = """
 id: string @index(exact) .
 name: string @index(exact) .
+definitionId: string @index(exact) .
+version: int @index(int) .
 status: string @index(exact) .
 startTime: datetime @index(hour) .
 endTime: datetime .
@@ -26,6 +28,8 @@ currentTask: uid @reverse .
 type Process {
   id
   name
+  definitionId
+  version
   status
   startTime
   endTime
