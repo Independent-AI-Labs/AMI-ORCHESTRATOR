@@ -1,6 +1,7 @@
 import logging
 import uuid
 import json
+import os
 
 from orchestrator.models.bpmn_models import Process, Task, Event, Gateway, ProcessStatus, TaskType, EventType, GatewayType, SequenceFlow
 from orchestrator.dgraph.dgraph_client import DgraphClient
@@ -13,64 +14,18 @@ class ProcessDefinitionsLoader:
         self.dgraph_client = dgraph_client
         self.active_processes = active_processes
 
-    async def start_bpmn_process(self, process_name: str, initial_data: dict = None):
-        # For now, we'll use a hardcoded process definition for demonstration.
-        # In a real system, this would be loaded from a file or database.
-        bpmn_definition_data = {
-            "id": "sample_process_1",
-            "name": process_name,
-            "elements": [
-                {
-                    "type": "Event",
-                    "id": "start_event_1",
-                    "name": "Process Started",
-                    "event_type": "StartEvent"
-                },
-                {
-                    "type": "Task",
-                    "id": "task_process_data",
-                    "name": "Process Data",
-                    "task_type": "ServiceTask"
-                },
-                {
-                    "type": "Gateway",
-                    "id": "gateway_data_valid",
-                    "name": "Is Data Valid?",
-                    "gateway_type": "ExclusiveGateway"
-                },
-                {
-                    "type": "Task",
-                    "id": "task_handle_valid",
-                    "name": "Handle Valid Data",
-                    "task_type": "ServiceTask"
-                },
-                {
-                    "type": "Task",
-                    "id": "task_handle_invalid",
-                    "name": "Handle Invalid Data",
-                    "task_type": "ServiceTask"
-                },
-                {
-                    "type": "Event",
-                    "id": "end_event_1",
-                    "name": "Process Ended",
-                    "event_type": "EndEvent"
-                }
-            ],
-            "sequence_flows": [
-                { "id": "flow_1", "source_ref": "start_event_1", "target_ref": "task_process_data" },
-                { "id": "flow_2", "source_ref": "task_process_data", "target_ref": "gateway_data_valid" },
-                { "id": "flow_3_valid", "source_ref": "gateway_data_valid", "target_ref": "task_handle_valid" },
-                { "id": "flow_4_invalid", "source_ref": "gateway_data_valid", "target_ref": "task_handle_invalid" },
-                { "id": "flow_5_valid_to_end", "source_ref": "task_handle_valid", "target_ref": "end_event_1" },
-                { "id": "flow_6_invalid_to_end", "source_ref": "task_handle_invalid", "target_ref": "end_event_1" }
-            ]
-        }
+    async def start_bpmn_process(self, process_definition_id: str, version: str = "latest", initial_data: dict = None):
+        # Load the BPMN process definition from an external source (e.g., file or database)
+        # For now, we'll simulate loading by raising an error if not found.
+        # In a real system, this would involve fetching the definition based on ID and version.
+        bpmn_definition_data = self._load_definition_from_source(process_definition_id, version)
+        if not bpmn_definition_data:
+            raise ValueError(f"BPMN process definition '{process_definition_id}' (version: {version}) not found.")
 
         process_definition = self._load_bpmn_process_definition(bpmn_definition_data)
 
         process_id = str(uuid.uuid4())
-        new_process = Process(id=process_id, name=process_name, sequence_flows=process_definition.sequence_flows)
+        new_process = Process(id=process_id, name=process_definition.name, sequence_flows=process_definition.sequence_flows)
 
         for element_data in process_definition.elements:
             element_id = element_data["id"]
@@ -97,7 +52,25 @@ class ProcessDefinitionsLoader:
 
         await self.dgraph_client.upsert_process(new_process)
         self.active_processes[new_process.id] = new_process
-        logging.info(f"[ORCHESTRATOR] Started new BPMN Process: {process_name} (ID: {new_process.id}) with predefined flow.")
+        logging.info(f"[ORCHESTRATOR] Started new BPMN Process: {process_definition.name} (ID: {new_process.id}) with predefined flow.")
+        return new_process
+
+    def _load_definition_from_source(self, process_definition_id: str, version: str) -> dict:
+        # In a real system, this would load from a database or a more sophisticated file system.
+        # For now, we'll load from a JSON file in the bpmn_definitions directory.
+        file_path = f"orchestrator/bpmn_definitions/{process_definition_id}.json"
+        try:
+            with open(file_path, 'r') as f:
+                definition = json.load(f)
+            if definition.get("version") == version or version == "latest":
+                return definition
+            else:
+                return None # Version mismatch
+        except FileNotFoundError:
+            return None
+        except json.JSONDecodeError:
+            logging.error(f"[ORCHESTRATOR] Error decoding JSON from {file_path}")
+            return None
         return new_process
 
     def _load_bpmn_process_definition(self, definition: dict) -> ProcessDefinition:
@@ -109,6 +82,7 @@ class ProcessDefinitionsLoader:
         return ProcessDefinition(
             id=definition["id"],
             name=definition["name"],
+            version=definition["version"],
             elements=definition["elements"],
             sequence_flows=sequence_flows
         )

@@ -58,7 +58,7 @@ class OrchestratorAgent:
             FunctionTool.from_defaults(fn=self.send_message_to_worker, name="send_message_to_worker", description="Sends a message to a specific worker."),
             FunctionTool.from_defaults(fn=self.query_dgraph, name="query_dgraph", description="Queries the Dgraph database with a DQL query. Returns JSON results."),
             FunctionTool.from_defaults(fn=self.list_agents, name="list_agents", description="Lists all agents in the system."),
-            FunctionTool.from_defaults(fn=self.start_bpmn_process, name="start_bpmn_process", description="Starts a BPMN process given its process definition ID."),
+            FunctionTool.from_defaults(fn=self.start_bpmn_process, name="start_bpmn_process", description="Starts a BPMN process given its process definition ID and an optional version (defaults to 'latest')."),
             FunctionTool.from_defaults(fn=self.stop_orchestrator, name="stop_orchestrator", description="Stops the orchestrator gracefully."),
             FunctionTool.from_defaults(fn=self.update_task_status, name="update_task_status", description="Updates the status of a specific task."),
             FunctionTool.from_defaults(fn=self.update_process_status, name="update_process_status", description="Updates the status of a specific process."),
@@ -213,16 +213,16 @@ class OrchestratorAgent:
             logging.error(f"[OrchestratorAgent][Tool] Error querying Dgraph: {e}")
             return f"Error querying Dgraph: {e}"
 
-    async def start_bpmn_process(self, process_definition_id: str) -> str:
-        logging.info(f"[OrchestratorAgent][Tool] Starting BPMN process: {process_definition_id}")
+    async def start_bpmn_process(self, process_definition_id: str, version: str = "latest") -> str:
+        logging.info(f"[OrchestratorAgent][Tool] Starting BPMN process: {process_definition_id} (version: {version})")
         try:
             # This will trigger the process_definitions_loader to start the process
             # The orchestrator_core_instance has access to process_definitions_loader
-            await self.orchestrator_core_instance.process_definitions_loader.start_bpmn_process(process_definition_id)
-            return f"BPMN process {process_definition_id} started successfully."
+            await self.orchestrator_core_instance.process_definitions_loader.start_bpmn_process(process_definition_id, version)
+            return f"BPMN process {process_definition_id} (version: {version}) started successfully."
         except Exception as e:
-            logging.error(f"[OrchestratorAgent][Tool] Error starting BPMN process {process_definition_id}: {e}")
-            return f"Error starting BPMN process {process_definition_id}: {e}"
+            logging.error(f"[OrchestratorAgent][Tool] Error starting BPMN process {process_definition_id} (version: {version}): {e}")
+            return f"Error starting BPMN process {process_definition_id} (version: {version}): {e}"
 
     async def stop_orchestrator(self) -> str:
         logging.info("[OrchestratorAgent][Tool] Stopping orchestrator via tool call.")

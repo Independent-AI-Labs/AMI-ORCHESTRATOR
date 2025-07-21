@@ -6,11 +6,13 @@ class ProcessDefinition:
         self,
         id: str,
         name: str,
+        version: str,
         elements: List[Dict[str, Any]],
         sequence_flows: List[SequenceFlow]
     ):
         self.id = id
         self.name = name
+        self.version = version
         self.elements = elements
         self.sequence_flows = sequence_flows
 
