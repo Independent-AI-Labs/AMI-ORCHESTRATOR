@@ -25,6 +25,8 @@ logging.basicConfig(
 class LocalFiles:
     def __init__(self):
         self.tools = {
+            "read_file": self.read_file,
+            "write_file": self.write_file,
             "edit_file_replace_string": self.edit_file_replace_string,
             "edit_file_replace_lines": self.edit_file_replace_lines,
             "edit_file_delete_lines": self.edit_file_delete_lines,
@@ -64,6 +66,8 @@ class LocalFiles:
         """Filter tool arguments to only include expected parameters."""
         # Define expected parameters for each tool
         expected_params = {
+            "read_file": {"file_path", "mode", "encoding"},
+            "write_file": {"file_path", "content", "mode", "encoding"},
             "edit_file_replace_string": {"file_path", "old_string", "new_string", "mode", "encoding", "count"},
             "edit_file_replace_lines": {"file_path", "start_line", "end_line", "new_string", "encoding"},
             "edit_file_delete_lines": {"file_path", "start_line", "end_line", "encoding"},
@@ -90,11 +94,11 @@ class LocalFiles:
     def _validate_file_path(self, file_path: str) -> str:
         """Validate and normalize file path for security."""
         try:
-            # Convert to Path object and resolve
+            # Convert to Path object and resolve to absolute path
             path_obj = Path(file_path).resolve()
 
             # Basic security check - prevent directory traversal attacks
-            if '..' in str(path_obj):
+            if ".." in str(path_obj) and not str(path_obj).startswith(os.path.abspath(os.getcwd())):
                 raise ValueError(f"Invalid file path: directory traversal not allowed")
 
             return str(path_obj)
@@ -113,6 +117,7 @@ class LocalFiles:
     def _normalize_line_endings(self, content: str, target_format: str = '\n') -> str:
         """Normalize line endings in text content and ensure a trailing newline."""
         normalized_content = re.sub(r'\r\n|\r|\n', target_format, content)
+        # Only add trailing newline if content is not empty and doesn't already end with one
         if normalized_content and not normalized_content.endswith(target_format):
             normalized_content += target_format
         return normalized_content
@@ -153,7 +158,7 @@ class LocalFiles:
         validated_path = self._validate_file_path(file_path)
 
         if not os.path.exists(validated_path):
-            raise FileNotFoundError(f"File not found: '{validated_path}'. Please check the path and ensure the file exists.")
+            raise FileNotFoundError(f"File not found: '{file_path}'. Please check the path and ensure the file exists.")
 
         if not os.path.isfile(validated_path):
             raise ValueError(f"Path exists but is not a file: '{validated_path}'")
@@ -177,6 +182,8 @@ class LocalFiles:
             )
         except PermissionError:
             raise PermissionError(f"Permission denied: cannot read file '{validated_path}'")
+        except ValueError as e:
+            raise e
         except Exception as e:
             raise Exception(f"Unexpected error reading file '{validated_path}': {e}")
 
@@ -185,7 +192,13 @@ class LocalFiles:
         validated_path = self._validate_file_path(file_path)
 
         # Create directory if it doesn't exist
-        os.makedirs(os.path.dirname(validated_path), exist_ok=True)
+        parent_dir = os.path.dirname(validated_path)
+        if parent_dir and not os.path.exists(parent_dir):
+            try:
+                os.makedirs(parent_dir, exist_ok=True)
+                logging.info(f"Created parent directory: {parent_dir}")
+            except Exception as e:
+                raise OSError(f"Failed to create parent directory '{parent_dir}': {e}")
 
         try:
             if mode == 'binary':
@@ -202,6 +215,8 @@ class LocalFiles:
                 raise OSError(f"No space left on device when writing to '{validated_path}': {e}")
             else:
                 raise OSError(f"OS error writing to file '{validated_path}': {e}")
+        except ValueError as e:
+            raise e
         except Exception as e:
             raise Exception(f"Unexpected error writing to file '{validated_path}': {e}")
 
@@ -222,40 +237,73 @@ class LocalFiles:
 
         except Exception as e:
             logging.error(f"Failed to read file {file_path}: {e}")
-            raise Exception(f"Read operation failed: {e}")
+            raise e
 
     def write_file(self, file_path: str, content, mode: str = 'text', encoding: str = 'utf-8'):
         """Write content to a file."""
         try:
             logging.info(f"Writing file: {file_path} (mode: {mode}, encoding: {encoding})")
 
-            if not os.path.exists(os.path.dirname(file_path)):
-                # Only raise if the parent directory doesn't exist and it's not the root
-                if os.path.dirname(file_path) and not os.path.exists(os.path.dirname(file_path)):
-                    raise FileNotFoundError(f"Directory not found for path: {file_path}")
+            # Validate inputs
+            if not file_path:
+                raise ValueError("file_path cannot be empty")
 
+            if content is None:
+                raise ValueError("content cannot be None")
+
+            # Handle binary mode content decoding
             if mode == 'binary':
-                try:
-                    decoded_content = base64.b64decode(content.encode('utf-8'))
-                    logging.info(f"Decoded base64 content: {len(decoded_content)} bytes")
-                except Exception as e:
-                    raise ValueError(f"Invalid base64 content for binary mode: {e}")
-                content = decoded_content
+                if isinstance(content, str):
+                    try:
+                        decoded_content = base64.b64decode(content.encode('utf-8'))
+                        logging.info(f"Decoded base64 content: {len(decoded_content)} bytes")
+                    except (TypeError, ValueError) as e:
+                        raise ValueError(f"Invalid base64 content for binary mode: {e}")
+                    content = decoded_content
+                elif not isinstance(content, bytes):
+                    raise ValueError("Binary mode requires base64-encoded string or bytes content")
+            else:
+                # Text mode - ensure content is a string
+                if not isinstance(content, str):
+                    try:
+                        content = str(content)
+                    except Exception as e:
+                        raise ValueError(f"Cannot convert content to string: {e}")
 
+            # Check if file exists to generate diff for text mode
+            file_exists = os.path.exists(file_path)
+            original_content = ""
+            if file_exists and mode == 'text':
+                try:
+                    original_content = self._read_file_content(file_path, mode, encoding)
+                except Exception as e:
+                    logging.warning(f"Could not read existing file for diff: {e}")
+
+            # Write the content
             self._write_file_content(file_path, content, mode, encoding)
 
-            # Log success with content info
+            # Generate success message with content statistics
             if mode == 'binary':
-                logging.info(f"Successfully wrote binary file: {file_path} ({len(content)} bytes)")
-                return f"Successfully wrote binary content to '{file_path}' ({len(content)} bytes)."
+                content_size = len(content)
+                logging.info(f"Successfully wrote binary file: {file_path} ({content_size} bytes)")
+                result_msg = f"Successfully wrote binary content to '{file_path}' ({content_size} bytes)."
             else:
+                content_length = len(content)
                 line_count = content.count('\n') + (1 if content and not content.endswith('\n') else 0)
-                logging.info(f"Successfully wrote text file: {file_path} ({len(content)} characters, {line_count} lines)")
-                return f"Successfully wrote text content to '{file_path}' ({len(content)} characters, {line_count} lines)."
+                logging.info(f"Successfully wrote text file: {file_path} ({content_length} characters, {line_count} lines)")
+                result_msg = f"Successfully wrote text content to '{file_path}' ({content_length} characters, {line_count} lines)."
+
+                # Add diff if file existed before and content changed
+                if file_exists and original_content != content:
+                    diff_output = self._generate_diff(original_content, content, file_path)
+                    if diff_output and diff_output != "No changes detected in diff":
+                        result_msg += f"\n\nDiff:\n{diff_output}"
+
+            return result_msg
 
         except Exception as e:
             logging.error(f"Failed to write file {file_path}: {e}")
-            raise Exception(f"Write operation failed: {e}")
+            raise e
 
     def edit_file_replace_string(self, file_path: str, old_string, new_string, mode: str = 'text', encoding: str = 'utf-8', count: int = 0):
         """Replace occurrences of old_string with new_string in a file."""
@@ -279,27 +327,35 @@ class LocalFiles:
                 if not isinstance(old_string, str) or not isinstance(new_string, str):
                     raise ValueError("old_string and new_string must be strings in text mode")
 
+                # Prevent empty string replacement which would corrupt the file
+                if not old_string:
+                    raise ValueError("old_string cannot be empty - this would insert new_string between every character")
+
                 # Normalize line endings in search strings to match file content
-                old_string = self._normalize_line_endings(old_string, '\n')
-                new_string = self._normalize_line_endings(new_string, '\n')
+                old_string_normalized = self._normalize_line_endings(old_string, '\n')
+                new_string_normalized = self._normalize_line_endings(new_string, '\n')
 
                 # Count occurrences before replacement
-                occurrence_count = current_content.count(old_string)
+                occurrence_count = current_content.count(old_string_normalized)
                 if occurrence_count == 0:
                     logging.info(f"No occurrences found of search string in {file_path}")
                     return f"No changes made to '{file_path}': search string not found."
 
                 # Perform replacement
                 if count == 0:
-                    new_content = current_content.replace(old_string, new_string)
-                    actual_replacements = occurrence_count
+                    new_content = current_content.replace(old_string_normalized, new_string_normalized)
+                    actual_replacements = current_content.count(old_string_normalized)  # Count after replacement
                 else:
-                    new_content = current_content.replace(old_string, new_string, count)
-                    actual_replacements = min(count, occurrence_count)
+                    new_content = current_content.replace(old_string_normalized, new_string_normalized, count)
+                    actual_replacements = count
 
             elif mode == 'binary':
                 if not isinstance(old_string, bytes) or not isinstance(new_string, bytes):
                     raise ValueError("old_string and new_string must be bytes in binary mode")
+
+                # Prevent empty bytes replacement which would corrupt the file
+                if not old_string:
+                    raise ValueError("old_string cannot be empty - this would insert new_string between every byte")
 
                 occurrence_count = current_content.count(old_string)
                 if occurrence_count == 0:
@@ -308,10 +364,10 @@ class LocalFiles:
 
                 if count == 0:
                     new_content = current_content.replace(old_string, new_string)
-                    actual_replacements = occurrence_count
+                    actual_replacements = current_content.count(old_string)  # Count after replacement
                 else:
                     new_content = current_content.replace(old_string, new_string, count)
-                    actual_replacements = min(count, occurrence_count)
+                    actual_replacements = count
             else:
                 raise ValueError("Mode must be 'text' or 'binary'")
 
@@ -336,7 +392,7 @@ class LocalFiles:
 
         except Exception as e:
             logging.error(f"Failed to replace string in file {file_path}: {e}")
-            raise Exception(f"String replacement failed: {e}")
+            raise e
 
     def edit_file_replace_lines(self, file_path: str, start_line: int, end_line: int, new_string: str, encoding: str = 'utf-8'):
         """Replace content within a specified range of lines."""
@@ -351,13 +407,13 @@ class LocalFiles:
 
             # Read original content for diff
             original_content = self._read_file_content(file_path, 'text', encoding)
-            lines = original_content.splitlines(keepends=True) # Keep ends here
+            lines = original_content.splitlines(keepends=True)  # Keep ends here
             total_lines = len(lines)
 
-            if start_line > total_lines + 1: # Allow replacing at end of file
+            if start_line > total_lines + 1:  # Allow replacing at end of file
                 raise ValueError(f"Start line {start_line} exceeds file length ({total_lines} lines)")
 
-            if end_line > total_lines + 1: # Allow replacing at end of file
+            if end_line > total_lines + 1:  # Allow replacing at end of file
                 raise ValueError(f"End line {end_line} exceeds file length ({total_lines} lines)")
 
             # Convert to 0-based indexing
@@ -390,7 +446,7 @@ class LocalFiles:
 
         except Exception as e:
             logging.error(f"Failed to replace lines in file {file_path}: {e}")
-            raise Exception(f"Line replacement failed: {e}")
+            raise e
 
     def edit_file_delete_lines(self, file_path: str, start_line: int, end_line: int, encoding: str = 'utf-8'):
         """Delete lines within a specified range."""
@@ -405,13 +461,13 @@ class LocalFiles:
 
             # Read original content for diff
             original_content = self._read_file_content(file_path, 'text', encoding)
-            lines = original_content.splitlines(keepends=True) # Keep ends here
+            lines = original_content.splitlines(keepends=True)  # Keep ends here
             total_lines = len(lines)
 
-            if start_line > total_lines + 1: # Allow deleting from end of file
+            if start_line > total_lines + 1:  # Allow deleting from end of file
                 raise ValueError(f"Start line {start_line} exceeds file length ({total_lines} lines)")
 
-            if end_line > total_lines + 1: # Allow deleting from end of file
+            if end_line > total_lines + 1:  # Allow deleting from end of file
                 raise ValueError(f"End line {end_line} exceeds file length ({total_lines} lines)")
 
             # Convert to 0-based indexing
@@ -440,7 +496,7 @@ class LocalFiles:
 
         except Exception as e:
             logging.error(f"Failed to delete lines from file {file_path}: {e}")
-            raise Exception(f"Line deletion failed: {e}")
+            raise e
 
     def edit_file_insert_lines(self, file_path: str, line_number: int, content: str, encoding: str = 'utf-8'):
         """Insert content at a specified line number."""
@@ -452,7 +508,7 @@ class LocalFiles:
 
             # Read original content for diff
             original_content = self._read_file_content(file_path, 'text', encoding)
-            lines = original_content.splitlines(keepends=True) # Keep ends here
+            lines = original_content.splitlines(keepends=True)  # Keep ends here
             total_lines = len(lines)
 
             # Allow inserting at line_number = total_lines + 1 (append to end)
@@ -491,7 +547,7 @@ class LocalFiles:
 
         except Exception as e:
             logging.error(f"Failed to insert lines in file {file_path}: {e}")
-            raise Exception(f"Line insertion failed: {e}")
+            raise e
 
     def delete_files(self, file_paths: list):
         """Delete multiple files."""
@@ -533,7 +589,6 @@ class LocalFiles:
                 error_msg += f". Successfully deleted: {', '.join(deleted_files)}"
 
             logging.error(error_msg)
-
             raise Exception(error_msg)
 
         logging.info(f"Successfully deleted all {len(deleted_files)} file(s)")
@@ -645,10 +700,12 @@ class LocalFiles:
             error_msg = f"Permission denied creating directory: '{directory_path}'"
             logging.error(error_msg)
             raise PermissionError(error_msg)
+        except ValueError as e:
+            raise e
         except Exception as e:
             error_msg = f"Failed to create directory '{directory_path}': {e}"
             logging.error(error_msg)
-            raise Exception(error_msg)
+            raise e
 
     def delete_directory(self, directory_path: str):
         """Delete a directory and all its contents."""
@@ -672,14 +729,70 @@ class LocalFiles:
             error_msg = f"Permission denied deleting directory: '{directory_path}'"
             logging.error(error_msg)
             raise PermissionError(error_msg)
+        except ValueError as e:
+            raise e
         except Exception as e:
             error_msg = f"Failed to delete directory '{directory_path}': {e}"
             logging.error(error_msg)
-            raise Exception(error_msg)
+            raise e
 
     def get_tool_declarations(self):
         """Return tool declarations for the MCP protocol."""
         return [
+            {
+                "name": "read_file",
+                "description": "Read content from a file. Supports both text and binary modes with automatic line ending normalization for text.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "file_path": {
+                            "type": "string",
+                            "description": "The path to the file to read."
+                        },
+                        "mode": {
+                            "type": "string",
+                            "enum": ["text", "binary"],
+                            "default": "text",
+                            "description": "Read mode: 'text' for text files with encoding, 'binary' for binary files (returns base64)."
+                        },
+                        "encoding": {
+                            "type": "string",
+                            "default": "utf-8",
+                            "description": "Text encoding to use (ignored in binary mode)."
+                        }
+                    },
+                    "required": ["file_path"]
+                }
+            },
+            {
+                "name": "write_file",
+                "description": "Write content to a file. Creates parent directories if needed. Supports both text and binary modes with diff generation for text files.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "file_path": {
+                            "type": "string",
+                            "description": "The path to the file to write."
+                        },
+                        "content": {
+                            "type": "string",
+                            "description": "The content to write. For binary mode, provide base64-encoded data."
+                        },
+                        "mode": {
+                            "type": "string",
+                            "enum": ["text", "binary"],
+                            "default": "text",
+                            "description": "Write mode: 'text' for text files with encoding, 'binary' for binary files (expects base64)."
+                        },
+                        "encoding": {
+                            "type": "string",
+                            "default": "utf-8",
+                            "description": "Text encoding to use (ignored in binary mode)."
+                        }
+                    },
+                    "required": ["file_path", "content"]
+                }
+            },
             {
                 "name": "edit_file_replace_string",
                 "description": "Replaces occurrences of old_string with new_string in a file. Shows a diff of changes made. Handles line ending normalization automatically for text mode.",
@@ -839,7 +952,7 @@ class LocalFiles:
                         },
                         "create_dirs": {
                             "type": "boolean",
-                            "default": true,
+                            "default": True,
                             "description": "Whether to create destination directories if they don't exist."
                         }
                     },
@@ -879,6 +992,8 @@ class LocalFiles:
     def run(self):
         """Main server loop to handle JSON-RPC requests."""
         logging.info("MCP File Manipulation Server started")
+        print("SERVER_STARTED_DEBUG_MESSAGE")
+        sys.stdout.flush()
 
         while True:
             try:
@@ -924,6 +1039,8 @@ class LocalFiles:
 
                 if method == "notifications/initialized":
                     logging.info("Client initialization complete")
+                    print("INITIALIZED_NOTIFICATION_SENT_DEBUG_MESSAGE")
+                    sys.stdout.flush()
                     continue
 
                 if method == "tools/list":
@@ -956,7 +1073,12 @@ class LocalFiles:
                         response = {
                             "jsonrpc": "2.0",
                             "result": {
-                                "result": result
+                                "content": [
+                                    {
+                                        "type": "text",
+                                        "text": str(result)
+                                    }
+                                ]
                             },
                             "id": request_id
                         }
