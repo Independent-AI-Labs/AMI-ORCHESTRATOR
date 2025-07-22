@@ -88,8 +88,8 @@ class MCPServerManager:
     def _terminate_process_unix(self, pid: int):
         """Terminates the process on Unix-like systems."""
         try:
-            pgid = os.getpgid(pid)  # pylint: disable=no-member
-            os.killpg(pgid, signal.SIGTERM)  # pylint: disable=no-member
+            pgid = os.getpgid(pid)  # pylint: disable=no-member # type: ignore
+            os.killpg(pgid, signal.SIGTERM)  # pylint: disable=no-member # type: ignore
             logger.info(
                 "Successfully sent termination signal to process group %d.", pgid
             )
@@ -200,7 +200,7 @@ class MCPServerManager:
                 )
                 return str(pid) in result.stdout
             # On Unix, os.kill(pid, 0) checks if the process exists.
-            os.kill(pid, 0)  # pylint: disable=no-member
+            os.kill(pid, 0)  # pylint: disable=no-member # type: ignore
             return True
         except (subprocess.CalledProcessError, OSError):
             return False
