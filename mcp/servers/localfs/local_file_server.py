@@ -10,19 +10,25 @@ from datetime import datetime
 from pathlib import Path
 
 # Create a /logs directory in the project root if it doesn't exist
-LOGS_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "logs"))
+LOGS_DIR = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "..", "..", "..", "logs")
+)
 os.makedirs(LOGS_DIR, exist_ok=True)
 
 # Generate a unique log file name with a timestamp
-LOG_FILE = os.path.join(LOGS_DIR, f"localfs_server_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.log")
+LOG_FILE = os.path.join(
+    LOGS_DIR, f"mcp_server_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.log"
+)
 logging.basicConfig(
     filename=LOG_FILE,
     level=logging.INFO,
-    format='[%(asctime)s] [%(levelname)s] %(funcName)s:%(lineno)d - %(message)s'
+    format="[%(asctime)s] [%(levelname)s] %(funcName)s:%(lineno)d - %(message)s",
 )
 
 
 class LocalFiles:
+    """Provides file manipulation tools via the MCP protocol."""
+
     def __init__(self):
         self.tools = {
             "read_file": self.read_file,
@@ -41,22 +47,21 @@ class LocalFiles:
     def _send_response(self, response):
         """Send a JSON-RPC response to stdout."""
         try:
-            response_str = json.dumps(response) + '\n'
-            sys.stdout.buffer.write(response_str.encode('utf-8'))
+            response_str = json.dumps(response) + "\n"
+            sys.stdout.buffer.write(response_str.encode("utf-8"))
             sys.stdout.buffer.flush()
-            logging.info(f"Response sent successfully: {response.get('id', 'unknown')}")
-        except Exception as e:
-            logging.error(f"Failed to send response: {e}")
+            logging.info(
+                "Response sent successfully: %s", response.get("id", "unknown")
+            )
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            logging.error("Failed to send response: %s", e)
 
     def _send_error(self, message, request_id=None, code=-32602):
         """Send a JSON-RPC error response."""
-        logging.error(f"Error response: {message} (request_id: {request_id})")
+        logging.error("Error response: %s (request_id: %s)", message, request_id)
         error_response = {
             "jsonrpc": "2.0",
-            "error": {
-                "code": code,
-                "message": str(message)
-            }
+            "error": {"code": code, "message": str(message)},
         }
         if request_id:
             error_response["id"] = request_id
@@ -68,14 +73,37 @@ class LocalFiles:
         expected_params = {
             "read_file": {"file_path", "mode", "encoding"},
             "write_file": {"file_path", "content", "mode", "encoding"},
-            "edit_file_replace_string": {"file_path", "old_string", "new_string", "mode", "encoding", "count"},
-            "edit_file_replace_lines": {"file_path", "start_line", "end_line", "new_string", "encoding"},
-            "edit_file_delete_lines": {"file_path", "start_line", "end_line", "encoding"},
-            "edit_file_insert_lines": {"file_path", "line_number", "content", "encoding"},
+            "edit_file_replace_string": {
+                "file_path",
+                "old_string",
+                "new_string",
+                "mode",
+                "encoding",
+                "count",
+            },
+            "edit_file_replace_lines": {
+                "file_path",
+                "start_line",
+                "end_line",
+                "new_string",
+                "encoding",
+            },
+            "edit_file_delete_lines": {
+                "file_path",
+                "start_line",
+                "end_line",
+                "encoding",
+            },
+            "edit_file_insert_lines": {
+                "file_path",
+                "line_number",
+                "content",
+                "encoding",
+            },
             "delete_files": {"file_paths"},
             "move_files": {"source_paths", "destination_paths", "create_dirs"},
             "create_directory": {"directory_path"},
-            "delete_directory": {"directory_path"}
+            "delete_directory": {"directory_path"},
         }
 
         if tool_name not in expected_params:
@@ -87,7 +115,9 @@ class LocalFiles:
         # Log if we filtered out any parameters
         filtered_out = set(tool_args.keys()) - expected
         if filtered_out:
-            logging.warning(f"Filtered out unexpected parameters for {tool_name}: {filtered_out}")
+            logging.warning(
+                "Filtered out unexpected parameters for %s: %s", tool_name, filtered_out
+            )
 
         return filtered_args
 
@@ -98,31 +128,37 @@ class LocalFiles:
             path_obj = Path(file_path).resolve()
 
             # Basic security check - prevent directory traversal attacks
-            if ".." in str(path_obj) and not str(path_obj).startswith(os.path.abspath(os.getcwd())):
-                raise ValueError(f"Invalid file path: directory traversal not allowed")
+            if ".." in str(path_obj) and not str(path_obj).startswith(
+                os.path.abspath(os.getcwd())
+            ):
+                raise ValueError("Invalid file path: directory traversal not allowed")
 
             return str(path_obj)
-        except Exception as e:
-            raise ValueError(f"Invalid file path '{file_path}': {e}")
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            raise ValueError(f"Invalid file path '{file_path}': {e}") from e
 
     def _check_file_size(self, file_path: str):
         """Check if file size is within limits."""
         try:
             size = os.path.getsize(file_path)
             if size > self.max_file_size:
-                raise ValueError(f"File too large: {size} bytes (max: {self.max_file_size} bytes)")
+                raise ValueError(
+                    f"File too large: {size} bytes (max: {self.max_file_size} bytes)"
+                )
         except OSError:
             pass  # File doesn't exist yet, which is fine for write operations
 
-    def _normalize_line_endings(self, content: str, target_format: str = '\n') -> str:
+    def _normalize_line_endings(self, content: str, target_format: str = "\n") -> str:
         """Normalize line endings in text content and ensure a trailing newline."""
-        normalized_content = re.sub(r'\r\n|\r|\n', target_format, content)
+        normalized_content = re.sub(r"\r\n|\r|\n", target_format, content)
         # Only add trailing newline if content is not empty and doesn't already end with one
         if normalized_content and not normalized_content.endswith(target_format):
             normalized_content += target_format
         return normalized_content
 
-    def _generate_diff(self, before_content: str, after_content: str, file_path: str) -> str:
+    def _generate_diff(
+        self, before_content: str, after_content: str, file_path: str
+    ) -> str:
         """Generate a unified diff between before and after content."""
         try:
             before_lines = before_content.splitlines(keepends=True)
@@ -133,7 +169,7 @@ class LocalFiles:
                 after_lines,
                 fromfile=f"{os.path.basename(file_path)} (before)",
                 tofile=f"{os.path.basename(file_path)} (after)",
-                lineterm=''
+                lineterm="",
             )
 
             diff_lines = list(diff)
@@ -143,22 +179,26 @@ class LocalFiles:
             # Limit diff output to prevent extremely long responses
             max_diff_lines = 100
             if len(diff_lines) > max_diff_lines:
-                diff_text = '\n'.join(diff_lines[:max_diff_lines])
+                diff_text = "\n".join(diff_lines[:max_diff_lines])
                 diff_text += f"\n... (diff truncated after {max_diff_lines} lines)"
             else:
-                diff_text = '\n'.join(diff_lines)
+                diff_text = "\n".join(diff_lines)
 
             return diff_text
-        except Exception as e:
-            logging.error(f"Failed to generate diff: {e}")
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            logging.error("Failed to generate diff: %s", e)
             return f"Failed to generate diff: {e}"
 
-    def _read_file_content(self, file_path: str, mode: str = 'text', encoding: str = 'utf-8'):
+    def _read_file_content(
+        self, file_path: str, mode: str = "text", encoding: str = "utf-8"
+    ):
         """Read file content with proper error handling and normalization."""
         validated_path = self._validate_file_path(file_path)
 
         if not os.path.exists(validated_path):
-            raise FileNotFoundError(f"File not found: '{file_path}'. Please check the path and ensure the file exists.")
+            raise FileNotFoundError(
+                f"File not found: '{file_path}'. Please check the path and ensure the file exists."
+            )
 
         if not os.path.isfile(validated_path):
             raise ValueError(f"Path exists but is not a file: '{validated_path}'")
@@ -166,28 +206,34 @@ class LocalFiles:
         self._check_file_size(validated_path)
 
         try:
-            if mode == 'binary':
-                with open(validated_path, 'rb') as f:
+            if mode == "binary":
+                with open(validated_path, "rb") as f:
                     return f.read()
             else:
-                with open(validated_path, 'r', encoding=encoding) as f:
+                with open(validated_path, "r", encoding=encoding) as f:
                     content = f.read()
                 # Normalize line endings to \n for consistent processing
-                return self._normalize_line_endings(content, '\n')
+                return self._normalize_line_endings(content, "\n")
 
         except UnicodeDecodeError as e:
             raise ValueError(
                 f"Cannot decode file '{validated_path}' with encoding '{encoding}'. "
                 f"Error: {e}. Try using a different encoding or 'binary' mode."
-            )
-        except PermissionError:
-            raise PermissionError(f"Permission denied: cannot read file '{validated_path}'")
+            ) from e
+        except PermissionError as e:
+            raise PermissionError(
+                f"Permission denied: cannot read file '{validated_path}'"
+            ) from e
         except ValueError as e:
             raise e
-        except Exception as e:
-            raise Exception(f"Unexpected error reading file '{validated_path}': {e}")
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            raise Exception(
+                f"Unexpected error reading file '{validated_path}': {e}"
+            ) from e
 
-    def _write_file_content(self, file_path: str, content, mode: str = 'text', encoding: str = 'utf-8'):
+    def _write_file_content(
+        self, file_path: str, content, mode: str = "text", encoding: str = "utf-8"
+    ):
         """Write file content with proper error handling."""
         validated_path = self._validate_file_path(file_path)
 
@@ -196,53 +242,76 @@ class LocalFiles:
         if parent_dir and not os.path.exists(parent_dir):
             try:
                 os.makedirs(parent_dir, exist_ok=True)
-                logging.info(f"Created parent directory: {parent_dir}")
-            except Exception as e:
-                raise OSError(f"Failed to create parent directory '{parent_dir}': {e}")
+                logging.info("Created parent directory: %s", parent_dir)
+            except Exception as e:  # pylint: disable=broad-exception-caught
+                raise OSError(
+                    f"Failed to create parent directory '{parent_dir}': {e}"
+                ) from e
 
         try:
-            if mode == 'binary':
-                with open(validated_path, 'wb') as f:
+            if mode == "binary":
+                with open(validated_path, "wb") as f:
                     f.write(content)
             else:
-                with open(validated_path, 'w', encoding=encoding) as f:
+                with open(validated_path, "w", encoding=encoding) as f:
                     f.write(content)
 
-        except PermissionError:
-            raise PermissionError(f"Permission denied: cannot write to file '{validated_path}'")
+        except PermissionError as e:
+            raise PermissionError(
+                f"Permission denied: cannot write to file '{validated_path}'"
+            ) from e
         except OSError as e:
             if e.errno == 28:  # No space left on device
-                raise OSError(f"No space left on device when writing to '{validated_path}': {e}")
-            else:
-                raise OSError(f"OS error writing to file '{validated_path}': {e}")
+                raise OSError(
+                    f"No space left on device when writing to '{validated_path}': {e}"
+                ) from e
+            raise OSError(f"OS error writing to file '{validated_path}': {e}") from e
         except ValueError as e:
             raise e
-        except Exception as e:
-            raise Exception(f"Unexpected error writing to file '{validated_path}': {e}")
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            raise Exception(
+                f"Unexpected error writing to file '{validated_path}': {e}"
+            ) from e
 
-    def read_file(self, file_path: str, mode: str = 'text', encoding: str = 'utf-8'):
+    def read_file(self, file_path: str, mode: str = "text", encoding: str = "utf-8"):
         """Read content from a file."""
         try:
-            logging.info(f"Reading file: {file_path} (mode: {mode}, encoding: {encoding})")
+            logging.info(
+                "Reading file: %s (mode: %s, encoding: %s)", file_path, mode, encoding
+            )
             content = self._read_file_content(file_path, mode, encoding)
 
-            if mode == 'binary':
+            if mode == "binary":
                 # Return base64 encoded content for binary files
-                encoded_content = base64.b64encode(content).decode('utf-8')
-                logging.info(f"Successfully read binary file: {file_path} ({len(content)} bytes)")
+                encoded_content = base64.b64encode(content).decode("utf-8")
+                logging.info(
+                    "Successfully read binary file: %s (%s bytes)",
+                    file_path,
+                    len(content),
+                )
                 return encoded_content
+            # pylint: disable=else-after-return
             else:
-                logging.info(f"Successfully read text file: {file_path} ({len(content)} characters, {content.count(chr(10))} lines)")
+                logging.info(
+                    "Successfully read text file: %s (%s characters, %s lines)",
+                    file_path,
+                    len(content),
+                    content.count(chr(10)),
+                )
                 return content
 
-        except Exception as e:
-            logging.error(f"Failed to read file {file_path}: {e}")
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            logging.error("Failed to read file %s: %s", file_path, e)
             raise e
 
-    def write_file(self, file_path: str, content, mode: str = 'text', encoding: str = 'utf-8'):
+    def write_file(
+        self, file_path: str, content, mode: str = "text", encoding: str = "utf-8"
+    ):
         """Write content to a file."""
         try:
-            logging.info(f"Writing file: {file_path} (mode: {mode}, encoding: {encoding})")
+            logging.info(
+                "Writing file: %s (mode: %s, encoding: %s)", file_path, mode, encoding
+            )
 
             # Validate inputs
             if not file_path:
@@ -252,119 +321,179 @@ class LocalFiles:
                 raise ValueError("content cannot be None")
 
             # Handle binary mode content decoding
-            if mode == 'binary':
+            if mode == "binary":
                 if isinstance(content, str):
                     try:
-                        decoded_content = base64.b64decode(content.encode('utf-8'))
-                        logging.info(f"Decoded base64 content: {len(decoded_content)} bytes")
+                        decoded_content = base64.b64decode(content.encode("utf-8"))
+                        logging.info(
+                            "Decoded base64 content: %s bytes", len(decoded_content)
+                        )
                     except (TypeError, ValueError) as e:
-                        raise ValueError(f"Invalid base64 content for binary mode: {e}")
+                        raise ValueError(
+                            f"Invalid base64 content for binary mode: {e}"
+                        ) from e
                     content = decoded_content
                 elif not isinstance(content, bytes):
-                    raise ValueError("Binary mode requires base64-encoded string or bytes content")
+                    raise ValueError(
+                        "Binary mode requires base64-encoded string or bytes content"
+                    )
             else:
                 # Text mode - ensure content is a string
                 if not isinstance(content, str):
                     try:
                         content = str(content)
-                    except Exception as e:
-                        raise ValueError(f"Cannot convert content to string: {e}")
+                    except Exception as e:  # pylint: disable=broad-exception-caught
+                        raise ValueError(
+                            f"Cannot convert content to string: {e}"
+                        ) from e
 
             # Check if file exists to generate diff for text mode
             file_exists = os.path.exists(file_path)
             original_content = ""
-            if file_exists and mode == 'text':
+            if file_exists and mode == "text":
                 try:
-                    original_content = self._read_file_content(file_path, mode, encoding)
-                except Exception as e:
-                    logging.warning(f"Could not read existing file for diff: {e}")
+                    original_content = self._read_file_content(
+                        file_path, mode, encoding
+                    )
+                except Exception as e:  # pylint: disable=broad-exception-caught
+                    logging.warning("Could not read existing file for diff: %s", e)
 
             # Write the content
             self._write_file_content(file_path, content, mode, encoding)
 
             # Generate success message with content statistics
-            if mode == 'binary':
+            if mode == "binary":
                 content_size = len(content)
-                logging.info(f"Successfully wrote binary file: {file_path} ({content_size} bytes)")
+                logging.info(
+                    "Successfully wrote binary file: %s (%s bytes)",
+                    file_path,
+                    content_size,
+                )
                 result_msg = f"Successfully wrote binary content to '{file_path}' ({content_size} bytes)."
             else:
                 content_length = len(content)
-                line_count = content.count('\n') + (1 if content and not content.endswith('\n') else 0)
-                logging.info(f"Successfully wrote text file: {file_path} ({content_length} characters, {line_count} lines)")
+                line_count = content.count("\n") + (
+                    1 if content and not content.endswith("\n") else 0
+                )
+                logging.info(
+                    "Successfully wrote text file: %s (%s characters, %s lines)",
+                    file_path,
+                    content_length,
+                    line_count,
+                )
                 result_msg = f"Successfully wrote text content to '{file_path}' ({content_length} characters, {line_count} lines)."
 
                 # Add diff if file existed before and content changed
                 if file_exists and original_content != content:
-                    diff_output = self._generate_diff(original_content, content, file_path)
+                    diff_output = self._generate_diff(
+                        original_content, content, file_path
+                    )
                     if diff_output and diff_output != "No changes detected in diff":
                         result_msg += f"\n\nDiff:\n{diff_output}"
 
             return result_msg
 
-        except Exception as e:
-            logging.error(f"Failed to write file {file_path}: {e}")
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            logging.error("Failed to write file %s: %s", file_path, e)
             raise e
 
-    def edit_file_replace_string(self, file_path: str, old_string, new_string, mode: str = 'text', encoding: str = 'utf-8', count: int = 0):
+    def edit_file_replace_string(
+        self,
+        file_path: str,
+        old_string,
+        new_string,
+        mode: str = "text",
+        encoding: str = "utf-8",
+        count: int = 0,
+    ):
         """Replace occurrences of old_string with new_string in a file."""
         try:
-            logging.info(f"Replacing string in file: {file_path} (mode: {mode}, count: {count})")
+            logging.info(
+                "Replacing string in file: %s (mode: %s, count: %s)",
+                file_path,
+                mode,
+                count,
+            )
 
             # Read original content for diff
             original_content = self._read_file_content(file_path, mode, encoding)
 
-            if mode == 'binary':
+            if mode == "binary":
                 try:
-                    old_bytes = base64.b64decode(old_string.encode('utf-8'))
-                    new_bytes = base64.b64decode(new_string.encode('utf-8'))
-                except Exception as e:
-                    raise ValueError(f"Invalid base64 content for binary mode: {e}")
+                    old_bytes = base64.b64decode(old_string.encode("utf-8"))
+                    new_bytes = base64.b64decode(new_string.encode("utf-8"))
+                except (TypeError, ValueError) as e:
+                    raise ValueError(
+                        f"Invalid base64 content for binary mode: {e}"
+                    ) from e
                 old_string, new_string = old_bytes, new_bytes
 
             current_content = original_content
 
-            if mode == 'text':
+            if mode == "text":
                 if not isinstance(old_string, str) or not isinstance(new_string, str):
-                    raise ValueError("old_string and new_string must be strings in text mode")
+                    raise ValueError(
+                        "old_string and new_string must be strings in text mode"
+                    )
 
                 # Prevent empty string replacement which would corrupt the file
                 if not old_string:
-                    raise ValueError("old_string cannot be empty - this would insert new_string between every character")
+                    raise ValueError(
+                        "old_string cannot be empty - this would insert new_string between every character"
+                    )
 
                 # Normalize line endings in search strings to match file content
-                old_string_normalized = self._normalize_line_endings(old_string, '\n')
-                new_string_normalized = self._normalize_line_endings(new_string, '\n')
+                old_string_normalized = self._normalize_line_endings(old_string, "\n")
+                new_string_normalized = self._normalize_line_endings(new_string, "\n")
 
                 # Count occurrences before replacement
                 occurrence_count = current_content.count(old_string_normalized)
                 if occurrence_count == 0:
-                    logging.info(f"No occurrences found of search string in {file_path}")
+                    logging.info(
+                        "No occurrences found of search string in %s", file_path
+                    )
                     return f"No changes made to '{file_path}': search string not found."
 
                 # Perform replacement
                 if count == 0:
-                    new_content = current_content.replace(old_string_normalized, new_string_normalized)
-                    actual_replacements = current_content.count(old_string_normalized)  # Count after replacement
+                    new_content = current_content.replace(
+                        old_string_normalized, new_string_normalized
+                    )
+                    actual_replacements = current_content.count(
+                        old_string_normalized
+                    )  # Count after replacement
                 else:
-                    new_content = current_content.replace(old_string_normalized, new_string_normalized, count)
+                    new_content = current_content.replace(
+                        old_string_normalized, new_string_normalized, count
+                    )
                     actual_replacements = count
 
-            elif mode == 'binary':
-                if not isinstance(old_string, bytes) or not isinstance(new_string, bytes):
-                    raise ValueError("old_string and new_string must be bytes in binary mode")
+            elif mode == "binary":
+                if not isinstance(old_string, bytes) or not isinstance(
+                    new_string, bytes
+                ):
+                    raise ValueError(
+                        "old_string and new_string must be bytes in binary mode"
+                    )
 
                 # Prevent empty bytes replacement which would corrupt the file
                 if not old_string:
-                    raise ValueError("old_string cannot be empty - this would insert new_string between every byte")
+                    raise ValueError(
+                        "old_string cannot be empty - this would insert new_string between every byte"
+                    )
 
                 occurrence_count = current_content.count(old_string)
                 if occurrence_count == 0:
-                    logging.info(f"No occurrences found of search bytes in {file_path}")
+                    logging.info(
+                        "No occurrences found of search bytes in %s", file_path
+                    )
                     return f"No changes made to '{file_path}': search bytes not found."
 
                 if count == 0:
                     new_content = current_content.replace(old_string, new_string)
-                    actual_replacements = current_content.count(old_string)  # Count after replacement
+                    actual_replacements = current_content.count(
+                        old_string
+                    )  # Count after replacement
                 else:
                     new_content = current_content.replace(old_string, new_string, count)
                     actual_replacements = count
@@ -372,17 +501,26 @@ class LocalFiles:
                 raise ValueError("Mode must be 'text' or 'binary'")
 
             if new_content == current_content:
-                logging.info(f"No changes made to {file_path} - content identical after replacement")
+                logging.info(
+                    "No changes made to %s - content identical after replacement",
+                    file_path,
+                )
                 return f"No changes made to '{file_path}': replacement resulted in identical content."
 
             self._write_file_content(file_path, new_content, mode, encoding)
 
             # Generate diff for text mode
             diff_output = ""
-            if mode == 'text':
-                diff_output = self._generate_diff(original_content, new_content, file_path)
+            if mode == "text":
+                diff_output = self._generate_diff(
+                    original_content, new_content, file_path
+                )
 
-            logging.info(f"Successfully replaced {actual_replacements} occurrences in {file_path}")
+            logging.info(
+                "Successfully replaced %s occurrences in %s",
+                actual_replacements,
+                file_path,
+            )
 
             result_msg = f"Successfully replaced {actual_replacements} occurrence(s) in '{file_path}'."
             if diff_output:
@@ -390,45 +528,60 @@ class LocalFiles:
 
             return result_msg
 
-        except Exception as e:
-            logging.error(f"Failed to replace string in file {file_path}: {e}")
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            logging.error("Failed to replace string in file %s: %s", file_path, e)
             raise e
 
-    def edit_file_replace_lines(self, file_path: str, start_line: int, end_line: int, new_string: str, encoding: str = 'utf-8'):
+    def edit_file_replace_lines(
+        self,
+        file_path: str,
+        start_line: int,
+        end_line: int,
+        new_string: str,
+        encoding: str = "utf-8",
+    ):
         """Replace content within a specified range of lines."""
         try:
-            logging.info(f"Replacing lines {start_line}-{end_line} in file: {file_path}")
+            logging.info(
+                "Replacing lines %s-%s in file: %s", start_line, end_line, file_path
+            )
 
             if start_line <= 0 or end_line <= 0:
                 raise ValueError("Line numbers must be positive (1-based indexing)")
 
             if start_line > end_line:
-                raise ValueError(f"Start line ({start_line}) must be less than or equal to end line ({end_line})")
+                raise ValueError(
+                    f"Start line ({start_line}) must be less than or equal to end line ({end_line})"
+                )
 
             # Read original content for diff
-            original_content = self._read_file_content(file_path, 'text', encoding)
+            original_content = self._read_file_content(file_path, "text", encoding)
             lines = original_content.splitlines(keepends=True)  # Keep ends here
             total_lines = len(lines)
 
             if start_line > total_lines + 1:  # Allow replacing at end of file
-                raise ValueError(f"Start line {start_line} exceeds file length ({total_lines} lines)")
+                raise ValueError(
+                    f"Start line {start_line} exceeds file length ({total_lines} lines)"
+                )
 
             if end_line > total_lines + 1:  # Allow replacing at end of file
-                raise ValueError(f"End line {end_line} exceeds file length ({total_lines} lines)")
+                raise ValueError(
+                    f"End line {end_line} exceeds file length ({total_lines} lines)"
+                )
 
             # Convert to 0-based indexing
             start_idx = start_line - 1
             end_idx = end_line
 
             # Normalize the new string's line endings and split
-            new_string_normalized = self._normalize_line_endings(new_string, '\n')
+            new_string_normalized = self._normalize_line_endings(new_string, "\n")
             new_lines = new_string_normalized.splitlines(keepends=True)
 
             # Perform replacement
             modified_lines = lines[:start_idx] + new_lines + lines[end_idx:]
-            new_content = ''.join(modified_lines)
+            new_content = "".join(modified_lines)
 
-            self._write_file_content(file_path, new_content, 'text', encoding)
+            self._write_file_content(file_path, new_content, "text", encoding)
 
             # Generate diff
             diff_output = self._generate_diff(original_content, new_content, file_path)
@@ -436,7 +589,12 @@ class LocalFiles:
             replaced_lines = end_line - start_line + 1
             new_line_count = len(new_lines)
 
-            logging.info(f"Successfully replaced {replaced_lines} lines with {new_line_count} lines in {file_path}")
+            logging.info(
+                "Successfully replaced %s lines with %s lines in %s",
+                replaced_lines,
+                new_line_count,
+                file_path,
+            )
 
             result_msg = f"Successfully replaced lines {start_line}-{end_line} ({replaced_lines} lines) with {new_line_count} line(s) in '{file_path}'."
             if diff_output:
@@ -444,31 +602,41 @@ class LocalFiles:
 
             return result_msg
 
-        except Exception as e:
-            logging.error(f"Failed to replace lines in file {file_path}: {e}")
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            logging.error("Failed to replace lines in file %s: %s", file_path, e)
             raise e
 
-    def edit_file_delete_lines(self, file_path: str, start_line: int, end_line: int, encoding: str = 'utf-8'):
+    def edit_file_delete_lines(
+        self, file_path: str, start_line: int, end_line: int, encoding: str = "utf-8"
+    ):
         """Delete lines within a specified range."""
         try:
-            logging.info(f"Deleting lines {start_line}-{end_line} in file: {file_path}")
+            logging.info(
+                "Deleting lines %s-%s in file: %s", start_line, end_line, file_path
+            )
 
             if start_line <= 0 or end_line <= 0:
                 raise ValueError("Line numbers must be positive (1-based indexing)")
 
             if start_line > end_line:
-                raise ValueError(f"Start line ({start_line}) must be less than or equal to end line ({end_line})")
+                raise ValueError(
+                    f"Start line ({start_line}) must be less than or equal to end line ({end_line})"
+                )
 
             # Read original content for diff
-            original_content = self._read_file_content(file_path, 'text', encoding)
+            original_content = self._read_file_content(file_path, "text", encoding)
             lines = original_content.splitlines(keepends=True)  # Keep ends here
             total_lines = len(lines)
 
             if start_line > total_lines + 1:  # Allow deleting from end of file
-                raise ValueError(f"Start line {start_line} exceeds file length ({total_lines} lines)")
+                raise ValueError(
+                    f"Start line {start_line} exceeds file length ({total_lines} lines)"
+                )
 
             if end_line > total_lines + 1:  # Allow deleting from end of file
-                raise ValueError(f"End line {end_line} exceeds file length ({total_lines} lines)")
+                raise ValueError(
+                    f"End line {end_line} exceeds file length ({total_lines} lines)"
+                )
 
             # Convert to 0-based indexing
             start_idx = start_line - 1
@@ -476,9 +644,9 @@ class LocalFiles:
 
             # Delete the specified lines by keeping everything before and after
             modified_lines = lines[:start_idx] + lines[end_idx:]
-            new_content = ''.join(modified_lines)
+            new_content = "".join(modified_lines)
 
-            self._write_file_content(file_path, new_content, 'text', encoding)
+            self._write_file_content(file_path, new_content, "text", encoding)
 
             # Generate diff
             diff_output = self._generate_diff(original_content, new_content, file_path)
@@ -486,7 +654,9 @@ class LocalFiles:
             deleted_lines = end_line - start_line + 1
             remaining_lines = len(modified_lines)
 
-            logging.info(f"Successfully deleted {deleted_lines} lines from {file_path}")
+            logging.info(
+                "Successfully deleted %s lines from %s", deleted_lines, file_path
+            )
 
             result_msg = f"Successfully deleted lines {start_line}-{end_line} ({deleted_lines} lines) from '{file_path}'. File now has {remaining_lines} lines."
             if diff_output:
@@ -494,42 +664,51 @@ class LocalFiles:
 
             return result_msg
 
-        except Exception as e:
-            logging.error(f"Failed to delete lines from file {file_path}: {e}")
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            logging.error("Failed to delete lines from file %s: %s", file_path, e)
             raise e
 
-    def edit_file_insert_lines(self, file_path: str, line_number: int, content: str, encoding: str = 'utf-8'):
+    def edit_file_insert_lines(
+        self, file_path: str, line_number: int, content: str, encoding: str = "utf-8"
+    ):
         """Insert content at a specified line number."""
         try:
-            logging.info(f"Inserting content at line {line_number} in file: {file_path}")
+            logging.info(
+                "Inserting content at line %s in file: %s", line_number, file_path
+            )
 
             if line_number <= 0:
                 raise ValueError("Line number must be positive (1-based indexing)")
 
             # Read original content for diff
-            original_content = self._read_file_content(file_path, 'text', encoding)
+            original_content = self._read_file_content(file_path, "text", encoding)
             lines = original_content.splitlines(keepends=True)  # Keep ends here
             total_lines = len(lines)
 
-            # Allow inserting at line_number = total_lines + 1 (append to end)
-            if line_number > total_lines + 1:
-                raise ValueError(f"Line number {line_number} exceeds file length + 1 ({total_lines + 1})")
+            if (
+                line_number > total_lines + 1
+            ):  # Allow inserting at line_number = total_lines + 1 (append to end)
+                raise ValueError(
+                    f"Line number {line_number} exceeds file length + 1 ({total_lines + 1})"
+                )
 
             # Normalize the content's line endings and split
-            content_normalized = self._normalize_line_endings(content, '\n')
+            content_normalized = self._normalize_line_endings(content, "\n")
             insert_lines = content_normalized.splitlines(keepends=False)
 
             # Re-add newlines for joining
-            insert_lines_with_ends = [line + '\n' for line in insert_lines]
+            insert_lines_with_ends = [line + "\n" for line in insert_lines]
 
             # Convert to 0-based indexing for insertion
             insert_idx = line_number - 1
 
             # Insert the new lines
-            modified_lines = lines[:insert_idx] + insert_lines_with_ends + lines[insert_idx:]
-            new_content = ''.join(modified_lines)
+            modified_lines = (
+                lines[:insert_idx] + insert_lines_with_ends + lines[insert_idx:]
+            )
+            new_content = "".join(modified_lines)
 
-            self._write_file_content(file_path, new_content, 'text', encoding)
+            self._write_file_content(file_path, new_content, "text", encoding)
 
             # Generate diff
             diff_output = self._generate_diff(original_content, new_content, file_path)
@@ -537,7 +716,12 @@ class LocalFiles:
             inserted_line_count = len(insert_lines)
             new_total_lines = len(modified_lines)
 
-            logging.info(f"Successfully inserted {inserted_line_count} lines at line {line_number} in {file_path}")
+            logging.info(
+                "Successfully inserted %s lines at line %s in %s",
+                inserted_line_count,
+                line_number,
+                file_path,
+            )
 
             result_msg = f"Successfully inserted {inserted_line_count} line(s) at line {line_number} in '{file_path}'. File now has {new_total_lines} lines."
             if diff_output:
@@ -545,8 +729,8 @@ class LocalFiles:
 
             return result_msg
 
-        except Exception as e:
-            logging.error(f"Failed to insert lines in file {file_path}: {e}")
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            logging.error("Failed to insert lines in file %s: %s", file_path, e)
             raise e
 
     def delete_files(self, file_paths: list):
@@ -560,7 +744,7 @@ class LocalFiles:
         deleted_files = []
         errors = []
 
-        logging.info(f"Attempting to delete {len(file_paths)} file(s)")
+        logging.info("Attempting to delete %s file(s)", len(file_paths))
 
         for file_path in file_paths:
             try:
@@ -576,11 +760,11 @@ class LocalFiles:
 
                 os.remove(validated_path)
                 deleted_files.append(file_path)
-                logging.info(f"Successfully deleted file: {file_path}")
+                logging.info("Successfully deleted file: %s", file_path)
 
-            except PermissionError:
-                errors.append(f"Permission denied deleting file: '{file_path}'")
-            except Exception as e:
+            except PermissionError as e:
+                errors.append(f"Permission denied deleting file: '{file_path}': {e}")
+            except Exception as e:  # pylint: disable=broad-exception-caught
                 errors.append(f"Error deleting file '{file_path}': {e}")
 
         if errors:
@@ -589,13 +773,15 @@ class LocalFiles:
                 error_msg += f". Successfully deleted: {', '.join(deleted_files)}"
 
             logging.error(error_msg)
-            raise Exception(error_msg)
+            raise Exception(error_msg) from None  # pylint: disable=raise-missing-from
 
-        logging.info(f"Successfully deleted all {len(deleted_files)} file(s)")
+        logging.info("Successfully deleted all %s file(s)", len(deleted_files))
 
         return f"Successfully deleted {len(deleted_files)} file(s): {', '.join(deleted_files)}"
 
-    def move_files(self, source_paths: list, destination_paths: list, create_dirs: bool = True):
+    def move_files(
+        self, source_paths: list, destination_paths: list, create_dirs: bool = True
+    ):
         """Move/rename files from source paths to destination paths."""
         if not isinstance(source_paths, list):
             raise ValueError("source_paths must be a list")
@@ -610,12 +796,14 @@ class LocalFiles:
             raise ValueError("destination_paths list cannot be empty")
 
         if len(source_paths) != len(destination_paths):
-            raise ValueError(f"Number of source paths ({len(source_paths)}) must match destination paths ({len(destination_paths)})")
+            raise ValueError(
+                f"Number of source paths ({len(source_paths)}) must match destination paths ({len(destination_paths)})"
+            )
 
         moved_files = []
         errors = []
 
-        logging.info(f"Attempting to move {len(source_paths)} file(s)")
+        logging.info("Attempting to move %s file(s)", len(source_paths))
 
         for source_path, dest_path in zip(source_paths, destination_paths):
             try:
@@ -637,17 +825,23 @@ class LocalFiles:
                     if create_dirs:
                         try:
                             os.makedirs(dest_dir, exist_ok=True)
-                            logging.info(f"Created destination directory: {dest_dir}")
-                        except Exception as e:
-                            errors.append(f"Failed to create destination directory '{dest_dir}' for '{source_path}': {e}")
+                            logging.info("Created destination directory: %s", dest_dir)
+                        except Exception as e:  # pylint: disable=broad-exception-caught
+                            errors.append(
+                                f"Failed to create destination directory '{dest_dir}' for '{source_path}': {e}"
+                            )
                             continue
                     else:
-                        errors.append(f"Destination directory does not exist: '{dest_dir}' for '{source_path}'")
+                        errors.append(
+                            f"Destination directory does not exist: '{dest_dir}' for '{source_path}'"
+                        )
                         continue
 
                 # Check if destination already exists
                 if os.path.exists(validated_dest):
-                    errors.append(f"Destination already exists: '{dest_path}' for source '{source_path}'")
+                    errors.append(
+                        f"Destination already exists: '{dest_path}' for source '{source_path}'"
+                    )
                     continue
 
                 # Check file size before moving (just for logging)
@@ -659,12 +853,21 @@ class LocalFiles:
                 # Perform the move operation
                 shutil.move(validated_source, validated_dest)
                 moved_files.append((source_path, dest_path))
-                logging.info(f"Successfully moved file: {source_path} -> {dest_path} ({file_size} bytes)")
+                logging.info(
+                    "Successfully moved file: %s -> %s (%s bytes)",
+                    source_path,
+                    dest_path,
+                    file_size,
+                )
 
-            except PermissionError:
-                errors.append(f"Permission denied moving file: '{source_path}' -> '{dest_path}'")
-            except Exception as e:
-                errors.append(f"Error moving file '{source_path}' -> '{dest_path}': {e}")
+            except PermissionError as e:
+                errors.append(
+                    f"Permission denied moving file: '{source_path}' -> '{dest_path}': {e}"
+                )
+            except Exception as e:  # pylint: disable=broad-exception-caught
+                errors.append(
+                    f"Error moving file '{source_path}' -> '{dest_path}': {e}"
+                )
 
         # Prepare result message
         if errors:
@@ -674,9 +877,9 @@ class LocalFiles:
                 error_msg += f". Successfully moved: {', '.join(moved_list)}"
 
             logging.error(error_msg)
-            raise Exception(error_msg)
+            raise Exception(error_msg) from None  # pylint: disable=raise-missing-from
 
-        logging.info(f"Successfully moved all {len(moved_files)} file(s)")
+        logging.info("Successfully moved all %s file(s)", len(moved_files))
         moved_list = [f"{src} -> {dst}" for src, dst in moved_files]
         return f"Successfully moved {len(moved_files)} file(s): {', '.join(moved_list)}"
 
@@ -687,25 +890,28 @@ class LocalFiles:
 
             if os.path.exists(validated_path):
                 if os.path.isdir(validated_path):
-                    logging.info(f"Directory already exists: {directory_path}")
+                    logging.info("Directory already exists: %s", directory_path)
                     return f"Directory already exists: '{directory_path}'"
+                # pylint: disable=else-after-return
                 else:
-                    raise ValueError(f"Path exists but is not a directory: '{directory_path}'")
+                    raise ValueError(
+                        f"Path exists but is not a directory: '{directory_path}'"
+                    )
 
             os.makedirs(validated_path, exist_ok=True)
-            logging.info(f"Successfully created directory: {directory_path}")
+            logging.info("Successfully created directory: %s", directory_path)
             return f"Successfully created directory: '{directory_path}'"
 
-        except PermissionError:
-            error_msg = f"Permission denied creating directory: '{directory_path}'"
+        except PermissionError as e:
+            error_msg = f"Permission denied creating directory: '{directory_path}': {e}"
             logging.error(error_msg)
-            raise PermissionError(error_msg)
+            raise PermissionError(error_msg) from e
         except ValueError as e:
             raise e
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-exception-caught
             error_msg = f"Failed to create directory '{directory_path}': {e}"
             logging.error(error_msg)
-            raise e
+            raise Exception(error_msg) from e
 
     def delete_directory(self, directory_path: str):
         """Delete a directory and all its contents."""
@@ -722,19 +928,19 @@ class LocalFiles:
             item_count = sum(1 for _ in os.walk(validated_path))
 
             shutil.rmtree(validated_path)
-            logging.info(f"Successfully deleted directory: {directory_path}")
+            logging.info("Successfully deleted directory: %s", directory_path)
             return f"Successfully deleted directory '{directory_path}' and all its contents ({item_count} items)"
 
-        except PermissionError:
-            error_msg = f"Permission denied deleting directory: '{directory_path}'"
+        except PermissionError as e:
+            error_msg = f"Permission denied deleting directory: '{directory_path}': {e}"
             logging.error(error_msg)
-            raise PermissionError(error_msg)
+            raise PermissionError(error_msg) from e
         except ValueError as e:
             raise e
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-exception-caught
             error_msg = f"Failed to delete directory '{directory_path}': {e}"
             logging.error(error_msg)
-            raise e
+            raise Exception(error_msg) from e
 
     def get_tool_declarations(self):
         """Return tool declarations for the MCP protocol."""
@@ -747,22 +953,22 @@ class LocalFiles:
                     "properties": {
                         "file_path": {
                             "type": "string",
-                            "description": "The path to the file to read."
+                            "description": "The path to the file to read.",
                         },
                         "mode": {
                             "type": "string",
                             "enum": ["text", "binary"],
                             "default": "text",
-                            "description": "Read mode: 'text' for text files with encoding, 'binary' for binary files (returns base64)."
+                            "description": "Read mode: 'text' for text files with encoding, 'binary' for binary files (returns base64).",
                         },
                         "encoding": {
                             "type": "string",
                             "default": "utf-8",
-                            "description": "Text encoding to use (ignored in binary mode)."
-                        }
+                            "description": "Text encoding to use (ignored in binary mode).",
+                        },
                     },
-                    "required": ["file_path"]
-                }
+                    "required": ["file_path"],
+                },
             },
             {
                 "name": "write_file",
@@ -772,26 +978,26 @@ class LocalFiles:
                     "properties": {
                         "file_path": {
                             "type": "string",
-                            "description": "The path to the file to write."
+                            "description": "The path to the file to write.",
                         },
                         "content": {
                             "type": "string",
-                            "description": "The content to write. For binary mode, provide base64-encoded data."
+                            "description": "The content to write. For binary mode, provide base64-encoded data.",
                         },
                         "mode": {
                             "type": "string",
                             "enum": ["text", "binary"],
                             "default": "text",
-                            "description": "Write mode: 'text' for text files with encoding, 'binary' for binary files (expects base64)."
+                            "description": "Write mode: 'text' for text files with encoding, 'binary' for binary files (expects base64).",
                         },
                         "encoding": {
                             "type": "string",
                             "default": "utf-8",
-                            "description": "Text encoding to use (ignored in binary mode)."
-                        }
+                            "description": "Text encoding to use (ignored in binary mode).",
+                        },
                     },
-                    "required": ["file_path", "content"]
-                }
+                    "required": ["file_path", "content"],
+                },
             },
             {
                 "name": "edit_file_replace_string",
@@ -801,35 +1007,35 @@ class LocalFiles:
                     "properties": {
                         "file_path": {
                             "type": "string",
-                            "description": "The path to the file to modify."
+                            "description": "The path to the file to modify.",
                         },
                         "old_string": {
                             "type": "string",
-                            "description": "The content to find and replace. For binary mode, provide base64-encoded data."
+                            "description": "The content to find and replace. For binary mode, provide base64-encoded data.",
                         },
                         "new_string": {
                             "type": "string",
-                            "description": "The content to replace with. For binary mode, provide base64-encoded data."
+                            "description": "The content to replace with. For binary mode, provide base64-encoded data.",
                         },
                         "mode": {
                             "type": "string",
                             "enum": ["text", "binary"],
                             "default": "text",
-                            "description": "Operation mode: 'text' with automatic line ending handling, 'binary' for exact byte matching."
+                            "description": "Operation mode: 'text' with automatic line ending handling, 'binary' for exact byte matching.",
                         },
                         "encoding": {
                             "type": "string",
                             "default": "utf-8",
-                            "description": "Text encoding to use (ignored in binary mode)."
+                            "description": "Text encoding to use (ignored in binary mode).",
                         },
                         "count": {
                             "type": "integer",
                             "default": 0,
-                            "description": "Maximum number of replacements to make. 0 means replace all occurrences."
-                        }
+                            "description": "Maximum number of replacements to make. 0 means replace all occurrences.",
+                        },
                     },
-                    "required": ["file_path", "old_string", "new_string"]
-                }
+                    "required": ["file_path", "old_string", "new_string"],
+                },
             },
             {
                 "name": "edit_file_replace_lines",
@@ -839,28 +1045,28 @@ class LocalFiles:
                     "properties": {
                         "file_path": {
                             "type": "string",
-                            "description": "The path to the file to modify."
+                            "description": "The path to the file to modify.",
                         },
                         "start_line": {
                             "type": "integer",
-                            "description": "The starting line number (1-based, inclusive)."
+                            "description": "The starting line number (1-based, inclusive).",
                         },
                         "end_line": {
                             "type": "integer",
-                            "description": "The ending line number (1-based, inclusive)."
+                            "description": "The ending line number (1-based, inclusive).",
                         },
                         "new_string": {
                             "type": "string",
-                            "description": "The new content to replace the specified lines with."
+                            "description": "The new content to replace the specified lines with.",
                         },
                         "encoding": {
                             "type": "string",
                             "default": "utf-8",
-                            "description": "Text encoding to use."
-                        }
+                            "description": "Text encoding to use.",
+                        },
                     },
-                    "required": ["file_path", "start_line", "end_line", "new_string"]
-                }
+                    "required": ["file_path", "start_line", "end_line", "new_string"],
+                },
             },
             {
                 "name": "edit_file_delete_lines",
@@ -870,24 +1076,24 @@ class LocalFiles:
                     "properties": {
                         "file_path": {
                             "type": "string",
-                            "description": "The path to the file to modify."
+                            "description": "The path to the file to modify.",
                         },
                         "start_line": {
                             "type": "integer",
-                            "description": "The starting line number to delete (1-based, inclusive)."
+                            "description": "The starting line number to delete (1-based, inclusive).",
                         },
                         "end_line": {
                             "type": "integer",
-                            "description": "The ending line number to delete (1-based, inclusive)."
+                            "description": "The ending line number to delete (1-based, inclusive).",
                         },
                         "encoding": {
                             "type": "string",
                             "default": "utf-8",
-                            "description": "Text encoding to use."
-                        }
+                            "description": "Text encoding to use.",
+                        },
                     },
-                    "required": ["file_path", "start_line", "end_line"]
-                }
+                    "required": ["file_path", "start_line", "end_line"],
+                },
             },
             {
                 "name": "edit_file_insert_lines",
@@ -897,24 +1103,24 @@ class LocalFiles:
                     "properties": {
                         "file_path": {
                             "type": "string",
-                            "description": "The path to the file to modify."
+                            "description": "The path to the file to modify.",
                         },
                         "line_number": {
                             "type": "integer",
-                            "description": "The line number where content should be inserted (1-based). Content will be inserted before this line. Use file_length + 1 to append to the end."
+                            "description": "The line number where content should be inserted (1-based). Content will be inserted before this line. Use file_length + 1 to append to the end.",
                         },
                         "content": {
                             "type": "string",
-                            "description": "The content to insert at the specified line."
+                            "description": "The content to insert at the specified line.",
                         },
                         "encoding": {
                             "type": "string",
                             "default": "utf-8",
-                            "description": "Text encoding to use."
-                        }
+                            "description": "Text encoding to use.",
+                        },
                     },
-                    "required": ["file_path", "line_number", "content"]
-                }
+                    "required": ["file_path", "line_number", "content"],
+                },
             },
             {
                 "name": "delete_files",
@@ -926,11 +1132,11 @@ class LocalFiles:
                             "type": "array",
                             "items": {"type": "string"},
                             "description": "A list of file paths to delete.",
-                            "minItems": 1
+                            "minItems": 1,
                         }
                     },
-                    "required": ["file_paths"]
-                }
+                    "required": ["file_paths"],
+                },
             },
             {
                 "name": "move_files",
@@ -942,22 +1148,22 @@ class LocalFiles:
                             "type": "array",
                             "items": {"type": "string"},
                             "description": "A list of source file paths to move.",
-                            "minItems": 1
+                            "minItems": 1,
                         },
                         "destination_paths": {
                             "type": "array",
                             "items": {"type": "string"},
                             "description": "A list of destination file paths. Must match the number of source paths.",
-                            "minItems": 1
+                            "minItems": 1,
                         },
                         "create_dirs": {
                             "type": "boolean",
                             "default": True,
-                            "description": "Whether to create destination directories if they don't exist."
-                        }
+                            "description": "Whether to create destination directories if they don't exist.",
+                        },
                     },
-                    "required": ["source_paths", "destination_paths"]
-                }
+                    "required": ["source_paths", "destination_paths"],
+                },
             },
             {
                 "name": "create_directory",
@@ -967,11 +1173,11 @@ class LocalFiles:
                     "properties": {
                         "directory_path": {
                             "type": "string",
-                            "description": "The path of the directory to create."
+                            "description": "The path of the directory to create.",
                         }
                     },
-                    "required": ["directory_path"]
-                }
+                    "required": ["directory_path"],
+                },
             },
             {
                 "name": "delete_directory",
@@ -981,133 +1187,191 @@ class LocalFiles:
                     "properties": {
                         "directory_path": {
                             "type": "string",
-                            "description": "The path of the directory to delete."
+                            "description": "The path of the directory to delete.",
                         }
                     },
-                    "required": ["directory_path"]
-                }
-            }
+                    "required": ["directory_path"],
+                },
+            },
         ]
 
     def run(self):
         """Main server loop to handle JSON-RPC requests."""
+
         logging.info("MCP File Manipulation Server started")
+
         print("SERVER_STARTED_DEBUG_MESSAGE")
+
         sys.stdout.flush()
 
         while True:
+
             try:
+
                 line = sys.stdin.buffer.readline()
+
                 if not line:
+
                     logging.info("EOF received, shutting down server")
+
                     break
 
-                line_str = line.decode('utf-8').strip()
+                line_str = line.decode("utf-8").strip()
+
                 if not line_str:
+
                     continue
 
-                logging.debug(f"Received request: {line_str}")
+                logging.debug("Received request: %s", line_str)
 
                 try:
+
                     request = json.loads(line_str)
+
                 except json.JSONDecodeError as e:
+
                     self._send_error(f"Invalid JSON in request: {e}")
+
                     continue
 
                 request_id = request.get("id")
+
                 method = request.get("method")
 
-                logging.debug(f"Processing method: {method}, ID: {request_id}")
+                logging.debug("Processing method: %s, ID: %s", method, request_id)
 
                 if method == "initialize":
+
                     response = {
                         "jsonrpc": "2.0",
                         "result": {
                             "protocolVersion": "2025-06-18",
-                            "serverInfo": {
-                                "name": "Local Files",
-                                "version": "1.0.0"
-                            },
-                            "capabilities": {
-                                "tools": {}
-                            }
+                            "serverInfo": {"name": "Local Files", "version": "1.0.0"},
+                            "capabilities": {"tools": {}},
                         },
-                        "id": request_id
+                        "id": request_id,
                     }
+
                     self._send_response(response)
+
                     continue
 
                 if method == "notifications/initialized":
+
                     logging.info("Client initialization complete")
+
                     print("INITIALIZED_NOTIFICATION_SENT_DEBUG_MESSAGE")
+
                     sys.stdout.flush()
+
                     continue
 
                 if method == "tools/list":
+
                     response = {
                         "jsonrpc": "2.0",
-                        "result": {
-                            "tools": self.get_tool_declarations()
-                        },
-                        "id": request_id
+                        "result": {"tools": self.get_tool_declarations()},
+                        "id": request_id,
                     }
+
                     self._send_response(response)
+
                     continue
 
                 if method == "tools/call":
+
                     params = request.get("params", {})
+
                     tool_name = params.get("name")
+
                     tool_args = params.get("arguments", {})
 
                     if tool_name not in self.tools:
-                        self._send_error(f"Unknown tool: '{tool_name}'. Available tools: {list(self.tools.keys())}", request_id)
+
+                        self._send_error(
+                            f"Unknown tool: '{tool_name}'. Available tools: {list(self.tools.keys())}",
+                            request_id,
+                        )
+
                         continue
 
                     try:
-                        logging.info(f"Executing tool: {tool_name}")
+
+                        logging.info("Executing tool: %s", tool_name)
 
                         # Filter arguments to only include expected parameters
-                        filtered_args = self._filter_tool_arguments(tool_name, tool_args)
+
+                        filtered_args = self._filter_tool_arguments(
+                            tool_name, tool_args
+                        )
 
                         result = self.tools[tool_name](**filtered_args)
+
                         response = {
                             "jsonrpc": "2.0",
                             "result": {
-                                "content": [
-                                    {
-                                        "type": "text",
-                                        "text": str(result)
-                                    }
-                                ]
+                                "content": [{"type": "text", "text": str(result)}]
                             },
-                            "id": request_id
+                            "id": request_id,
                         }
+
                         self._send_response(response)
 
-                    except Exception as e:
-                        logging.error(f"Tool execution failed for {tool_name}: {e}", exc_info=True)
-                        self._send_error(f"Tool '{tool_name}' execution failed: {e}", request_id)
+                    except Exception as e:  # pylint: disable=broad-exception-caught
+
+                        logging.error(
+                            "Tool execution failed for %s: %s",
+                            tool_name,
+                            e,
+                            exc_info=True,
+                        )
+
+                        self._send_error(
+                            f"Tool '{tool_name}' execution failed: {e}", request_id
+                        )
+
                     continue
 
                 # Unknown method
-                self._send_error(f"Unknown method: '{method}'. Supported methods: initialize, tools/list, tools/call", request_id)
+
+                self._send_error(
+                    f"Unknown method: '{method}'. Supported methods: initialize, tools/list, tools/call",
+                    request_id,
+                )
 
             except KeyboardInterrupt:
+
                 logging.info("Server interrupted by user")
+
                 break
-            except Exception as e:
-                logging.error(f"Unexpected server error: {e}", exc_info=True)
+
+            except Exception as e:  # pylint: disable=broad-exception-caught
+
+                logging.error("Unexpected server error: %s", e, exc_info=True)
+
                 try:
+
                     self._send_error(f"Internal server error: {e}")
-                except Exception as send_error:
-                    logging.error(f"Failed to send error response: {send_error}")
+
+                except (
+                    Exception
+                ) as send_error:  # pylint: disable=broad-exception-caught
+
+                    logging.error("Failed to send error response: %s", send_error)
+
                 # Continue running despite the error
 
 
 if __name__ == "__main__":
+
     try:
+
         server = LocalFiles()
+
         server.run()
-    except Exception as e:
-        logging.error(f"Failed to start server: {e}", exc_info=True)
+
+    except Exception as e:  # pylint: disable=broad-exception-caught
+
+        logging.error("Failed to start server: %s", e, exc_info=True)
+
         sys.exit(1)

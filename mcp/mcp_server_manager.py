@@ -1,18 +1,37 @@
+"""
+Manages the lifecycle of an MCP (Model-Controller-Presenter) server.
+
+This script provides the MCPServerManager class to start, stop, and check the status
+of a detached MCP server process. It is designed to be used as a command-line
+tool or imported as a module.
+"""
+
+import logging
 import os
+import signal
 import subprocess
 import sys
-import signal
 
-PID_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), ".mcp_server.pid"))
-LOG_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), ".mcp_server.log"))
+# Configure logging
+LOG_FORMAT = "%(asctime)s - %(levelname)s - %(message)s"
+logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
+logger = logging.getLogger(__name__)
+
+# File paths for PID and logs
+PID_FILE = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), ".mcp_server.pid")
+)
+LOG_FILE = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "logs", "mcp_server.log")
+)
 
 
 class MCPServerManager:
     """
-    Manages the lifecycle of an MCP (Model-Controller-Presenter) server.
+    Manages the lifecycle of a detached MCP server process.
 
-    This class provides functionality to start and stop a given Python server script
-    as a detached process, managing its PID and logging its output.
+    Provides methods to start, stop, and check the status of the server,
+    handling PID file management and logging.
     """
 
     def __init__(self, server_script_path: str, cwd: str):
@@ -20,131 +39,172 @@ class MCPServerManager:
         Initializes the MCPServerManager.
 
         Args:
-            server_script_path (str): The absolute path to the Python script that runs the MCP server.
-            cwd (str): The current working directory to run the server script from.
+            server_script_path (str): Absolute path to the server script.
+            cwd (str): The working directory to run the script from.
         """
         self.server_script_path = server_script_path
         self.cwd = cwd
+        os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
+
+    def _read_pid(self) -> int | None:
+        """Reads the PID from the PID file."""
+        try:
+            with open(PID_FILE, "r", encoding="utf-8") as f:
+                return int(f.read().strip())
+        except FileNotFoundError:
+            return None
+        except (IOError, ValueError) as e:
+            logger.error("Error reading PID file: %s", e)
+            return None
+
+    def _write_pid(self, pid: int):
+        """Writes the PID to the PID file."""
+        try:
+            with open(PID_FILE, "w", encoding="utf-8") as f:
+                f.write(str(pid))
+        except IOError as e:
+            logger.error("Error writing PID file: %s", e)
+            raise
+
+    def _terminate_process_windows(self, pid: int):
+        """Terminates the process on Windows."""
+        try:
+            subprocess.run(
+                ["taskkill", "/F", "/T", "/PID", str(pid)],
+                check=True,
+                capture_output=True,
+            )
+            logger.info("Successfully sent termination signal to process group %d.", pid)
+        except subprocess.CalledProcessError as e:
+            if "not found" in e.stderr.decode(errors="ignore").lower():
+                logger.warning("Process with PID %d was not found.", pid)
+            else:
+                logger.error(
+                    "Error stopping server with taskkill: %s",
+                    e.stderr.decode(errors="ignore"),
+                )
+
+    def _terminate_process_unix(self, pid: int):
+        """Terminates the process on Unix-like systems."""
+        try:
+            pgid = os.getpgid(pid)  # pylint: disable=no-member
+            os.killpg(pgid, signal.SIGTERM)  # pylint: disable=no-member
+            logger.info("Successfully sent termination signal to process group %d.", pgid)
+        except (ProcessLookupError, PermissionError) as e:
+            logger.warning("Process with PID %d not found or permission denied: %s", pid, e)
+        except OSError as e:
+            logger.error("Error getting process group or killing process: %s", e)
 
     def start_server(self):
         """
         Starts the MCP server as a detached process.
-
-        If a PID file exists, it assumes the server is already running.
-        The server's output is redirected to a log file.
         """
-        if os.path.exists(PID_FILE):
-            print("MCP server is already running (PID file exists).")
+        if self.is_running():
+            logger.info("MCP server is already running.")
             return
 
-        print(f"Starting MCP server: {self.server_script_path} in {self.cwd}")
+        logger.info("Starting MCP server: %s in %s", self.server_script_path, self.cwd)
         try:
-            creation_flags = subprocess.DETACHED_PROCESS if sys.platform == "win32" else 0
+            creation_flags = (
+                subprocess.DETACHED_PROCESS if sys.platform == "win32" else 0
+            )
             preexec_fn = os.setsid if sys.platform != "win32" else None
 
-            with open(LOG_FILE, 'wb') as log_file:
+            with open(LOG_FILE, "wb") as log_file:
                 process = subprocess.Popen(
                     [sys.executable, self.server_script_path],
                     cwd=self.cwd,
                     creationflags=creation_flags,
                     preexec_fn=preexec_fn,
                     stdout=log_file,
-                    stderr=log_file
+                    stderr=log_file,
                 )
-            with open(PID_FILE, "w") as f:
-                f.write(str(process.pid))
-            print(f"MCP server started with PID: {process.pid}. Logs are in {LOG_FILE}")
-        except Exception as e:
-            print(f"Error starting MCP server: {e}")
+            self._write_pid(process.pid)
+            logger.info(
+                "MCP server started with PID: %d. Logs are in %s",
+                process.pid,
+                LOG_FILE,
+            )
+        except (IOError, OSError) as e:
+            logger.error("Error starting MCP server: %s", e)
             raise
 
     def start_server_for_testing(self):
         """
-        Starts the MCP server for testing purposes (not detached, with pipes).
+        Starts the MCP server for testing (not detached).
         Returns the Popen object for direct communication.
         """
-        print(f"Starting MCP server for testing: {self.server_script_path} in {self.cwd}")
+        logger.info(
+            "Starting MCP server for testing: %s in %s",
+            self.server_script_path,
+            self.cwd,
+        )
         try:
-            creation_flags = 0
-            start_new_session = False
-            if sys.platform == "win32":
-                creation_flags = subprocess.CREATE_NEW_PROCESS_GROUP
-            else:
-                start_new_session = True
+            creation_flags = (
+                subprocess.CREATE_NEW_PROCESS_GROUP if sys.platform == "win32" else 0
+            )
+            start_new_session = sys.platform != "win32"
 
             process = subprocess.Popen(
                 [sys.executable, self.server_script_path],
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,  # Capture stderr separately
+                stderr=subprocess.PIPE,
                 cwd=self.cwd,
                 creationflags=creation_flags,
-                start_new_session=start_new_session
+                start_new_session=start_new_session,
             )
             return process
-        except Exception as e:
-            print(f"Error starting MCP server for testing: {e}")
+        except (IOError, OSError) as e:
+            logger.error("Error starting MCP server for testing: %s", e)
             raise
 
     def stop_server(self):
         """
         Stops the running MCP server.
-
-        Reads the PID from the PID file and attempts to terminate the process group.
-        Removes the PID file upon successful termination or if the process is not found.
         """
-        if not os.path.exists(PID_FILE):
-            print("MCP server is not running (no PID file).")
+        pid = self._read_pid()
+        if not pid:
+            logger.info("MCP server is not running (no PID file).")
             return
 
-        try:
-            with open(PID_FILE, "r") as f:
-                pid = int(f.read().strip())
-        except FileNotFoundError:
-            print("MCP server is not running (no PID file).")
-            return
-        except (IOError, ValueError) as e:
-            print(f"Error reading PID file: {e}")
-            return
+        logger.info("Stopping MCP server with PID: %d...", pid)
+        if sys.platform == "win32":
+            self._terminate_process_windows(pid)
+        else:
+            self._terminate_process_unix(pid)
 
-        print(f"Stopping MCP server with PID: {pid}...")
-        try:
-            if sys.platform == "win32":
-                subprocess.run(["taskkill", "/F", "/T", "/PID", str(pid)], check=True, capture_output=True)
-            else:
-                pgid = os.getpgid(pid)
-                os.killpg(pgid, signal.SIGTERM)
-            print("MCP server stopped.")
-        except (ProcessLookupError, PermissionError) as e:
-            print(f"Process with PID {pid} not found or permission denied: {e}")
-        except subprocess.CalledProcessError as e:
-            # This can happen if the process is already gone
-            if "not found" in e.stderr.decode(errors='ignore').lower():
-                print(f"Process with PID {pid} was not found.")
-            else:
-                print(f"Error stopping MCP server with taskkill: {e.stderr.decode(errors='ignore')}")
-        except Exception as e:
-            print(f"An unexpected error occurred while stopping the server: {e}")
-        finally:
-            if os.path.exists(PID_FILE):
-                os.remove(PID_FILE)
+        # Clean up PID file
+        if os.path.exists(PID_FILE):
+            os.remove(PID_FILE)
+        logger.info("MCP server stopped and PID file removed.")
 
-    def is_process_running(self, pid):
-        """Checks if a process with the given PID is running."""
-        if pid is None:
+    def is_running(self) -> bool:
+        """Checks if the server process is running."""
+        pid = self._read_pid()
+        if not pid:
             return False
+
         try:
             if sys.platform == "win32":
-                result = subprocess.run(["tasklist", "/FI", f"PID eq {pid}"], capture_output=True, text=True)
+                result = subprocess.run(
+                    ["tasklist", "/FI", f"PID eq {pid}"],
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                )
                 return str(pid) in result.stdout
-            else:
-                os.kill(pid, 0)
-                return True
-        except (OSError, subprocess.CalledProcessError):
+            # On Unix, os.kill(pid, 0) checks if the process exists.
+            os.kill(pid, 0)  # pylint: disable=no-member
+            return True
+        except (subprocess.CalledProcessError, OSError):
             return False
 
 
-if __name__ == "__main__":
+def main():
+    """
+    Command-line interface for managing the MCP server.
+    """
     if len(sys.argv) < 3:
         print("Usage: python mcp_server_manager.py <command> <server_script_path>")
         print("Commands: start, stop")
@@ -152,9 +212,11 @@ if __name__ == "__main__":
 
     command = sys.argv[1]
     server_script = sys.argv[2]
-    cwd = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))  # Project root (AMI-SDA)
+    project_root = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), "..", "..")
+    )
 
-    manager = MCPServerManager(server_script, cwd)
+    manager = MCPServerManager(server_script, project_root)
 
     if command == "start":
         manager.start_server()
@@ -163,3 +225,7 @@ if __name__ == "__main__":
     else:
         print(f"Unknown command: {command}")
         sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()

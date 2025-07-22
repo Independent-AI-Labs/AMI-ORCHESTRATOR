@@ -1,0 +1,59 @@
+repos:
+  # Python code formatting
+  - repo: https://github.com/psf/black
+    rev: 23.12.1
+    hooks:
+      - id: black
+        language_version: python3
+        stages: [pre-commit]
+
+  # Import sorting
+  - repo: https://github.com/pycqa/isort
+    rev: 5.13.2
+    hooks:
+      - id: isort
+        args: ["--profile", "black"]
+        stages: [pre-commit]
+
+  # Linting
+  - repo: local
+    hooks:
+      - id: pylint
+        name: pylint
+        entry: poetry run python -m pylint
+        language: system
+        types: [python]
+        args: [--rcfile=.pylintrc]
+        stages: [pre-push]
+
+  # Type checking
+  - repo: local
+    hooks:
+      - id: mypy
+        name: mypy
+        entry: poetry run python -m mypy
+        language: system
+        types: [python]
+        require_serial: true
+        stages: [pre-push]
+
+  # Additional useful hooks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-added-large-files
+      - id: check-merge-conflict
+      - id: debug-statements
+        stages: [pre-commit]
+
+  # Security checks
+  - repo: https://github.com/pycqa/bandit
+    rev: 1.7.5
+    hooks:
+      - id: bandit
+        args: ['-r', '.', '-f', 'json', '-o', 'bandit-report.json', '--exit-zero']
+        stages: [pre-push]
+        pass_filenames: false

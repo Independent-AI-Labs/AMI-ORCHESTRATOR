@@ -1,0 +1,15 @@
+[MASTER]
+load-plugins=pylint.extensions.docparams
+jobs=0
+
+[MESSAGES CONTROL]
+disable=C0114,C0115,C0116,R0903,R0913,W0613,too-many-positional-arguments
+
+[FORMAT]
+max-line-length=160
+
+[DESIGN]
+max-args=7
+max-locals=50
+max-statements=90
+max-branches=15
