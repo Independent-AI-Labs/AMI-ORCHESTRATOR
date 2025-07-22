@@ -57,10 +57,3 @@ repos:
         args: ['-r', '.', '-f', 'json', '-o', 'bandit-report.json', '--exit-zero']
         stages: [pre-push]
         pass_filenames: false
-  - repo: local
-    hooks:
-      - id: pre-push-echo
-        name: Pre-push Echo Test
-        entry: echo "Pre-push hook is running!"
-        language: system
-        stages: [pre-push]
