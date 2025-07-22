@@ -124,10 +124,10 @@ class MCPServerManager:
                     [sys.executable, self.server_script_path],
                     cwd=self.cwd,
                     creationflags=creation_flags,
-                    preexec_fn=preexec_fn,
+                    preexec_fn=preexec_fn,  # pylint: disable=subprocess-popen-preexec-fn
                     stdout=log_file,
                     stderr=log_file,
-                )
+                )  # pylint: disable=consider-using-with
             self._write_pid(process.pid)
             logger.info(
                 "MCP server started with PID: %d. Logs are in %s",
@@ -162,7 +162,7 @@ class MCPServerManager:
                 cwd=self.cwd,
                 creationflags=creation_flags,
                 start_new_session=start_new_session,
-            )
+            )  # pylint: disable=consider-using-with
             return process
         except (IOError, OSError) as e:
             logger.error("Error starting MCP server for testing: %s", e)
@@ -207,9 +207,8 @@ class MCPServerManager:
             if sys.platform != "win32":
                 os.kill(pid, 0)  # pylint: disable=no-member
                 return True
-            else:
-                # On Windows, os.kill is not used for checking process existence
-                return False
+
+            return False
         except (subprocess.CalledProcessError, OSError):
             return False
 
