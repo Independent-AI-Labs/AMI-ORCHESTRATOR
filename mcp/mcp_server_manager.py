@@ -88,11 +88,15 @@ class MCPServerManager:
     def _terminate_process_unix(self, pid: int):
         """Terminates the process on Unix-like systems."""
         try:
-            pgid = os.getpgid(pid)  # pylint: disable=no-member # type: ignore
-            os.killpg(pgid, signal.SIGTERM)  # pylint: disable=no-member # type: ignore
-            logger.info(
-                "Successfully sent termination signal to process group %d.", pgid
-            )
+            if sys.platform != "win32":
+                pgid = os.getpgid(pid)  # pylint: disable=no-member
+                os.killpg(pgid, signal.SIGTERM)  # pylint: disable=no-member
+                logger.info(
+                    "Successfully sent termination signal to process group %d.", pgid
+                )
+            else:
+                # On Windows, os.getpgid and os.killpg are not available
+                pass
         except (ProcessLookupError, PermissionError) as e:
             logger.warning(
                 "Process with PID %d not found or permission denied: %s", pid, e
@@ -200,8 +204,12 @@ class MCPServerManager:
                 )
                 return str(pid) in result.stdout
             # On Unix, os.kill(pid, 0) checks if the process exists.
-            os.kill(pid, 0)  # pylint: disable=no-member # type: ignore
-            return True
+            if sys.platform != "win32":
+                os.kill(pid, 0)  # pylint: disable=no-member
+                return True
+            else:
+                # On Windows, os.kill is not used for checking process existence
+                return False
         except (subprocess.CalledProcessError, OSError):
             return False
 
