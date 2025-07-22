@@ -106,3 +106,4 @@ Security and compliance are paramount and are integrated into the core design:
 - **Continue Linting and Static Analysis:** Address remaining Pylint warnings in all `orchestrator` modules, focusing on code complexity and style.
 - **Implement Core BPMN Engine:** Begin development of the BPMN engine as outlined in the `DEVELOPMENT_PLAN.md`.
 - **Integrate First Agent:** Implement the first agent adapter and integrate it with the Orchestrator.
+- **Pre-commit Hooks:** Pre-commit hooks are installed and configured to ensure code quality.
