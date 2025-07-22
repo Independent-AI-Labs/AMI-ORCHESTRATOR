@@ -14,7 +14,7 @@ LOGS_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "
 os.makedirs(LOGS_DIR, exist_ok=True)
 
 # Generate a unique log file name with a timestamp
-LOG_FILE = os.path.join(LOGS_DIR, f"mcp_server_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.log")
+LOG_FILE = os.path.join(LOGS_DIR, f"localfs_server_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.log")
 logging.basicConfig(
     filename=LOG_FILE,
     level=logging.INFO,

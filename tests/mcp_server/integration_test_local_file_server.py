@@ -16,7 +16,7 @@ import pytest
 from orchestrator.mcp.mcp_server_manager import MCPServerManager
 
 # Define paths relative to the project root
-SERVER_SCRIPT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "mcp", "servers", "local_file_server.py"))
+SERVER_SCRIPT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "mcp", "servers", "localfs", "local_file_server.py"))
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 
 
