@@ -107,3 +107,4 @@ Security and compliance are paramount and are integrated into the core design:
 - **Implement Core BPMN Engine:** Begin development of the BPMN engine as outlined in the `DEVELOPMENT_PLAN.md`.
 - **Integrate First Agent:** Implement the first agent adapter and integrate it with the Orchestrator.
 - **Pre-commit Hooks:** Pre-commit hooks are installed and configured to ensure code quality.
+- This is another line to test pre-push hook.
