@@ -1,3 +1,4 @@
+# Test comment for pre-commit hook
 """
 Manages the lifecycle of an MCP (Model-Controller-Presenter) server.
 
