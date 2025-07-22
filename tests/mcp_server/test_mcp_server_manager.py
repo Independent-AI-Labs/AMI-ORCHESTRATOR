@@ -5,12 +5,12 @@ Unit tests for the MCPServerManager class.
 import os
 import sys
 import unittest
-from unittest.mock import MagicMock, patch, mock_open
+from unittest.mock import MagicMock, mock_open, patch
 
 # Add the project root to the Python path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
-from mcp.mcp_server_manager import MCPServerManager, PID_FILE, LOG_FILE
+from mcp.mcp_server_manager import LOG_FILE, PID_FILE, MCPServerManager
 
 
 class TestMCPServerManager(unittest.TestCase):
@@ -67,7 +67,9 @@ class TestMCPServerManager(unittest.TestCase):
     @patch("mcp.mcp_server_manager.MCPServerManager._terminate_process_windows")
     @patch("mcp.mcp_server_manager.MCPServerManager._read_pid")
     @patch("os.path.exists")
-    def test_stop_server_windows(self, mock_exists, mock_read_pid, mock_terminate, mock_remove):
+    def test_stop_server_windows(
+        self, mock_exists, mock_read_pid, mock_terminate, mock_remove
+    ):
         """Test the stop_server method on Windows."""
         sys.platform = "win32"
         mock_read_pid.return_value = 12345

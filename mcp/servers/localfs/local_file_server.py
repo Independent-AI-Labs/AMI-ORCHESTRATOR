@@ -1205,13 +1205,10 @@ class LocalFiles:
         sys.stdout.flush()
 
         while True:
-
             try:
-
                 line = sys.stdin.buffer.readline()
 
                 if not line:
-
                     logging.info("EOF received, shutting down server")
 
                     break
@@ -1219,17 +1216,14 @@ class LocalFiles:
                 line_str = line.decode("utf-8").strip()
 
                 if not line_str:
-
                     continue
 
                 logging.debug("Received request: %s", line_str)
 
                 try:
-
                     request = json.loads(line_str)
 
                 except json.JSONDecodeError as e:
-
                     self._send_error(f"Invalid JSON in request: {e}")
 
                     continue
@@ -1241,7 +1235,6 @@ class LocalFiles:
                 logging.debug("Processing method: %s, ID: %s", method, request_id)
 
                 if method == "initialize":
-
                     response = {
                         "jsonrpc": "2.0",
                         "result": {
@@ -1257,7 +1250,6 @@ class LocalFiles:
                     continue
 
                 if method == "notifications/initialized":
-
                     logging.info("Client initialization complete")
 
                     print("INITIALIZED_NOTIFICATION_SENT_DEBUG_MESSAGE")
@@ -1267,7 +1259,6 @@ class LocalFiles:
                     continue
 
                 if method == "tools/list":
-
                     response = {
                         "jsonrpc": "2.0",
                         "result": {"tools": self.get_tool_declarations()},
@@ -1279,7 +1270,6 @@ class LocalFiles:
                     continue
 
                 if method == "tools/call":
-
                     params = request.get("params", {})
 
                     tool_name = params.get("name")
@@ -1287,7 +1277,6 @@ class LocalFiles:
                     tool_args = params.get("arguments", {})
 
                     if tool_name not in self.tools:
-
                         self._send_error(
                             f"Unknown tool: '{tool_name}'. Available tools: {list(self.tools.keys())}",
                             request_id,
@@ -1296,7 +1285,6 @@ class LocalFiles:
                         continue
 
                     try:
-
                         logging.info("Executing tool: %s", tool_name)
 
                         # Filter arguments to only include expected parameters
@@ -1318,7 +1306,6 @@ class LocalFiles:
                         self._send_response(response)
 
                     except Exception as e:  # pylint: disable=broad-exception-caught
-
                         logging.error(
                             "Tool execution failed for %s: %s",
                             tool_name,
@@ -1340,38 +1327,31 @@ class LocalFiles:
                 )
 
             except KeyboardInterrupt:
-
                 logging.info("Server interrupted by user")
 
                 break
 
             except Exception as e:  # pylint: disable=broad-exception-caught
-
                 logging.error("Unexpected server error: %s", e, exc_info=True)
 
                 try:
-
                     self._send_error(f"Internal server error: {e}")
 
                 except (
                     Exception
                 ) as send_error:  # pylint: disable=broad-exception-caught
-
                     logging.error("Failed to send error response: %s", send_error)
 
                 # Continue running despite the error
 
 
 if __name__ == "__main__":
-
     try:
-
         server = LocalFiles()
 
         server.run()
 
     except Exception as e:  # pylint: disable=broad-exception-caught
-
         logging.error("Failed to start server: %s", e, exc_info=True)
 
         sys.exit(1)

@@ -29,15 +29,15 @@ This document outlines the future improvements and tasks for the `orchestrator` 
 -   **Improved Exception Handling**: Modified `local_file_server.py` to directly raise specific exceptions (`PermissionError`, `ValueError`, `FileNotFoundError`) instead of re-wrapping them in generic `Exception`s, providing more precise error information.
 -   **Corrected String Replacement Logic**: Re-examined and fixed the `edit_file_replace_string` method in `local_file_server.py` to correctly handle `count=0` (replace all occurrences) and single occurrences.
 -   **Adjusted Line Ending Normalization**: Ensured `_normalize_line_endings` in `local_file_server.py` does not add extra newlines unnecessarily.
--   **Updated `test_local_file_server.py`**: 
+-   **Updated `test_local_file_server.py`**:
     -   Removed the `test_validate_file_path_invalid_chars` test.
     -   Adjusted assertions to correctly match the specific exceptions raised by `local_file_server.py` (e.g., `PermissionError`, `ValueError`, `FileNotFoundError`).
     -   Corrected expected outputs for string replacement tests.
     -   Ensured line range and directory/file type validations raise `ValueError` directly.
--   **Updated `test_mcp_server_manager.py`**: 
+-   **Updated `test_mcp_server_manager.py`**:
     -   Added `time.sleep()` calls to improve test stability for process management.
     -   Ensured `pytest-mock` is correctly integrated for mocking `subprocess.Popen`.
--   **Refactored `integration_test_local_file_server.py`**: 
+-   **Refactored `integration_test_local_file_server.py`**:
     -   Implemented a robust `MCPClient` for JSON-RPC communication with the `local_file_server.py` instance.
     -   Corrected the `PROJECT_ROOT` path to ensure accurate file resolution.
     -   Addressed `OSError` during `stdin.flush()` by ensuring proper pipe handling and server readiness.

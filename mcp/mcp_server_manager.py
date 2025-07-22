@@ -18,9 +18,7 @@ logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
 logger = logging.getLogger(__name__)
 
 # File paths for PID and logs
-PID_FILE = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), ".mcp_server.pid")
-)
+PID_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), ".mcp_server.pid"))
 LOG_FILE = os.path.abspath(
     os.path.join(os.path.dirname(__file__), "logs", "mcp_server.log")
 )
@@ -74,7 +72,9 @@ class MCPServerManager:
                 check=True,
                 capture_output=True,
             )
-            logger.info("Successfully sent termination signal to process group %d.", pid)
+            logger.info(
+                "Successfully sent termination signal to process group %d.", pid
+            )
         except subprocess.CalledProcessError as e:
             if "not found" in e.stderr.decode(errors="ignore").lower():
                 logger.warning("Process with PID %d was not found.", pid)
@@ -89,9 +89,13 @@ class MCPServerManager:
         try:
             pgid = os.getpgid(pid)  # pylint: disable=no-member
             os.killpg(pgid, signal.SIGTERM)  # pylint: disable=no-member
-            logger.info("Successfully sent termination signal to process group %d.", pgid)
+            logger.info(
+                "Successfully sent termination signal to process group %d.", pgid
+            )
         except (ProcessLookupError, PermissionError) as e:
-            logger.warning("Process with PID %d not found or permission denied: %s", pid, e)
+            logger.warning(
+                "Process with PID %d not found or permission denied: %s", pid, e
+            )
         except OSError as e:
             logger.error("Error getting process group or killing process: %s", e)
 
@@ -212,9 +216,7 @@ def main():
 
     command = sys.argv[1]
     server_script = sys.argv[2]
-    project_root = os.path.abspath(
-        os.path.join(os.path.dirname(__file__), "..", "..")
-    )
+    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 
     manager = MCPServerManager(server_script, project_root)
 
