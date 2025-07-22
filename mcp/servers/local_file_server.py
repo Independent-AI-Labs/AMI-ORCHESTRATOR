@@ -1,4 +1,5 @@
 import base64
+import difflib
 import json
 import logging
 import os
@@ -21,13 +22,15 @@ logging.basicConfig(
 )
 
 
-class FileManipulationServer:
+class LocalFiles:
     def __init__(self):
         self.tools = {
-            "write_file": self.write_file,
             "edit_file_replace_string": self.edit_file_replace_string,
             "edit_file_replace_lines": self.edit_file_replace_lines,
+            "edit_file_delete_lines": self.edit_file_delete_lines,
+            "edit_file_insert_lines": self.edit_file_insert_lines,
             "delete_files": self.delete_files,
+            "move_files": self.move_files,
             "create_directory": self.create_directory,
             "delete_directory": self.delete_directory,
         }
@@ -44,7 +47,7 @@ class FileManipulationServer:
             logging.error(f"Failed to send response: {e}")
 
     def _send_error(self, message, request_id=None, code=-32602):
-        """Send a JSON-RPC error response and raise an exception."""
+        """Send a JSON-RPC error response."""
         logging.error(f"Error response: {message} (request_id: {request_id})")
         error_response = {
             "jsonrpc": "2.0",
@@ -56,7 +59,33 @@ class FileManipulationServer:
         if request_id:
             error_response["id"] = request_id
         self._send_response(error_response)
-        raise Exception(message)
+
+    def _filter_tool_arguments(self, tool_name: str, tool_args: dict) -> dict:
+        """Filter tool arguments to only include expected parameters."""
+        # Define expected parameters for each tool
+        expected_params = {
+            "edit_file_replace_string": {"file_path", "old_string", "new_string", "mode", "encoding", "count"},
+            "edit_file_replace_lines": {"file_path", "start_line", "end_line", "new_string", "encoding"},
+            "edit_file_delete_lines": {"file_path", "start_line", "end_line", "encoding"},
+            "edit_file_insert_lines": {"file_path", "line_number", "content", "encoding"},
+            "delete_files": {"file_paths"},
+            "move_files": {"source_paths", "destination_paths", "create_dirs"},
+            "create_directory": {"directory_path"},
+            "delete_directory": {"directory_path"}
+        }
+
+        if tool_name not in expected_params:
+            return tool_args
+
+        expected = expected_params[tool_name]
+        filtered_args = {k: v for k, v in tool_args.items() if k in expected}
+
+        # Log if we filtered out any parameters
+        filtered_out = set(tool_args.keys()) - expected
+        if filtered_out:
+            logging.warning(f"Filtered out unexpected parameters for {tool_name}: {filtered_out}")
+
+        return filtered_args
 
     def _validate_file_path(self, file_path: str) -> str:
         """Validate and normalize file path for security."""
@@ -82,9 +111,42 @@ class FileManipulationServer:
             pass  # File doesn't exist yet, which is fine for write operations
 
     def _normalize_line_endings(self, content: str, target_format: str = '\n') -> str:
-        """Normalize line endings in text content."""
-        # Replace all variations of line endings with the target format
-        return re.sub(r'\r\n|\r|\n', target_format, content)
+        """Normalize line endings in text content and ensure a trailing newline."""
+        normalized_content = re.sub(r'\r\n|\r|\n', target_format, content)
+        if normalized_content and not normalized_content.endswith(target_format):
+            normalized_content += target_format
+        return normalized_content
+
+    def _generate_diff(self, before_content: str, after_content: str, file_path: str) -> str:
+        """Generate a unified diff between before and after content."""
+        try:
+            before_lines = before_content.splitlines(keepends=True)
+            after_lines = after_content.splitlines(keepends=True)
+
+            diff = difflib.unified_diff(
+                before_lines,
+                after_lines,
+                fromfile=f"{os.path.basename(file_path)} (before)",
+                tofile=f"{os.path.basename(file_path)} (after)",
+                lineterm=''
+            )
+
+            diff_lines = list(diff)
+            if not diff_lines:
+                return "No changes detected in diff"
+
+            # Limit diff output to prevent extremely long responses
+            max_diff_lines = 100
+            if len(diff_lines) > max_diff_lines:
+                diff_text = '\n'.join(diff_lines[:max_diff_lines])
+                diff_text += f"\n... (diff truncated after {max_diff_lines} lines)"
+            else:
+                diff_text = '\n'.join(diff_lines)
+
+            return diff_text
+        except Exception as e:
+            logging.error(f"Failed to generate diff: {e}")
+            return f"Failed to generate diff: {e}"
 
     def _read_file_content(self, file_path: str, mode: str = 'text', encoding: str = 'utf-8'):
         """Read file content with proper error handling and normalization."""
@@ -137,7 +199,7 @@ class FileManipulationServer:
             raise PermissionError(f"Permission denied: cannot write to file '{validated_path}'")
         except OSError as e:
             if e.errno == 28:  # No space left on device
-                raise OSError(f"No space left on device when writing to '{validated_path}'")
+                raise OSError(f"No space left on device when writing to '{validated_path}': {e}")
             else:
                 raise OSError(f"OS error writing to file '{validated_path}': {e}")
         except Exception as e:
@@ -167,6 +229,11 @@ class FileManipulationServer:
         try:
             logging.info(f"Writing file: {file_path} (mode: {mode}, encoding: {encoding})")
 
+            if not os.path.exists(os.path.dirname(file_path)):
+                # Only raise if the parent directory doesn't exist and it's not the root
+                if os.path.dirname(file_path) and not os.path.exists(os.path.dirname(file_path)):
+                    raise FileNotFoundError(f"Directory not found for path: {file_path}")
+
             if mode == 'binary':
                 try:
                     decoded_content = base64.b64decode(content.encode('utf-8'))
@@ -195,6 +262,9 @@ class FileManipulationServer:
         try:
             logging.info(f"Replacing string in file: {file_path} (mode: {mode}, count: {count})")
 
+            # Read original content for diff
+            original_content = self._read_file_content(file_path, mode, encoding)
+
             if mode == 'binary':
                 try:
                     old_bytes = base64.b64decode(old_string.encode('utf-8'))
@@ -203,7 +273,7 @@ class FileManipulationServer:
                     raise ValueError(f"Invalid base64 content for binary mode: {e}")
                 old_string, new_string = old_bytes, new_bytes
 
-            current_content = self._read_file_content(file_path, mode, encoding)
+            current_content = original_content
 
             if mode == 'text':
                 if not isinstance(old_string, str) or not isinstance(new_string, str):
@@ -251,8 +321,18 @@ class FileManipulationServer:
 
             self._write_file_content(file_path, new_content, mode, encoding)
 
+            # Generate diff for text mode
+            diff_output = ""
+            if mode == 'text':
+                diff_output = self._generate_diff(original_content, new_content, file_path)
+
             logging.info(f"Successfully replaced {actual_replacements} occurrences in {file_path}")
-            return f"Successfully replaced {actual_replacements} occurrence(s) in '{file_path}'."
+
+            result_msg = f"Successfully replaced {actual_replacements} occurrence(s) in '{file_path}'."
+            if diff_output:
+                result_msg += f"\n\nDiff:\n{diff_output}"
+
+            return result_msg
 
         except Exception as e:
             logging.error(f"Failed to replace string in file {file_path}: {e}")
@@ -269,36 +349,24 @@ class FileManipulationServer:
             if start_line > end_line:
                 raise ValueError(f"Start line ({start_line}) must be less than or equal to end line ({end_line})")
 
-            content = self._read_file_content(file_path, 'text', encoding)
-            lines = content.splitlines(keepends=True)
+            # Read original content for diff
+            original_content = self._read_file_content(file_path, 'text', encoding)
+            lines = original_content.splitlines(keepends=True) # Keep ends here
             total_lines = len(lines)
 
-            if start_line > total_lines:
+            if start_line > total_lines + 1: # Allow replacing at end of file
                 raise ValueError(f"Start line {start_line} exceeds file length ({total_lines} lines)")
 
-            if end_line > total_lines:
+            if end_line > total_lines + 1: # Allow replacing at end of file
                 raise ValueError(f"End line {end_line} exceeds file length ({total_lines} lines)")
 
             # Convert to 0-based indexing
             start_idx = start_line - 1
             end_idx = end_line
 
-            # Normalize the new string's line endings
-            new_string = self._normalize_line_endings(new_string, '\n')
-
-            # Prepare replacement lines
-            if new_string == '':
-                new_lines = []
-            else:
-                new_lines = new_string.splitlines(keepends=True)
-
-                # Handle the case where new_string doesn't end with newline
-                # but we're replacing complete lines that do end with newlines
-                if new_lines and not new_string.endswith('\n'):
-                    # Check if we're replacing lines that end with newline
-                    if end_idx <= len(lines) and any(line.endswith('\n') for line in lines[start_idx:end_idx]):
-                        # Add newline to the last replacement line
-                        new_lines[-1] = new_lines[-1] + '\n'
+            # Normalize the new string's line endings and split
+            new_string_normalized = self._normalize_line_endings(new_string, '\n')
+            new_lines = new_string_normalized.splitlines(keepends=True)
 
             # Perform replacement
             modified_lines = lines[:start_idx] + new_lines + lines[end_idx:]
@@ -306,15 +374,124 @@ class FileManipulationServer:
 
             self._write_file_content(file_path, new_content, 'text', encoding)
 
+            # Generate diff
+            diff_output = self._generate_diff(original_content, new_content, file_path)
+
             replaced_lines = end_line - start_line + 1
             new_line_count = len(new_lines)
 
             logging.info(f"Successfully replaced {replaced_lines} lines with {new_line_count} lines in {file_path}")
-            return f"Successfully replaced lines {start_line}-{end_line} ({replaced_lines} lines) with {new_line_count} line(s) in '{file_path}'."
+
+            result_msg = f"Successfully replaced lines {start_line}-{end_line} ({replaced_lines} lines) with {new_line_count} line(s) in '{file_path}'."
+            if diff_output:
+                result_msg += f"\n\nDiff:\n{diff_output}"
+
+            return result_msg
 
         except Exception as e:
             logging.error(f"Failed to replace lines in file {file_path}: {e}")
             raise Exception(f"Line replacement failed: {e}")
+
+    def edit_file_delete_lines(self, file_path: str, start_line: int, end_line: int, encoding: str = 'utf-8'):
+        """Delete lines within a specified range."""
+        try:
+            logging.info(f"Deleting lines {start_line}-{end_line} in file: {file_path}")
+
+            if start_line <= 0 or end_line <= 0:
+                raise ValueError("Line numbers must be positive (1-based indexing)")
+
+            if start_line > end_line:
+                raise ValueError(f"Start line ({start_line}) must be less than or equal to end line ({end_line})")
+
+            # Read original content for diff
+            original_content = self._read_file_content(file_path, 'text', encoding)
+            lines = original_content.splitlines(keepends=True) # Keep ends here
+            total_lines = len(lines)
+
+            if start_line > total_lines + 1: # Allow deleting from end of file
+                raise ValueError(f"Start line {start_line} exceeds file length ({total_lines} lines)")
+
+            if end_line > total_lines + 1: # Allow deleting from end of file
+                raise ValueError(f"End line {end_line} exceeds file length ({total_lines} lines)")
+
+            # Convert to 0-based indexing
+            start_idx = start_line - 1
+            end_idx = end_line
+
+            # Delete the specified lines by keeping everything before and after
+            modified_lines = lines[:start_idx] + lines[end_idx:]
+            new_content = ''.join(modified_lines)
+
+            self._write_file_content(file_path, new_content, 'text', encoding)
+
+            # Generate diff
+            diff_output = self._generate_diff(original_content, new_content, file_path)
+
+            deleted_lines = end_line - start_line + 1
+            remaining_lines = len(modified_lines)
+
+            logging.info(f"Successfully deleted {deleted_lines} lines from {file_path}")
+
+            result_msg = f"Successfully deleted lines {start_line}-{end_line} ({deleted_lines} lines) from '{file_path}'. File now has {remaining_lines} lines."
+            if diff_output:
+                result_msg += f"\n\nDiff:\n{diff_output}"
+
+            return result_msg
+
+        except Exception as e:
+            logging.error(f"Failed to delete lines from file {file_path}: {e}")
+            raise Exception(f"Line deletion failed: {e}")
+
+    def edit_file_insert_lines(self, file_path: str, line_number: int, content: str, encoding: str = 'utf-8'):
+        """Insert content at a specified line number."""
+        try:
+            logging.info(f"Inserting content at line {line_number} in file: {file_path}")
+
+            if line_number <= 0:
+                raise ValueError("Line number must be positive (1-based indexing)")
+
+            # Read original content for diff
+            original_content = self._read_file_content(file_path, 'text', encoding)
+            lines = original_content.splitlines(keepends=True) # Keep ends here
+            total_lines = len(lines)
+
+            # Allow inserting at line_number = total_lines + 1 (append to end)
+            if line_number > total_lines + 1:
+                raise ValueError(f"Line number {line_number} exceeds file length + 1 ({total_lines + 1})")
+
+            # Normalize the content's line endings and split
+            content_normalized = self._normalize_line_endings(content, '\n')
+            insert_lines = content_normalized.splitlines(keepends=False)
+
+            # Re-add newlines for joining
+            insert_lines_with_ends = [line + '\n' for line in insert_lines]
+
+            # Convert to 0-based indexing for insertion
+            insert_idx = line_number - 1
+
+            # Insert the new lines
+            modified_lines = lines[:insert_idx] + insert_lines_with_ends + lines[insert_idx:]
+            new_content = ''.join(modified_lines)
+
+            self._write_file_content(file_path, new_content, 'text', encoding)
+
+            # Generate diff
+            diff_output = self._generate_diff(original_content, new_content, file_path)
+
+            inserted_line_count = len(insert_lines)
+            new_total_lines = len(modified_lines)
+
+            logging.info(f"Successfully inserted {inserted_line_count} lines at line {line_number} in {file_path}")
+
+            result_msg = f"Successfully inserted {inserted_line_count} line(s) at line {line_number} in '{file_path}'. File now has {new_total_lines} lines."
+            if diff_output:
+                result_msg += f"\n\nDiff:\n{diff_output}"
+
+            return result_msg
+
+        except Exception as e:
+            logging.error(f"Failed to insert lines in file {file_path}: {e}")
+            raise Exception(f"Line insertion failed: {e}")
 
     def delete_files(self, file_paths: list):
         """Delete multiple files."""
@@ -354,11 +531,99 @@ class FileManipulationServer:
             error_msg = f"Some files could not be deleted: {'; '.join(errors)}"
             if deleted_files:
                 error_msg += f". Successfully deleted: {', '.join(deleted_files)}"
+
             logging.error(error_msg)
+
             raise Exception(error_msg)
 
         logging.info(f"Successfully deleted all {len(deleted_files)} file(s)")
+
         return f"Successfully deleted {len(deleted_files)} file(s): {', '.join(deleted_files)}"
+
+    def move_files(self, source_paths: list, destination_paths: list, create_dirs: bool = True):
+        """Move/rename files from source paths to destination paths."""
+        if not isinstance(source_paths, list):
+            raise ValueError("source_paths must be a list")
+
+        if not isinstance(destination_paths, list):
+            raise ValueError("destination_paths must be a list")
+
+        if not source_paths:
+            raise ValueError("source_paths list cannot be empty")
+
+        if not destination_paths:
+            raise ValueError("destination_paths list cannot be empty")
+
+        if len(source_paths) != len(destination_paths):
+            raise ValueError(f"Number of source paths ({len(source_paths)}) must match destination paths ({len(destination_paths)})")
+
+        moved_files = []
+        errors = []
+
+        logging.info(f"Attempting to move {len(source_paths)} file(s)")
+
+        for source_path, dest_path in zip(source_paths, destination_paths):
+            try:
+                validated_source = self._validate_file_path(source_path)
+                validated_dest = self._validate_file_path(dest_path)
+
+                # Check if source exists and is a file
+                if not os.path.exists(validated_source):
+                    errors.append(f"Source file not found: '{source_path}'")
+                    continue
+
+                if not os.path.isfile(validated_source):
+                    errors.append(f"Source path is not a file: '{source_path}'")
+                    continue
+
+                # Create destination directory if requested and it doesn't exist
+                dest_dir = os.path.dirname(validated_dest)
+                if dest_dir and not os.path.exists(dest_dir):
+                    if create_dirs:
+                        try:
+                            os.makedirs(dest_dir, exist_ok=True)
+                            logging.info(f"Created destination directory: {dest_dir}")
+                        except Exception as e:
+                            errors.append(f"Failed to create destination directory '{dest_dir}' for '{source_path}': {e}")
+                            continue
+                    else:
+                        errors.append(f"Destination directory does not exist: '{dest_dir}' for '{source_path}'")
+                        continue
+
+                # Check if destination already exists
+                if os.path.exists(validated_dest):
+                    errors.append(f"Destination already exists: '{dest_path}' for source '{source_path}'")
+                    continue
+
+                # Check file size before moving (just for logging)
+                try:
+                    file_size = os.path.getsize(validated_source)
+                except OSError:
+                    file_size = 0
+
+                # Perform the move operation
+                shutil.move(validated_source, validated_dest)
+                moved_files.append((source_path, dest_path))
+                logging.info(f"Successfully moved file: {source_path} -> {dest_path} ({file_size} bytes)")
+
+            except PermissionError:
+                errors.append(f"Permission denied moving file: '{source_path}' -> '{dest_path}'")
+            except Exception as e:
+                errors.append(f"Error moving file '{source_path}' -> '{dest_path}': {e}")
+
+        # Prepare result message
+        if errors:
+            error_msg = f"Some files could not be moved: {'; '.join(errors)}"
+            if moved_files:
+                moved_list = [f"{src} -> {dst}" for src, dst in moved_files]
+                error_msg += f". Successfully moved: {', '.join(moved_list)}"
+
+            logging.error(error_msg)
+            raise Exception(error_msg)
+
+        logging.info(f"Successfully moved all {len(moved_files)} file(s)")
+        moved_list = [f"{src} -> {dst}" for src, dst in moved_files]
+        return f"Successfully moved {len(moved_files)} file(s): {', '.join(moved_list)}"
 
     def create_directory(self, directory_path: str):
         """Create a directory and any necessary parent directories."""
@@ -416,37 +681,8 @@ class FileManipulationServer:
         """Return tool declarations for the MCP protocol."""
         return [
             {
-                "name": "write_file",
-                "description": "Writes content to a file. Creates parent directories if they don't exist. Supports both text and binary modes.",
-                "inputSchema": {
-                    "type": "object",
-                    "properties": {
-                        "file_path": {
-                            "type": "string",
-                            "description": "The path to the file to write to."
-                        },
-                        "content": {
-                            "type": "string",
-                            "description": "The content to write. For binary mode, provide base64-encoded data."
-                        },
-                        "mode": {
-                            "type": "string",
-                            "enum": ["text", "binary"],
-                            "default": "text",
-                            "description": "Writing mode: 'text' for text files, 'binary' for binary files (content must be base64-encoded)."
-                        },
-                        "encoding": {
-                            "type": "string",
-                            "default": "utf-8",
-                            "description": "Text encoding to use (ignored in binary mode)."
-                        }
-                    },
-                    "required": ["file_path", "content"]
-                }
-            },
-            {
                 "name": "edit_file_replace_string",
-                "description": "Replaces occurrences of old_string with new_string in a file. Handles line ending normalization automatically for text mode.",
+                "description": "Replaces occurrences of old_string with new_string in a file. Shows a diff of changes made. Handles line ending normalization automatically for text mode.",
                 "inputSchema": {
                     "type": "object",
                     "properties": {
@@ -484,7 +720,7 @@ class FileManipulationServer:
             },
             {
                 "name": "edit_file_replace_lines",
-                "description": "Replaces content within a specified range of lines (1-indexed). Handles line ending normalization automatically.",
+                "description": "Replaces content within a specified range of lines (1-indexed). Shows a diff of changes made. Handles line ending normalization automatically.",
                 "inputSchema": {
                     "type": "object",
                     "properties": {
@@ -514,6 +750,60 @@ class FileManipulationServer:
                 }
             },
             {
+                "name": "edit_file_delete_lines",
+                "description": "Deletes lines within a specified range (1-indexed). Shows a diff of changes made. Handles line ending normalization automatically.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "file_path": {
+                            "type": "string",
+                            "description": "The path to the file to modify."
+                        },
+                        "start_line": {
+                            "type": "integer",
+                            "description": "The starting line number to delete (1-based, inclusive)."
+                        },
+                        "end_line": {
+                            "type": "integer",
+                            "description": "The ending line number to delete (1-based, inclusive)."
+                        },
+                        "encoding": {
+                            "type": "string",
+                            "default": "utf-8",
+                            "description": "Text encoding to use."
+                        }
+                    },
+                    "required": ["file_path", "start_line", "end_line"]
+                }
+            },
+            {
+                "name": "edit_file_insert_lines",
+                "description": "Inserts content at a specified line number (1-indexed). Shows a diff of changes made. Handles line ending normalization automatically.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "file_path": {
+                            "type": "string",
+                            "description": "The path to the file to modify."
+                        },
+                        "line_number": {
+                            "type": "integer",
+                            "description": "The line number where content should be inserted (1-based). Content will be inserted before this line. Use file_length + 1 to append to the end."
+                        },
+                        "content": {
+                            "type": "string",
+                            "description": "The content to insert at the specified line."
+                        },
+                        "encoding": {
+                            "type": "string",
+                            "default": "utf-8",
+                            "description": "Text encoding to use."
+                        }
+                    },
+                    "required": ["file_path", "line_number", "content"]
+                }
+            },
+            {
                 "name": "delete_files",
                 "description": "Deletes multiple files. Provides detailed feedback about successes and failures.",
                 "inputSchema": {
@@ -527,6 +817,33 @@ class FileManipulationServer:
                         }
                     },
                     "required": ["file_paths"]
+                }
+            },
+            {
+                "name": "move_files",
+                "description": "Move/rename files from source paths to destination paths. Can create destination directories if needed.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "source_paths": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "A list of source file paths to move.",
+                            "minItems": 1
+                        },
+                        "destination_paths": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "A list of destination file paths. Must match the number of source paths.",
+                            "minItems": 1
+                        },
+                        "create_dirs": {
+                            "type": "boolean",
+                            "default": true,
+                            "description": "Whether to create destination directories if they don't exist."
+                        }
+                    },
+                    "required": ["source_paths", "destination_paths"]
                 }
             },
             {
@@ -631,7 +948,11 @@ class FileManipulationServer:
 
                     try:
                         logging.info(f"Executing tool: {tool_name}")
-                        result = self.tools[tool_name](**tool_args)
+
+                        # Filter arguments to only include expected parameters
+                        filtered_args = self._filter_tool_arguments(tool_name, tool_args)
+
+                        result = self.tools[tool_name](**filtered_args)
                         response = {
                             "jsonrpc": "2.0",
                             "result": {
@@ -654,12 +975,16 @@ class FileManipulationServer:
                 break
             except Exception as e:
                 logging.error(f"Unexpected server error: {e}", exc_info=True)
-                self._send_error(f"Internal server error: {e}")
+                try:
+                    self._send_error(f"Internal server error: {e}")
+                except Exception as send_error:
+                    logging.error(f"Failed to send error response: {send_error}")
+                # Continue running despite the error
 
 
 if __name__ == "__main__":
     try:
-        server = FileManipulationServer()
+        server = LocalFiles()
         server.run()
     except Exception as e:
         logging.error(f"Failed to start server: {e}", exc_info=True)
