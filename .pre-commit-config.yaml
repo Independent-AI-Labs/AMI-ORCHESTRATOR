@@ -57,3 +57,11 @@ repos:
         args: ['-r', '.', '-f', 'json', '-o', 'bandit-report.json', '--exit-zero']
         stages: [pre-push]
         pass_filenames: false
+
+  - repo: https://github.com/semgrep/semgrep
+    rev: v1.59.0
+    hooks:
+      - id: semgrep
+        args: ['--config=auto', '--error']
+        stages: [pre-push]
+        pass_filenames: false
