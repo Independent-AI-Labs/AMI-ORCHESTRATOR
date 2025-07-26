@@ -27,7 +27,7 @@ graph TD
     subgraph "Orchestrator Core"
         B -- Commands --> C{Event Bus: Redis Streams}
         D[BPMN Engine] -- Consumes & Publishes --> C
-        E[Worker & Agent Manager] -- Manages --> F((Agent Fleet))
+        E[Worker & Agent Manager] -- Manages --> F((Agent Fleet via ACP))
         E -- Consumes & Publishes --> C
         G[State & Audit Controller] -- Writes --> H
     end
@@ -54,12 +54,12 @@ graph TD
 
 ## 3. Key Components
 
-- **Orchestrator Core:** The central brain that listens for external API calls and internal events, initiating and driving the execution of BPMN processes.
-- **BPMN Engine:** Parses and interprets process definitions, managing state transitions within the Dgraph database.
-- **Dgraph Client:** A dedicated client for all interactions with the graph database, handling schema management and state persistence.
-- **Redis Streams:** The high-performance message bus for all inter-component communication, providing a persistent, scalable, and reliable event log.
-- **Worker Manager:** Responsible for discovering, registering, and monitoring the health of all connected agents and workers.
-- **Agent Ecosystem (via ACP):** A flexible framework for integrating diverse specialized agents and workers, each with specific capabilities (e.g., file manipulation, AI analysis, human interaction).
+- **REST API:** Provides external interfaces for initiating processes, querying process status, and interacting with human tasks.
+- **BPMN Engine:** The core execution engine responsible for parsing, interpreting, and executing BPMN 2.0 process definitions. It manages process state transitions and interacts with Dgraph for persistence.
+- **Dgraph Client:** Manages interactions with the Dgraph graph database, handling process state persistence, audit logging, and schema management.
+- **Redis Streams (Event Bus):** Serves as the high-performance, persistent message broker for all inter-component communication, enabling an event-driven architecture.
+- **Worker & Agent Manager:** Responsible for managing the lifecycle of connected workers and AI agents, including registration, health checks, and task distribution via the Agent-Coordinator Protocol (ACP).
+- **Agent Ecosystem (via ACP):** A flexible and extensible framework for integrating diverse specialized agents and workers (e.g., AI agents, file system workers, internal API workers, human task managers) that perform specific tasks within a BPMN process.
 
 ## 4. Getting Started
 
@@ -70,14 +70,16 @@ The Orchestrator is a complex system with multiple interacting components. To se
 3.  **Launch Agents/Workers:** Start one or more agent processes (e.g., the Local Files Worker, a Gemini AI Agent). These agents will automatically register themselves with the Orchestrator via the ACP.
 4.  **Initiate a Process:** Use the REST API or an administrative client to send a request to the Orchestrator to start a new BPMN process instance.
 
+For detailed setup instructions, refer to the `DEVELOPMENT_PLAN.md` and `NEXT_STEPS.md` files.
+
 ## 5. Security & Compliance by Design
 
-Security and compliance are paramount and are integrated into the core design:
+Security and compliance are not afterthoughts; they are core design principles:
 
--   **Authentication & Authorization:** All API endpoints are protected by OAuth2/OIDC. Role-Based Access Control (RBAC) governs all actions.
--   **Secret Management:** All sensitive information is stored in a secure vault.
--   **Immutable Audit Log:** Every event and state change is cryptographically signed and stored in an append-only log in Dgraph, creating an unbreakable chain of evidence.
--   **Data Encryption:** All data is encrypted both in transit (TLS) and at rest.
+-   **Authentication & Authorization:** All API endpoints will be protected by OAuth2/OIDC. Role-Based Access Control (RBAC) will govern all actions, from initiating a process to completing a human task.
+-   **Secret Management:** All secrets (API keys, passwords, certificates) will be stored in VaultWarden and never in code or configuration files.
+-   **Immutable Audit Log:** Every event and state change will be cryptographically signed and stored in an append-only log in Dgraph, creating an unbreakable chain of evidence.
+-   **Data Encryption:** All data will be encrypted both in transit (TLS) and at rest.
 
 ## 6. Scalability & Resilience
 
@@ -87,25 +89,13 @@ Security and compliance are paramount and are integrated into the core design:
 
 ## 7. Monitoring & Observability
 
--   **Comprehensive Metrics:** Detailed metrics are collected from all components, covering process execution, task performance, agent health, and resource utilization.
--   **Structured Logging:** All logs are structured and centralized for easy analysis and auditing.
--   **Distributed Tracing:** End-to-end tracing provides visibility into requests flowing through the system.
--   **Alerting & Dashboards:** Critical metrics trigger alerts, and Grafana dashboards provide real-time visualization of system health.
+-   **Metrics:** Comprehensive metrics will be collected from all components (BPMN engine, Dgraph, Redis, agents, adapters) including process instance counts, task execution times, agent performance, and resource utilization.
+-   **Logging:** Custom logging based on Prometheus (for time-series metrics), Dgraph (for immutable audit logs through BPMN), and Postgres (for general application logs) provides granular control and optimized data storage.
+-   **Tracing:** Distributed tracing (e.g., OpenTelemetry) will provide end-to-end visibility of requests flowing through the system.
+-   **Alerting & Dashboards:** Critical metrics will have predefined alert thresholds, and Grafana dashboards will provide real-time visualization of all key metrics and system health.
 
 ## 8. Current Status & Next Steps
 
-### Current Status
+The Orchestrator project is currently in **Phase 1: Foundational Infrastructure & Security Core** and **Phase 2: Core BPMN Engine & State Machine** of its development plan. Significant progress has been made in establishing the core infrastructure, including a Flask API, Redis client, and a functional BPMN engine with handlers for various BPMN elements. All unit, integration, and end-to-end tests are currently passing.
 
-- **Linting and Static Analysis:**
-    - `orchestrator/mcp/mcp_server_manager.py`: Syntax errors resolved. Pylint score improved to 9.08/10. Bandit warnings addressed.
-    - `orchestrator/mcp/servers/localfs/local_file_server.py`: Syntax errors resolved. Pylint score improved to 8.60/10. Bandit warnings addressed.
-    - `orchestrator/tests/mcp_server/integration_test_local_file_server.py`: Syntax errors resolved. Pylint score improved to 8.60/10. Bandit warnings addressed.
-
-### Next Steps
-
-- **Continue Linting and Static Analysis:** Address remaining Pylint warnings in all `orchestrator` modules, focusing on code complexity and style.
-- **Implement Core BPMN Engine:** Begin development of the BPMN engine as outlined in the `DEVELOPMENT_PLAN.md`.
-- **Integrate First Agent:** Implement the first agent adapter and integrate it with the Orchestrator.
-- **Pre-commit Hooks:** Pre-commit hooks are installed and configured to ensure code quality.
-- This is another line to test pre-push hook.
-- This is the third line to test pre-push hook.
+For a detailed breakdown of completed tasks, current progress, and the next steps, please refer to the `DEVELOPMENT_PLAN.md` and `NEXT_STEPS.md` files.
