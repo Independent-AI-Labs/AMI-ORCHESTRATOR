@@ -123,12 +123,10 @@ This plan breaks down the development into logical phases, starting with a solid
         *   Define standardized data structures and communication protocols for AI agents within the ACP, including clear input schemas for various AI tasks (e.g., decision requests, content analysis prompts) and robust output schemas for AI responses (e.g., decision outcomes, extracted entities, generated content, confidence scores).
         *   Establish efficient mechanisms for passing large context data (e.g., entire documents, extensive code snippets, complex datasets) to AI agents and receiving comprehensive results.
 
-    2.  **Enhance Gemini CLI Adapter for Specific AI Services:**
-        *   Develop the `GeminiCliAdapter` to expose specific, actionable AI capabilities of the Gemini CLI as distinct, callable services via the ACP. Examples include:
-            *   **Code Analysis:** Invoking Gemini to analyze code for vulnerabilities, suggest refactoring improvements, or generate documentation.
-            *   **Problem Diagnosis:** Using Gemini to analyze log data or error messages and suggest root causes or remediation steps.
-            *   **Natural Language Understanding:** Processing unstructured text (e.g., customer emails, support tickets) to extract intent, entities, or summarize content for routing or task creation.
-        *   Implement robust error handling, retry mechanisms, and fallback strategies for all Gemini CLI interactions to ensure process resilience.
+    2.  **Gemini CLI Adapter:** Develop a robust adapter for the `gemini-cli` agent that acts as a transparent communication bridge. This involves:
+        *   Translating incoming ACP `TaskRequest` messages into appropriate commands or inputs for the Gemini CLI.
+        *   Capturing the output and results from the Gemini CLI and translating them back into ACP `TaskCompleted` or `TaskFailed` messages.
+        *   Implementing necessary error handling, retry mechanisms, and basic fallback strategies to ensure reliable communication with the Gemini CLI, treating it as an external service.
 
     3.  **Implement AI-Driven Dynamic Routing (Enhanced Exclusive Gateway):**
         *   Extend the `exclusiveGateway` to support AI-driven decision logic. This involves:
