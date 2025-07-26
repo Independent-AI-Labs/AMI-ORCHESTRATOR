@@ -27,9 +27,28 @@ class TestBpmnEngineIntegration(unittest.TestCase):
             self.prometheus_client,
         )
 
+
+import os
+
+
+class TestBpmnEngineIntegration(unittest.TestCase):
+    """Integration tests for the BpmnEngine class."""
+
+    def setUp(self):
+        """Set up the test case."""
+        self.dgraph_client = DgraphClient()
+        self.redis_client = RedisClient()
+        self.security_manager = SecurityManager()
+        self.prometheus_client = PrometheusClient()
+        self.bpmn_engine = BpmnEngine(
+            self.dgraph_client,
+            self.security_manager,
+            self.redis_client,
+            self.prometheus_client,
+        )
+
     def test_start_process(self):
         """Test the start_process method."""
-        import os
 
         current_dir = os.path.dirname(os.path.abspath(__file__))
         project_root = os.path.abspath(os.path.join(current_dir, "..", "..", ".."))
