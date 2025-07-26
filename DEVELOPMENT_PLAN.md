@@ -109,13 +109,43 @@ This plan breaks down the development into logical phases, starting with a solid
 
 ### Phase 5: Intelligent Agents & Dynamic Process Execution (Planned)
 
-*   **Goal:** Infuse the orchestrator with AI-driven decision-making capabilities.
-*   **Current Status:** A placeholder `GeminiCliAdapter` exists.
+*   **Goal:** Transform the Orchestrator into an intelligent, adaptive system capable of AI-driven decision-making, dynamic process adaptation, and autonomous task execution, leveraging advanced AI models.
+
+*   **Key AI Capabilities to Integrate:**
+    *   **Intelligent Decisioning:** AI-powered evaluation of complex process variables, external data, and contextual information to determine optimal process paths, intelligent task assignments, or sophisticated exception handling.
+    *   **Autonomous Task Execution:** AI agents capable of performing complex, non-deterministic tasks (e.g., code generation, data analysis, natural language understanding, content summarization) as part of a `serviceTask`, reducing manual intervention.
+    *   **Dynamic Process Adaptation:** AI-driven modification of running process instances or even suggesting adjustments to process definitions based on real-time insights, performance metrics, or anomaly detection.
+    *   **Semantic Content Understanding:** AI for deep semantic analysis of messages, documents, or unstructured data to enable intelligent correlation, routing, and data extraction.
+
 *   **Tasks:**
-    1.  **Gemini CLI Adapter:** Develop a sophisticated adapter for the `gemini-cli` agent, exposing its capabilities (code analysis, refactoring, etc.) as addressable tools within the ACP.
-    2.  **Dynamic Routing:** Enhance the `exclusiveGateway` to make routing decisions based on the data returned by an AI agent.
-    3.  **Content-Based Correlation:** Implement the ability to correlate events and messages based on their content, allowing for highly dynamic and adaptive workflows.
-    4.  **Testing:** Write unit and integration tests for the Gemini CLI adapter and the dynamic routing logic.
+
+    1.  **Formalize AI Agent Interface & Data Exchange:**
+        *   Define standardized data structures and communication protocols for AI agents within the ACP, including clear input schemas for various AI tasks (e.g., decision requests, content analysis prompts) and robust output schemas for AI responses (e.g., decision outcomes, extracted entities, generated content, confidence scores).
+        *   Establish efficient mechanisms for passing large context data (e.g., entire documents, extensive code snippets, complex datasets) to AI agents and receiving comprehensive results.
+
+    2.  **Enhance Gemini CLI Adapter for Specific AI Services:**
+        *   Develop the `GeminiCliAdapter` to expose specific, actionable AI capabilities of the Gemini CLI as distinct, callable services via the ACP. Examples include:
+            *   **Code Analysis:** Invoking Gemini to analyze code for vulnerabilities, suggest refactoring improvements, or generate documentation.
+            *   **Problem Diagnosis:** Using Gemini to analyze log data or error messages and suggest root causes or remediation steps.
+            *   **Natural Language Understanding:** Processing unstructured text (e.g., customer emails, support tickets) to extract intent, entities, or summarize content for routing or task creation.
+        *   Implement robust error handling, retry mechanisms, and fallback strategies for all Gemini CLI interactions to ensure process resilience.
+
+    3.  **Implement AI-Driven Dynamic Routing (Enhanced Exclusive Gateway):**
+        *   Extend the `exclusiveGateway` to support AI-driven decision logic. This involves:
+            *   Configuring gateway conditions to invoke an AI agent with relevant process variables and contextual data.
+            *   Interpreting the AI agent's structured response (e.g., a recommended path ID, a confidence score, a set of weighted options) to dynamically select the next sequence flow.
+            *   Implementing a clear fallback mechanism if the AI decision is ambiguous, low-confidence, or fails to provide a valid path.
+
+    4.  **Enable Intelligent Content-Based Correlation:**
+        *   Integrate AI capabilities (e.g., advanced NLP models) to semantically analyze incoming messages or events (e.g., from Redis streams, external webhooks).
+        *   Enable the orchestrator to correlate these events with waiting process instances based on the *meaning* and *context* of the content, rather than just exact matches on predefined correlation keys. This will significantly enhance the flexibility and intelligence of `messageEvent` handling.
+
+    5.  **Explore AI-Powered Task Assignment and Delegation:**
+        *   Investigate and prototype mechanisms for using AI to intelligently assign human tasks or delegate `serviceTask` execution to the most appropriate worker/agent based on their capabilities, current workload, historical performance, and the specific requirements of the task.
+
+    6.  **Comprehensive Testing for AI Integration:**
+        *   Develop dedicated unit, integration, and end-to-end tests for all AI-driven functionalities. This includes testing AI agent invocation, accurate interpretation of AI responses, correct dynamic routing decisions, and effective content correlation.
+        *   Implement specific test cases for AI failure scenarios, ambiguous AI responses, and the robustness of fallback mechanisms.
 
 ### Phase 6: Enterprise Readiness, Scalability & Compliance (Planned)
 
