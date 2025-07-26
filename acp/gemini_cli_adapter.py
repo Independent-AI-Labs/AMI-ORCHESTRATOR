@@ -2,46 +2,74 @@
 Adapter for the Gemini CLI agent.
 """
 
-from orchestrator.acp.agent import ACPAgent
-from orchestrator.acp.protocol import (
-    AIRequest,
-    AIResponse,
-    TaskCompleted,
-    TaskFailed,
-    TaskRequest,
-    TaskType,
+import json
+import subprocess
+from threading import Thread
+
+from orchestrator.acp.gemini_acp_protocol import (
+    Agent,
+    InitializeParams,
+    InitializeResponse,
+    SendUserMessageParams,
 )
 
 
-class GeminiCliAdapter(ACPAgent):
+class GeminiCliAdapter(Agent):
     """Adapter for the Gemini CLI agent."""
 
-    def handle_task_request(self, task_request: TaskRequest) -> None:
-        """Handle a task request from the orchestrator."""
-        if task_request.task_type == TaskType.AI_REQUEST:
-            ai_request = AIRequest(**task_request.parameters)
-            # Placeholder for actual AI processing
-            print(f"Handling AI request: {ai_request.task_type}")
-            ai_response = AIResponse(status="success", output_data={"message": f"AI request {ai_request.task_type} processed."}, confidence_score=0.99)
-            task_completed = TaskCompleted(task_id=task_request.task_id, result=ai_response)
-            self.send_task_completed(task_completed)
-        elif task_request.task_type == TaskType.GENERIC_TASK:
-            # Existing generic task handling
-            print(f"Handling generic task request for Gemini CLI: {task_request.task_name}")
-            # In a real implementation, this would involve calling the Gemini CLI
-            # with the provided parameters and returning the result.
-            task_completed = TaskCompleted(task_id=task_request.task_id, result={"message": f"Generic task {task_request.task_name} processed."})
-            self.send_task_completed(task_completed)
-        else:
-            task_failed = TaskFailed(task_id=task_request.task_id, error_message=f"Unknown task type: {task_request.task_type}")
-            self.send_task_failed(task_failed)
+    def __init__(self, gemini_cli_path: str):
+        self.gemini_cli_path = gemini_cli_path
+        self.process = None
+        self.thread = None
+        self._running = False
 
-    def send_task_completed(self, task_completed: TaskCompleted) -> None:
-        """Send a task completed message to the orchestrator."""
-        # In a real implementation, this would send the message over Redis
-        print(f"Task {task_completed.task_id} completed with result: {task_completed.result}")
+    def initialize(self, params: InitializeParams) -> InitializeResponse:
+        """Initialize the Gemini CLI agent."""
+        self.process = subprocess.Popen(
+            ["node", self.gemini_cli_path, "--experimental-acp"],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
 
-    def send_task_failed(self, task_failed: TaskFailed) -> None:
-        """Send a task failed message to the orchestrator."""
-        # In a real implementation, this would send the message over Redis
-        print(f"Task {task_failed.task_id} failed with error: {task_failed.error_message}")
+        self.thread = Thread(target=self._listen_for_messages)
+        self.thread.start()
+
+        request = {"jsonrpc": "2.0", "id": 0, "method": "initialize", "params": params.__dict__}
+        self.process.stdin.write(json.dumps(request) + "\n")
+        self.process.stdin.flush()
+
+        response_str = self.process.stdout.readline()
+        response = json.loads(response_str)
+
+        return InitializeResponse(**response["result"])
+
+    def _listen_for_messages(self):
+        self._running = True
+        while self._running:
+            line = self.process.stdout.readline()
+            if not line:
+                break
+            message = json.loads(line)
+            # Process message
+
+    def stop(self):
+        self._running = False
+        if self.process:
+            self.process.terminate()
+            self.process.wait()
+        if self.thread:
+            self.thread.join()
+
+    def send_user_message(self, params: SendUserMessageParams) -> None:
+        """Send a user message to the Gemini CLI agent."""
+        request = {"jsonrpc": "2.0", "id": 1, "method": "sendUserMessage", "params": params.__dict__}
+        self.process.stdin.write(json.dumps(request) + "\n")
+        self.process.stdin.flush()
+
+    def cancel_send_message(self) -> None:
+        """Cancel the current send message operation."""
+        request = {"jsonrpc": "2.0", "id": 2, "method": "cancelSendMessage", "params": {}}
+        self.process.stdin.write(json.dumps(request) + "\n")
+        self.process.stdin.flush()

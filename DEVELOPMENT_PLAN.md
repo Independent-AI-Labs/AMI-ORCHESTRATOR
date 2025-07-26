@@ -9,7 +9,7 @@ Its purpose is to serve as a multi-purpose, enterprise-grade reasoning engine. I
 - **Auditability & Compliance:** Every action, decision, and state change is immutably logged, creating a comprehensive audit trail that can be used to meet strict compliance requirements.
 - **Resilience & Fault Tolerance:** The system is designed to be highly available and to gracefully handle failures, with built-in mechanisms for retries, rollbacks, and human-in-the-loop escalations.
 - **Scalability & Performance:** The architecture is horizontally scalable by design, allowing for the independent scaling of all components to meet any workload demand.
-- **Extensibility & Interoperability:** A standardized Agent-Coordinator Protocol (ACP) allows for the seamless integration of any service, from internal microservices and legacy systems to third-party APIs and advanced AI models.
+- **Extensibility & Interoperability:** A standardized Agent-Coordinator Protocol (ACP), implemented as a JSON-RPC protocol over stdin/stdout (e.g., when Gemini runs in `--experimental-acp` mode), allows for the seamless integration of any service, from internal microservices and legacy systems to third-party APIs and advanced AI models.
 - **Intelligence & Adaptability:** The Orchestrator is more than a static workflow engine; it is a reasoning engine that can use AI to make decisions, adapt processes in real-time, and automate complex, non-deterministic tasks.
 
 ## 2. Architectural Blueprint
