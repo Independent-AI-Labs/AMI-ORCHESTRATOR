@@ -174,18 +174,18 @@ Security and compliance are not afterthoughts; they are core design principles.
 
 ## 6. Technology Stack
 
--   **Core Language:** Python 3.10+
+-   **Core Language:** Python 3.12: Leveraging the latest performance improvements, enhanced type hinting features (e.g., `type` statement, `override` decorator), and improved error messages. These advancements contribute to a more robust, maintainable, and potentially more performant codebase, crucial for a high-throughput orchestration engine.
 -   **Process Engine:** Custom BPMN 2.0 engine (Python)
 -   **Graph Database:** Dgraph (for process state, audit log, and relationships)
 -   **Message Broker:** Redis Streams (for event-driven communication)
 -   **Containerization:** Docker
 -   **Orchestration:** Kubernetes (with Helm for deployment)
 -   **Authentication/Authorization:** OAuth2/OIDC, Custom RBAC implementation
--   **Secret Management:** HashiCorp Vault (or Kubernetes Secrets)
+-   **Secret Management:** VaultWarden: Provides a lightweight, self-hostable, and secure solution for managing secrets. It offers a balance between ease of deployment and robust security features, making it suitable for both development and production environments where a full-fledged HashiCorp Vault might introduce unnecessary complexity or overhead.
 -   **Monitoring & Alerting:** Prometheus, Grafana
--   **Logging:** Structured logging (e.g., ELK stack or similar)
+-   **Logging:** Custom based on Prometheus, Dgraph (through BPMN) and Postgres!: This custom logging strategy is designed for granular control and optimized data storage based on the type of information. Prometheus will be used for time-series metrics, providing real-time insights into system health, performance, and process throughput. Dgraph (through BPMN) will serve as the immutable audit log and primary store for process-specific events and state changes, leveraging its graph capabilities for complex queries and compliance. This ensures that every step of a BPMN process is auditable and traceable within the process context. Postgres will be utilized for general application logs, debugging information, and other structured data that doesn't fit the time-series or graph-based process audit models. This provides a robust relational database for comprehensive operational logging. This approach allows for tailored storage and querying mechanisms for different types of log data, optimizing both performance and analytical capabilities.
 -   **API Framework:** FastAPI (for REST API)
--   **UI Framework:** React/Next.js (for Admin & Monitoring UI)
+-   **UI Framework:** TBD: Decoupling the UI framework decision allows for maximum flexibility. The choice will be made at a later stage, based on evolving frontend requirements, the specific needs of the Admin & Monitoring UI, and the availability of suitable technologies that align with the project's long-term vision for user experience and maintainability. This ensures the core orchestrator remains independent and API-driven.
 
 ## 7. Deployment Strategy
 
