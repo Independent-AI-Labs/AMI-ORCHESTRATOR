@@ -5,7 +5,7 @@ Unit tests for the DgraphClient class.
 import unittest
 from unittest.mock import MagicMock, patch
 
-import pydgraph
+import pydgraph  # type: ignore
 
 from orchestrator.core.dgraph_client import DgraphClient
 

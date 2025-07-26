@@ -187,7 +187,7 @@ def read_only_dir_fixture(tmp_path: Path) -> Generator[Path, None, None]:
         os.chmod(dir_path, stat.S_IWRITE | stat.S_IREAD | stat.S_IEXEC)
 
 
-def test_mcp_list_tools(mcp_server_client_fixture: MCPClient):
+def test_mcp_list_tools(client: MCPClient):
     """Tests the list_tools MCP command."""
     tools = mcp_server_client_fixture.list_tools()
     assert isinstance(tools, list)  # nosec B101
@@ -195,20 +195,20 @@ def test_mcp_list_tools(mcp_server_client_fixture: MCPClient):
     assert any(tool["name"] == "read_file" for tool in tools)  # nosec B101
 
 
-def test_mcp_read_file_text(mcp_server_client_fixture: MCPClient, temp_integration_file_fixture: str):
+def test_mcp_read_file_text(client: MCPClient, temp_integration_file_fixture: str):
     """Tests reading a text file using MCP."""
     result = mcp_server_client_fixture.call_tool("read_file", file_path=temp_integration_file_fixture, mode="text")
     assert result == "Line 1\nLine 2\nLine 3\n"  # nosec B101
 
 
-def test_mcp_read_file_binary(mcp_server_client_fixture: MCPClient, temp_integration_binary_file_fixture: str):
+def test_mcp_read_file_binary(client: MCPClient, temp_integration_binary_file_fixture: str):
     """Tests reading a binary file using MCP."""
     result = mcp_server_client_fixture.call_tool("read_file", file_path=temp_integration_binary_file_fixture, mode="binary")
     expected_content_b64 = base64.b64encode(b"\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09").decode("utf-8")
     assert result == expected_content_b64  # nosec B101
 
 
-def test_mcp_write_file_text(mcp_server_client_fixture: MCPClient, tmp_path: Path):
+def test_mcp_write_file_text(client: MCPClient, tmp_path: Path):
     """Tests writing a text file using MCP."""
     file_path = tmp_path / "write_test.txt"
     result = mcp_server_client_fixture.call_tool("write_file", file_path=str(file_path), content="New text content.", mode="text")
@@ -216,7 +216,7 @@ def test_mcp_write_file_text(mcp_server_client_fixture: MCPClient, tmp_path: Pat
     assert file_path.read_text() == "New text content."  # nosec B101
 
 
-def test_mcp_write_file_binary(mcp_server_client_fixture: MCPClient, tmp_path: Path):
+def test_mcp_write_file_binary(client: MCPClient, tmp_path: Path):
     """Tests writing a binary file using MCP."""
     file_path = tmp_path / "write_binary_test.bin"
     content_b64 = base64.b64encode(b"\x0a\x0b\x0c").decode("utf-8")
@@ -225,7 +225,7 @@ def test_mcp_write_file_binary(mcp_server_client_fixture: MCPClient, tmp_path: P
     assert file_path.read_bytes() == b"\x0a\x0b\x0c"  # nosec B101
 
 
-def test_mcp_replace_content_text(mcp_server_client_fixture: MCPClient, temp_integration_file_fixture: str):
+def test_mcp_replace_content_text(client: MCPClient, temp_integration_file_fixture: str):
     """Tests replacing content in a text file using MCP."""
     old_c = "Line 2"
     new_c = "Replaced Line 2"
@@ -241,7 +241,7 @@ def test_mcp_replace_content_text(mcp_server_client_fixture: MCPClient, temp_int
         assert f.read() == "Line 1\nReplaced Line 2\nLine 3\n"  # nosec B101
 
 
-def test_mcp_replace_content_binary(mcp_server_client_fixture: MCPClient, temp_integration_binary_file_fixture: str):
+def test_mcp_replace_content_binary(client: MCPClient, temp_integration_binary_file_fixture: str):
     """Tests replacing content in a binary file using MCP."""
     old_c = b"\x01\x02"
     new_c = b"\xff\xfe"
@@ -257,7 +257,7 @@ def test_mcp_replace_content_binary(mcp_server_client_fixture: MCPClient, temp_i
         assert f.read() == b"\x00\xff\xfe\x03\x04\x05\x06\x07\x08\x09"  # nosec B101
 
 
-def test_mcp_replace_lines(mcp_server_client_fixture: MCPClient, temp_integration_file_fixture: str):
+def test_mcp_replace_lines(client: MCPClient, temp_integration_file_fixture: str):
     """Tests replacing lines in a text file using MCP."""
     new_content = "New line 2\nNew line 3\n"
     result = mcp_server_client_fixture.call_tool(
@@ -272,7 +272,7 @@ def test_mcp_replace_lines(mcp_server_client_fixture: MCPClient, temp_integratio
         assert f.read() == "Line 1\nNew line 2\nNew line 3\n"  # nosec B101
 
 
-def test_mcp_delete_files(mcp_server_client_fixture: MCPClient, tmp_path: Path):
+def test_mcp_delete_files(client: MCPClient, tmp_path: Path):
     """Tests deleting multiple files using MCP."""
     file1 = tmp_path / "file1.txt"
     file2 = tmp_path / "file2.txt"
@@ -285,7 +285,7 @@ def test_mcp_delete_files(mcp_server_client_fixture: MCPClient, tmp_path: Path):
     assert not file2.exists()  # nosec B101
 
 
-def test_mcp_move_files(mcp_server_client_fixture: MCPClient, tmp_path: Path):
+def test_mcp_move_files(client: MCPClient, tmp_path: Path):
     """Tests moving files using MCP."""
     source_file = tmp_path / "source.txt"
     destination_file = tmp_path / "destination.txt"
@@ -302,7 +302,7 @@ def test_mcp_move_files(mcp_server_client_fixture: MCPClient, tmp_path: Path):
     assert destination_file.read_text() == "content"  # nosec B101
 
 
-def test_mcp_create_directory(mcp_server_client_fixture: MCPClient, tmp_path: Path):
+def test_mcp_create_directory(client: MCPClient, tmp_path: Path):
     """Tests creating a directory using MCP."""
     new_dir = tmp_path / "new_directory"
     result = mcp_server_client_fixture.call_tool("create_directory", directory_path=str(new_dir))
@@ -310,7 +310,7 @@ def test_mcp_create_directory(mcp_server_client_fixture: MCPClient, tmp_path: Pa
     assert new_dir.is_dir()  # nosec B101
 
 
-def test_mcp_delete_directory(mcp_server_client_fixture: MCPClient, tmp_path: Path):
+def test_mcp_delete_directory(client: MCPClient, tmp_path: Path):
     """Tests deleting a directory using MCP."""
     dir_to_delete = tmp_path / "dir_to_delete"
     dir_to_delete.mkdir()
@@ -324,21 +324,21 @@ def test_mcp_delete_directory(mcp_server_client_fixture: MCPClient, tmp_path: Pa
 # --- Error handling tests ---
 
 
-def test_mcp_read_file_not_found_error(mcp_server_client_fixture: MCPClient, tmp_path: Path):
+def test_mcp_read_file_not_found_error(client: MCPClient, tmp_path: Path):
     """Tests read_file error for non-existent file."""
     non_existent_file = tmp_path / "non_existent.txt"
     with pytest.raises(MCPError, match=r"File not found: .*non_existent.txt"):
         mcp_server_client_fixture.call_tool("read_file", file_path=str(non_existent_file))
 
 
-def test_mcp_write_file_permission_error(mcp_server_client_fixture: MCPClient, read_only_dir_fixture: Path):
+def test_mcp_write_file_permission_error(client: MCPClient, read_only_dir_fixture: Path):
     """Tests write_file error for permission denied."""
     read_only_path = read_only_dir_fixture / "test.txt"
     with pytest.raises(MCPError, match=r"Permission denied: cannot write to file"):
         mcp_server_client_fixture.call_tool("write_file", file_path=str(read_only_path), content="some content")
 
 
-def test_mcp_replace_lines_error(mcp_server_client_fixture: MCPClient, tmp_path: Path):
+def test_mcp_replace_lines_error(client: MCPClient, tmp_path: Path):
     """Tests replace_lines error for non-existent file."""
     non_existent_file = tmp_path / "non_existent.txt"
     with pytest.raises(MCPError, match=r"File not found: .*non_existent.txt"):
@@ -351,7 +351,7 @@ def test_mcp_replace_lines_error(mcp_server_client_fixture: MCPClient, tmp_path:
         )
 
 
-def test_mcp_delete_files_error(mcp_server_client_fixture: MCPClient, tmp_path: Path):
+def test_mcp_delete_files_error(client: MCPClient, tmp_path: Path):
     """Tests delete_files error for non-existent file."""
     non_existent_file = tmp_path / "non_existent.txt"
     with pytest.raises(
@@ -361,7 +361,7 @@ def test_mcp_delete_files_error(mcp_server_client_fixture: MCPClient, tmp_path: 
         mcp_server_client_fixture.call_tool("delete_files", file_paths=[str(non_existent_file)])
 
 
-def test_mcp_move_files_error(mcp_server_client_fixture: MCPClient, tmp_path: Path):
+def test_mcp_move_files_error(client: MCPClient, tmp_path: Path):
     """Tests move_files error for non-existent source file."""
     non_existent_file = tmp_path / "non_existent.txt"
     target_file = tmp_path / "target.txt"
@@ -376,27 +376,27 @@ def test_mcp_move_files_error(mcp_server_client_fixture: MCPClient, tmp_path: Pa
         )
 
 
-def test_mcp_create_directory_permission_error(mcp_server_client_fixture: MCPClient, read_only_dir_fixture: Path):
+def test_mcp_create_directory_permission_error(client: MCPClient, read_only_dir_fixture: Path):
     """Tests create_directory error for permission denied."""
     invalid_path = read_only_dir_fixture / "new_dir"
     with pytest.raises(MCPError, match=r"Permission denied creating directory"):
         mcp_server_client_fixture.call_tool("create_directory", directory_path=str(invalid_path))
 
 
-def test_mcp_delete_directory_not_found_error(mcp_server_client_fixture: MCPClient, tmp_path: Path):
+def test_mcp_delete_directory_not_found_error(client: MCPClient, tmp_path: Path):
     """Tests delete_directory error for non-existent directory."""
     invalid_path = tmp_path / "nonexistent_dir"
     with pytest.raises(MCPError, match=r"Directory not found: .*nonexistent_dir"):
         mcp_server_client_fixture.call_tool("delete_directory", directory_path=str(invalid_path))
 
 
-def test_mcp_unknown_tool_error(mcp_server_client_fixture: MCPClient):
+def test_mcp_unknown_tool_error(client: MCPClient):
     """Tests unknown tool error."""
     with pytest.raises(MCPError, match="Unknown tool"):
         mcp_server_client_fixture.call_tool("non_existent_tool")
 
 
-def test_mcp_server_shutdown_on_eof(mcp_server_client_fixture: MCPClient):
+def test_mcp_server_shutdown_on_eof(client: MCPClient):
     """Tests that the MCP server shuts down on EOF."""
     if mcp_server_client_fixture.process.stdin and not mcp_server_client_fixture.process.stdin.closed:
         mcp_server_client_fixture.process.stdin.close()

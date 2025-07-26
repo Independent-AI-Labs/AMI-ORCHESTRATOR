@@ -1,3 +1,5 @@
+"""Setup script for the orchestrator package."""
+
 from setuptools import find_packages, setup
 
 setup(

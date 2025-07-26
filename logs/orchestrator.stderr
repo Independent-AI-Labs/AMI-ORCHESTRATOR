@@ -1,0 +1,12 @@
+C:\Users\vdonc\miniconda3\envs\sda\Lib\site-packages\google\protobuf\runtime_version.py:98: UserWarning: Protobuf gencode version 5.29.0 is exactly one major version older than the runtime version 6.30.0 at api.proto. Please update the gencode to avoid compatibility violations in the next runtime release.
+  warnings.warn(
+WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
+ * Running on http://127.0.0.1:8080
+Press CTRL+C to quit
+127.0.0.1 - - [26/Jul/2025 13:34:29] "POST /api/processes/sample_process/start HTTP/1.1" 200 -
+127.0.0.1 - - [26/Jul/2025 13:34:31] "GET /api/processes/instances/0x123 HTTP/1.1" 200 -
+C:\Users\vdonc\miniconda3\envs\sda\Lib\site-packages\google\protobuf\runtime_version.py:98: UserWarning: Protobuf gencode version 5.29.0 is exactly one major version older than the runtime version 6.30.0 at api.proto. Please update the gencode to avoid compatibility violations in the next runtime release.
+  warnings.warn(
+WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
+ * Running on http://127.0.0.1:8080
+Press CTRL+C to quit

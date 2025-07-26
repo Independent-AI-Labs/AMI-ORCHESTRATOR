@@ -29,7 +29,12 @@ class TestBpmnEngineIntegration(unittest.TestCase):
 
     def test_start_process(self):
         """Test the start_process method."""
-        self.bpmn_engine.start_process("orchestrator/bpmn/definitions/sample_process.json", "admin")
+        import os
+
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        project_root = os.path.abspath(os.path.join(current_dir, "..", "..", ".."))
+        process_definition_path = os.path.join(project_root, "orchestrator", "bpmn", "definitions", "sample_process.json")
+        self.bpmn_engine.start_process(process_definition_path, "admin")
 
 
 if __name__ == "__main__":

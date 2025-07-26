@@ -1,3 +1,6 @@
+"""Tool declarations for the MCP protocol."""
+
+
 def get_read_file_declaration():
     return {
         "name": "read_file",
@@ -29,7 +32,8 @@ def get_read_file_declaration():
 def get_write_file_declaration():
     return {
         "name": "write_file",
-        "description": "Write content to a file. Creates parent directories if needed. Supports both text and binary modes with diff generation for text files.",
+        "description": "Write content to a file. Creates parent directories if needed. "
+        "Supports both text and binary modes with diff generation for text files.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -61,7 +65,9 @@ def get_write_file_declaration():
 def get_edit_file_replace_string_declaration():
     return {
         "name": "edit_file_replace_string",
-        "description": "Replaces occurrences of old_string with new_string in a file. Shows a diff of changes made. Handles line ending normalization automatically for text mode.",
+        "description": "Replaces occurrences of old_string with new_string in a file. "
+        "Shows a diff of changes made. Handles line ending normalization "
+        "automatically for text mode.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -102,7 +108,9 @@ def get_edit_file_replace_string_declaration():
 def get_edit_file_replace_lines_declaration():
     return {
         "name": "edit_file_replace_lines",
-        "description": "Replaces content within a specified range of lines (1-indexed). Shows a diff of changes made. Handles line ending normalization automatically.",
+        "description": "Replaces content within a specified range of lines (1-indexed). "
+        "Shows a diff of changes made. Handles line ending normalization "
+        "automatically.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -136,7 +144,7 @@ def get_edit_file_replace_lines_declaration():
 def get_edit_file_delete_lines_declaration():
     return {
         "name": "edit_file_delete_lines",
-        "description": "Deletes lines within a specified range (1-indexed). Shows a diff of changes made. Handles line ending normalization automatically.",
+        "description": "Deletes lines within a specified range (1-indexed). Shows a diff of " "changes made. Handles line ending normalization automatically.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -166,7 +174,8 @@ def get_edit_file_delete_lines_declaration():
 def get_edit_file_insert_lines_declaration():
     return {
         "name": "edit_file_insert_lines",
-        "description": "Inserts content at a specified line number (1-indexed). Shows a diff of changes made. Handles line ending normalization automatically.",
+        "description": "Inserts content at a specified line number (1-indexed). Shows a diff of "
+        "changes made. Handles line ending normalization automatically.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -176,7 +185,11 @@ def get_edit_file_insert_lines_declaration():
                 },
                 "line_number": {
                     "type": "integer",
-                    "description": "The line number where content should be inserted (1-based). Content will be inserted before this line. Use file_length + 1 to append to the end.",
+                    "description": (
+                        "The line number where content should be inserted (1-based). "
+                        "Content will be inserted before this line. "
+                        "Use file_length + 1 to append to the end."
+                    ),
                 },
                 "content": {
                     "type": "string",
@@ -228,7 +241,7 @@ def get_move_files_declaration():
                 "destination_paths": {
                     "type": "array",
                     "items": {"type": "string"},
-                    "description": "A list of destination file paths. Must match the number of source paths.",
+                    "description": ("A list of destination file paths. Must match the number of " "source paths."),
                     "minItems": 1,
                 },
                 "create_dirs": {
@@ -262,7 +275,7 @@ def get_create_directory_declaration():
 def get_delete_directory_declaration():
     return {
         "name": "delete_directory",
-        "description": "Deletes a directory and all its contents recursively. Provides count of deleted items.",
+        "description": ("Deletes a directory and all its contents recursively. " "Provides count of deleted items."),
         "inputSchema": {
             "type": "object",
             "properties": {

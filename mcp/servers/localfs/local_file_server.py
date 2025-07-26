@@ -7,6 +7,7 @@ import sys
 from datetime import datetime
 
 from orchestrator.mcp.servers.localfs.file_utils import FileUtils
+from orchestrator.mcp.servers.localfs.tool_definitions import get_tool_declarations
 
 # Create a /logs directory in the project root if it doesn't exist
 LOGS_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "logs"))
@@ -25,18 +26,7 @@ class LocalFiles:
     """Provides file manipulation tools via the MCP protocol."""
 
     def __init__(self):
-        self.tools = {
-            "read_file": self.read_file,
-            "write_file": self.write_file,
-            "edit_file_replace_string": self.edit_file_replace_string,
-            "edit_file_replace_lines": self.edit_file_replace_lines,
-            "edit_file_delete_lines": self.edit_file_delete_lines,
-            "edit_file_insert_lines": self.edit_file_insert_lines,
-            "delete_files": self.delete_files,
-            "move_files": self.move_files,
-            "create_directory": self.create_directory,
-            "delete_directory": self.delete_directory,
-        }
+        self.tools = {tool_decl["name"]: getattr(self, tool_decl["name"]) for tool_decl in get_tool_declarations()}
 
     def _send_response(self, response):
         """Send a JSON-RPC response to stdout."""
@@ -61,44 +51,14 @@ class LocalFiles:
 
     def _filter_tool_arguments(self, tool_name: str, tool_args: dict) -> dict:
         """Filter tool arguments to only include expected parameters."""
-        # Define expected parameters for each tool
-        expected_params = {
-            "read_file": {"file_path", "mode", "encoding"},
-            "write_file": {"file_path", "content", "mode", "encoding"},
-            "edit_file_replace_string": {
-                "file_path",
-                "old_string",
-                "new_string",
-                "mode",
-                "encoding",
-                "count",
-            },
-            "edit_file_replace_lines": {
-                "file_path",
-                "start_line",
-                "end_line",
-                "new_string",
-                "encoding",
-            },
-            "edit_file_delete_lines": {
-                "file_path",
-                "start_line",
-                "end_line",
-                "encoding",
-            },
-            "edit_file_insert_lines": {
-                "file_path",
-                "line_number",
-                "content",
-                "encoding",
-            },
-            "delete_files": {"file_paths"},
-            "move_files": {"source_paths", "destination_paths", "create_dirs"},
-            "create_directory": {"directory_path"},
-            "delete_directory": {"directory_path"},
-        }
+        tool_declarations = get_tool_declarations()
+        expected_params = {}
+        for tool_decl in tool_declarations:
+            if tool_decl["name"] == tool_name:
+                expected_params = set(tool_decl["inputSchema"]["properties"].keys())
+                break
 
-        if tool_name not in expected_params:
+        if not expected_params:
             return tool_args
 
         expected = expected_params[tool_name]
@@ -684,259 +644,6 @@ class LocalFiles:
             logging.error(error_msg)
             raise Exception(error_msg) from e
 
-    def get_tool_declarations(self):
-        """Return tool declarations for the MCP protocol."""
-        return [
-            {
-                "name": "read_file",
-                "description": "Read content from a file. Supports both text and binary modes with automatic line ending normalization for text.",
-                "inputSchema": {
-                    "type": "object",
-                    "properties": {
-                        "file_path": {
-                            "type": "string",
-                            "description": "The path to the file to read.",
-                        },
-                        "mode": {
-                            "type": "string",
-                            "enum": ["text", "binary"],
-                            "default": "text",
-                            "description": "Read mode: 'text' for text files with encoding, 'binary' for binary files (returns base64).",
-                        },
-                        "encoding": {
-                            "type": "string",
-                            "default": "utf-8",
-                            "description": "Text encoding to use (ignored in binary mode).",
-                        },
-                    },
-                    "required": ["file_path"],
-                },
-            },
-            {
-                "name": "write_file",
-                "description": "Write content to a file. Creates parent directories if needed. Supports both text and binary modes with diff generation for text files.",
-                "inputSchema": {
-                    "type": "object",
-                    "properties": {
-                        "file_path": {
-                            "type": "string",
-                            "description": "The path to the file to write.",
-                        },
-                        "content": {
-                            "type": "string",
-                            "description": "The content to write. For binary mode, provide base64-encoded data.",
-                        },
-                        "mode": {
-                            "type": "string",
-                            "enum": ["text", "binary"],
-                            "default": "text",
-                            "description": "Write mode: 'text' for text files with encoding, 'binary' for binary files (expects base64).",
-                        },
-                        "encoding": {
-                            "type": "string",
-                            "default": "utf-8",
-                            "description": "Text encoding to use (ignored in binary mode).",
-                        },
-                    },
-                    "required": ["file_path", "content"],
-                },
-            },
-            {
-                "name": "edit_file_replace_string",
-                "description": "Replaces occurrences of old_string with new_string in a file. Shows a diff of changes made. Handles line ending normalization automatically for text mode.",
-                "inputSchema": {
-                    "type": "object",
-                    "properties": {
-                        "file_path": {
-                            "type": "string",
-                            "description": "The path to the file to modify.",
-                        },
-                        "old_string": {
-                            "type": "string",
-                            "description": "The content to find and replace. For binary mode, provide base64-encoded data.",
-                        },
-                        "new_string": {
-                            "type": "string",
-                            "description": "The content to replace with. For binary mode, provide base64-encoded data.",
-                        },
-                        "mode": {
-                            "type": "string",
-                            "enum": ["text", "binary"],
-                            "default": "text",
-                            "description": "Operation mode: 'text' with automatic line ending handling, 'binary' for exact byte matching.",
-                        },
-                        "encoding": {
-                            "type": "string",
-                            "default": "utf-8",
-                            "description": "Text encoding to use (ignored in binary mode).",
-                        },
-                        "count": {
-                            "type": "integer",
-                            "default": 0,
-                            "description": "Maximum number of replacements to make. 0 means replace all occurrences.",
-                        },
-                    },
-                    "required": ["file_path", "old_string", "new_string"],
-                },
-            },
-            {
-                "name": "edit_file_replace_lines",
-                "description": "Replaces content within a specified range of lines (1-indexed). Shows a diff of changes made. Handles line ending normalization automatically.",
-                "inputSchema": {
-                    "type": "object",
-                    "properties": {
-                        "file_path": {
-                            "type": "string",
-                            "description": "The path to the file to modify.",
-                        },
-                        "start_line": {
-                            "type": "integer",
-                            "description": "The starting line number (1-based, inclusive).",
-                        },
-                        "end_line": {
-                            "type": "integer",
-                            "description": "The ending line number (1-based, inclusive).",
-                        },
-                        "new_string": {
-                            "type": "string",
-                            "description": "The new content to replace the specified lines with.",
-                        },
-                        "encoding": {
-                            "type": "string",
-                            "default": "utf-8",
-                            "description": "Text encoding to use.",
-                        },
-                    },
-                    "required": ["file_path", "start_line", "end_line", "new_string"],
-                },
-            },
-            {
-                "name": "edit_file_delete_lines",
-                "description": "Deletes lines within a specified range (1-indexed). Shows a diff of changes made. Handles line ending normalization automatically.",
-                "inputSchema": {
-                    "type": "object",
-                    "properties": {
-                        "file_path": {
-                            "type": "string",
-                            "description": "The path to the file to modify.",
-                        },
-                        "start_line": {
-                            "type": "integer",
-                            "description": "The starting line number to delete (1-based, inclusive).",
-                        },
-                        "end_line": {
-                            "type": "integer",
-                            "description": "The ending line number to delete (1-based, inclusive).",
-                        },
-                        "encoding": {
-                            "type": "string",
-                            "default": "utf-8",
-                            "description": "Text encoding to use.",
-                        },
-                    },
-                    "required": ["file_path", "start_line", "end_line"],
-                },
-            },
-            {
-                "name": "edit_file_insert_lines",
-                "description": "Inserts content at a specified line number (1-indexed). Shows a diff of changes made. Handles line ending normalization automatically.",
-                "inputSchema": {
-                    "type": "object",
-                    "properties": {
-                        "file_path": {
-                            "type": "string",
-                            "description": "The path to the file to modify.",
-                        },
-                        "line_number": {
-                            "type": "integer",
-                            "description": "The line number where content should be inserted (1-based). Content will be inserted before this line. Use file_length + 1 to append to the end.",
-                        },
-                        "content": {
-                            "type": "string",
-                            "description": "The content to insert at the specified line.",
-                        },
-                        "encoding": {
-                            "type": "string",
-                            "default": "utf-8",
-                            "description": "Text encoding to use.",
-                        },
-                    },
-                    "required": ["file_path", "line_number", "content"],
-                },
-            },
-            {
-                "name": "delete_files",
-                "description": "Deletes multiple files. Provides detailed feedback about successes and failures.",
-                "inputSchema": {
-                    "type": "object",
-                    "properties": {
-                        "file_paths": {
-                            "type": "array",
-                            "items": {"type": "string"},
-                            "description": "A list of file paths to delete.",
-                            "minItems": 1,
-                        }
-                    },
-                    "required": ["file_paths"],
-                },
-            },
-            {
-                "name": "move_files",
-                "description": "Move/rename files from source paths to destination paths. Can create destination directories if needed.",
-                "inputSchema": {
-                    "type": "object",
-                    "properties": {
-                        "source_paths": {
-                            "type": "array",
-                            "items": {"type": "string"},
-                            "description": "A list of source file paths to move.",
-                            "minItems": 1,
-                        },
-                        "destination_paths": {
-                            "type": "array",
-                            "items": {"type": "string"},
-                            "description": "A list of destination file paths. Must match the number of source paths.",
-                            "minItems": 1,
-                        },
-                        "create_dirs": {
-                            "type": "boolean",
-                            "default": True,
-                            "description": "Whether to create destination directories if they don't exist.",
-                        },
-                    },
-                    "required": ["source_paths", "destination_paths"],
-                },
-            },
-            {
-                "name": "create_directory",
-                "description": "Creates a directory and any necessary parent directories. Reports if directory already exists.",
-                "inputSchema": {
-                    "type": "object",
-                    "properties": {
-                        "directory_path": {
-                            "type": "string",
-                            "description": "The path of the directory to create.",
-                        }
-                    },
-                    "required": ["directory_path"],
-                },
-            },
-            {
-                "name": "delete_directory",
-                "description": "Deletes a directory and all its contents recursively. Provides count of deleted items.",
-                "inputSchema": {
-                    "type": "object",
-                    "properties": {
-                        "directory_path": {
-                            "type": "string",
-                            "description": "The path of the directory to delete.",
-                        }
-                    },
-                    "required": ["directory_path"],
-                },
-            },
-        ]
-
     def _handle_request(self, line_str):
         """Handle a single JSON-RPC request."""
         try:
@@ -971,7 +678,7 @@ class LocalFiles:
         if method == "tools/list":
             response = {
                 "jsonrpc": "2.0",
-                "result": {"tools": self.get_tool_declarations()},
+                "result": {"tools": get_tool_declarations()},
                 "id": request_id,
             }
             self._send_response(response)
@@ -1000,12 +707,7 @@ class LocalFiles:
                 }
                 self._send_response(response)
             except Exception as e:  # pylint: disable=broad-exception-caught
-                logging.error(
-                    "Tool execution failed for %s: %s",
-                    tool_name,
-                    e,
-                    exc_info=True,
-                )
+                logging.error("Tool execution failed for %s: %s", tool_name, e, exc_info=True)
                 self._send_error(f"Tool '{tool_name}' execution failed: {e}", request_id)
             return
 
@@ -1024,8 +726,14 @@ class LocalFiles:
             try:
                 line = sys.stdin.buffer.readline()
                 if not line:
-                    logging.info("EOF received, shutting down server")
-                    break
+                    # If no line is received, it means no input is available.
+                    # In a detached process, stdin might not be actively written to.
+                    # We should not break, but rather continue to wait for input.
+                    # Add a small sleep to prevent busy-waiting.
+                    import time
+
+                    time.sleep(0.1)
+                    continue
 
                 line_str = line.decode("utf-8").strip()
                 if not line_str:

@@ -2,7 +2,7 @@
 Dgraph client for the Orchestrator.
 """
 
-import pydgraph
+import pydgraph  # type: ignore
 
 from orchestrator.core.config import Config
 

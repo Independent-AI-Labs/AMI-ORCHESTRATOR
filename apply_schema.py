@@ -1,7 +1,8 @@
 """
 Applies the Dgraph schema to the database.
 """
-import pydgraph
+
+import pydgraph  # type: ignore
 
 from orchestrator.core.dgraph_client import DgraphClient
 

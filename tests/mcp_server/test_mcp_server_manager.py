@@ -20,10 +20,12 @@ class TestMCPServerManager(unittest.TestCase):
         self.cwd = "/path/to/fake/cwd"
         self.manager = MCPServerManager(self.server_script_path, self.cwd)
 
+    @patch("orchestrator.mcp.mcp_server_manager.MCPServerManager._read_pid")
     @patch("os.path.exists")
-    def test_is_running_no_pid_file(self, mock_exists):
+    def test_is_running_no_pid_file(self, mock_exists, mock_read_pid):
         """Test is_running when no PID file exists."""
         mock_exists.return_value = False
+        mock_read_pid.return_value = None
         self.assertFalse(self.manager.is_running())
 
     @patch("builtins.open")

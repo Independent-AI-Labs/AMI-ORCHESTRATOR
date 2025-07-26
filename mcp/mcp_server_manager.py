@@ -111,12 +111,11 @@ class MCPServerManager:
 
             with open(LOG_FILE, "wb") as log_file:
                 process = subprocess.Popen(
-                    [sys.executable, self.server_script_path],
+                    [sys.executable, "-m", "orchestrator.mcp.servers.localfs.local_file_server"],
                     cwd=self.cwd,
                     creationflags=creation_flags,
-                    preexec_fn=preexec_fn,  # pylint: disable=subprocess-popen-preexec-fn
-                    stdout=log_file,
-                    stderr=log_file,
+                    preexec_fn=preexec_fn,  # pylint: disable=W1509,R1732
+                    stdin=subprocess.DEVNULL if sys.platform == "win32" else None,
                 )  # pylint: disable=consider-using-with
             self._write_pid(process.pid)
             logger.info(
@@ -150,7 +149,7 @@ class MCPServerManager:
                 cwd=self.cwd,
                 creationflags=creation_flags,
                 start_new_session=start_new_session,
-            )  # pylint: disable=consider-using-with
+            )
             return process
         except (IOError, OSError) as e:
             logger.error("Error starting MCP server for testing: %s", e)

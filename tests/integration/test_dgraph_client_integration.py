@@ -4,7 +4,7 @@ Integration tests for the DgraphClient class against a live Dgraph instance.
 
 import unittest
 
-import pydgraph
+import pydgraph  # type: ignore
 
 from orchestrator.core.dgraph_client import DgraphClient
 

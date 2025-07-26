@@ -38,7 +38,12 @@ class BpmnEngine:
             "endEvent": self._handle_end_event,
         }
 
-    def start_process(self, process_definition_path: str, user: str, variables: Optional[dict[str, Any]] = None) -> str:
+    def start_process(
+        self,
+        process_definition_path: str,
+        user: str,
+        variables: Optional[dict[str, Any]] = None,
+    ) -> str:
         """Start a new BPMN process instance."""
         if variables is None:
             variables = {}

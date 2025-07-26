@@ -32,13 +32,20 @@ class TestSampleProcessE2E(unittest.TestCase):
 
     def test_start_process(self):
         """Test starting a new process instance."""
-        response = requests.post("http://localhost:8080/api/processes/sample_process/start", json={}, timeout=10)
+        response = requests.post(
+            "http://localhost:8080/api/processes/sample_process/start",
+            json={},
+            timeout=10,
+        )
         self.assertEqual(response.status_code, 200)
         process_instance_id = response.json()["id"]
 
         # Wait for the process to complete
         for _ in range(10):
-            response = requests.get(f"http://localhost:8080/api/processes/instances/{process_instance_id}", timeout=10)
+            response = requests.get(
+                f"http://localhost:8080/api/processes/instances/{process_instance_id}",
+                timeout=10,
+            )
             if response.json()["status"] == "COMPLETED":
                 break
             time.sleep(1)
