@@ -1,0 +1,33 @@
+{
+    "name": "Sample Process",
+    "description": "A sample BPMN process for testing purposes.",
+    "nodes": [
+        {
+            "id": "start_event",
+            "type": "startEvent",
+            "name": "Start"
+        },
+        {
+            "id": "task_1",
+            "type": "task",
+            "name": "Task 1"
+        },
+        {
+            "id": "end_event",
+            "type": "endEvent",
+            "name": "End"
+        }
+    ],
+    "edges": [
+        {
+            "id": "flow_1",
+            "from": "start_event",
+            "to": "task_1"
+        },
+        {
+            "id": "flow_2",
+            "from": "task_1",
+            "to": "end_event"
+        }
+    ]
+}
