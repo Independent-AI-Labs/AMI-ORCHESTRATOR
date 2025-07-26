@@ -63,7 +63,7 @@ This plan breaks down the development into logical phases, starting with a solid
     *   Dgraph Client: Basic client implemented, but `create_process_instance` and `create_human_task` are placeholders.
     *   Redis Setup: Client implemented for messaging and dead-letter queue.
     *   Security Kernel: `SecurityManager` exists, but authorization logic (e.g., `is_authorized_for_human_task`) is not fully implemented.
-    *   Initial Orchestrator Service: Flask API is set up.
+    *   Initial Orchestrator Service: FastAPI is set up.
     *   Testing: Unit, integration, and E2E tests are passing.
 *   **Tasks to Complete:**
     1.  **Dgraph Persistence:** Fully implement `create_process_instance` and `create_human_task` in `DgraphClient` to ensure proper process and human task persistence.
@@ -87,15 +87,19 @@ This plan breaks down the development into logical phases, starting with a solid
     3.  **Real-time Process Status:** Implement the actual logic for the `/api/processes/instances/<process_instance_id>` endpoint in `api.py` to fetch real-time process status from Dgraph.
     4.  **Testing:** Write comprehensive unit and integration tests for the BPMN engine, process loader, and worker integration.
 
-### Phase 3: The Agent-Coordinator Protocol (ACP) & First Worker (Planned)
+### Phase 3: The Agent-Coordinator Protocol (ACP) & First Worker (In Progress)
 
 *   **Goal:** Define the agent communication standard and integrate the first simple worker.
-*   **Current Status:** ACP definition (`acp/protocol.py`) is complete. A `sample_worker.py` exists.
-*   **Tasks:**
-    1.  **Generic Agent Interface:** Create a Python abstract base class (`ACPAgent`) that defines the standard methods all agent adapters must implement.
-    2.  **Worker Manager Enhancements:** Enhance the `WorkerManager` to handle agent registration, health checks, and capability discovery via ACP.
-    3.  **First Adapter:** Implement a simple adapter for a basic Python function worker, proving the end-to-end flow from a `serviceTask` in BPMN to a worker and back.
-    4.  **Testing:** Write unit and integration tests for the ACP, worker manager, and sample adapter.
+*   **Current Status:**
+    *   ACP definition (`acp/protocol.py`) is complete.
+    *   Gemini CLI specific ACP definition (`acp/gemini_acp_protocol.py`) is defined.
+    *   `sample_worker.py` exists.
+    *   Generic Agent Interface: The `Icon` class and `Agent` base class are defined in `acp/agent.py`.
+    *   Gemini CLI Adapter: `GeminiCliAdapter` is implemented in `acp/gemini_cli_adapter.py` and unit tested.
+*   **Tasks to Complete:**
+    1.  **Worker Manager Enhancements:** Enhance the `WorkerManager` to handle agent registration, health checks, and capability discovery via ACP. This includes integrating the `GeminiCliAdapter` with the `WorkerManager`.
+    2.  **First Generic Adapter:** Implement a simple adapter for a basic Python function worker to demonstrate the end-to-end flow from a `serviceTask` in BPMN to a worker and back, utilizing the enhanced `WorkerManager`.
+    3.  **Testing:** Write comprehensive unit and integration tests for the `WorkerManager` enhancements and the first generic adapter.
 
 ### Phase 4: Advanced Business Logic & Human-in-the-Loop (Planned)
 
@@ -123,25 +127,20 @@ This plan breaks down the development into logical phases, starting with a solid
         *   Define standardized data structures and communication protocols for AI agents within the ACP, including clear input schemas for various AI tasks (e.g., decision requests, content analysis prompts) and robust output schemas for AI responses (e.g., decision outcomes, extracted entities, generated content, confidence scores).
         *   Establish efficient mechanisms for passing large context data (e.g., entire documents, extensive code snippets, complex datasets) to AI agents and receiving comprehensive results.
 
-    2.  **Gemini CLI Adapter:** Develop a robust adapter for the `gemini-cli` agent that acts as a transparent communication bridge. This involves:
-        *   Translating incoming ACP `TaskRequest` messages into appropriate commands or inputs for the Gemini CLI.
-        *   Capturing the output and results from the Gemini CLI and translating them back into ACP `TaskCompleted` or `TaskFailed` messages.
-        *   Implementing necessary error handling, retry mechanisms, and basic fallback strategies to ensure reliable communication with the Gemini CLI, treating it as an external service.
-
-    3.  **Implement AI-Driven Dynamic Routing (Enhanced Exclusive Gateway):**
+    2.  **Implement AI-Driven Dynamic Routing (Enhanced Exclusive Gateway):**
         *   Extend the `exclusiveGateway` to support AI-driven decision logic. This involves:
             *   Configuring gateway conditions to invoke an AI agent with relevant process variables and contextual data.
             *   Interpreting the AI agent's structured response (e.g., a recommended path ID, a confidence score, a set of weighted options) to dynamically select the next sequence flow.
             *   Implementing a clear fallback mechanism if the AI decision is ambiguous, low-confidence, or fails to provide a valid path.
 
-    4.  **Enable Intelligent Content-Based Correlation:**
+    3.  **Enable Intelligent Content-Based Correlation:**
         *   Integrate AI capabilities (e.g., advanced NLP models) to semantically analyze incoming messages or events (e.g., from Redis streams, external webhooks).
         *   Enable the orchestrator to correlate these events with waiting process instances based on the *meaning* and *context* of the content, rather than just exact matches on predefined correlation keys. This will significantly enhance the flexibility and intelligence of `messageEvent` handling.
 
-    5.  **Explore AI-Powered Task Assignment and Delegation:**
+    4.  **Explore AI-Powered Task Assignment and Delegation:**
         *   Investigate and prototype mechanisms for using AI to intelligently assign human tasks or delegate `serviceTask` execution to the most appropriate worker/agent based on their capabilities, current workload, historical performance, and the specific requirements of the task.
 
-    6.  **Comprehensive Testing for AI Integration:**
+    5.  **Comprehensive Testing for AI Integration:**
         *   Develop dedicated unit, integration, and end-to-end tests for all AI-driven functionalities. This includes testing AI agent invocation, accurate interpretation of AI responses, correct dynamic routing decisions, and effective content correlation.
         *   Implement specific test cases for AI failure scenarios, ambiguous AI responses, and the robustness of fallback mechanisms.
 
@@ -203,7 +202,7 @@ Security and compliance are not afterthoughts; they are core design principles.
     -   Agent availability and performance
     -   Resource utilization (CPU, memory, network I/O) for all containers/pods
     -   Queue lengths and message processing rates for Redis Streams
-    -   Database query performance and connection pool statistics
+    -   Database query performance and connection pool statistics.
 -   **Logging:** Structured logging will be implemented across all components, with logs centralized in a robust logging solution (e.g., ELK stack, Splunk, Datadog). Log levels will be configurable.
 -   **Tracing:** Distributed tracing (e.g., OpenTelemetry) will be implemented to provide end-to-end visibility of requests flowing through the system, aiding in debugging and performance optimization.
 -   **Alerting:** Critical metrics will have predefined alert thresholds, triggering notifications via PagerDuty, Slack, or email for operational teams.
