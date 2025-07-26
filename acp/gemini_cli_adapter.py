@@ -40,10 +40,13 @@ class GeminiCliAdapter(Agent):
         assert self.thread is not None
 
         request = {"jsonrpc": "2.0", "id": 0, "method": "initialize", "params": params.__dict__}
-        self.process.stdin.write(json.dumps(request) + "\n")
-        self.process.stdin.flush()
+        if self.process.stdin:
+            self.process.stdin.write(json.dumps(request) + "\n")
+            self.process.stdin.flush()
 
-        response_str = self.process.stdout.readline()
+        response_str = ""
+        if self.process.stdout:
+            response_str = self.process.stdout.readline()
         response = json.loads(response_str)
 
         return InitializeResponse(**response["result"])
@@ -51,11 +54,12 @@ class GeminiCliAdapter(Agent):
     def _listen_for_messages(self):
         self._running = True
         while self._running:
-            line = self.process.stdout.readline()
-            if not line:
-                break
-            message = json.loads(line)
-            # Process message
+            if self.process.stdout:
+                line = self.process.stdout.readline()
+                if not line:
+                    break
+                message = json.loads(line)
+                # Process message
 
     def stop(self):
         self._running = False
@@ -68,11 +72,13 @@ class GeminiCliAdapter(Agent):
     def send_user_message(self, params: SendUserMessageParams) -> None:
         """Send a user message to the Gemini CLI agent."""
         request = {"jsonrpc": "2.0", "id": 1, "method": "sendUserMessage", "params": params.__dict__}
-        self.process.stdin.write(json.dumps(request) + "\n")
-        self.process.stdin.flush()
+        if self.process.stdin:
+            self.process.stdin.write(json.dumps(request) + "\n")
+            self.process.stdin.flush()
 
     def cancel_send_message(self) -> None:
         """Cancel the current send message operation."""
         request = {"jsonrpc": "2.0", "id": 2, "method": "cancelSendMessage", "params": {}}
-        self.process.stdin.write(json.dumps(request) + "\n")
-        self.process.stdin.flush()
+        if self.process.stdin:
+            self.process.stdin.write(json.dumps(request) + "\n")
+            self.process.stdin.flush()
