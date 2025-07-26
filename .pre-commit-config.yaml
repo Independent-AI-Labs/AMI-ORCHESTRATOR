@@ -26,6 +26,10 @@ repos:
         types: [python]
         args: [orchestrator, --rcfile=.pylintrc]
         stages: [pre-push]
+        pass_filenames: false
+        files: ^orchestrator/
+        env:
+          PYTHONPATH: "."
 
   # Type checking
   - repo: local
