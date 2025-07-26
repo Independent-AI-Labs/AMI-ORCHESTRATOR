@@ -35,7 +35,7 @@ if __name__ == "__main__":
         if sys.platform == "win32":
             creation_flags = subprocess.DETACHED_PROCESS
             close_fds_val = False  # Must be false for redirection on Windows
-        else:
+        elif sys.platform != "win32":
             preexec_fn_val = os.setsid
             close_fds_val = True
 
