@@ -12,6 +12,7 @@ from orchestrator.acp.protocol import (
     TaskCompleted,
     TaskFailed,
     TaskRequest,
+    TaskResourceMetrics,
     TaskType,
 )
 from orchestrator.bpmn.process_loader import ProcessLoader
@@ -121,10 +122,16 @@ class BpmnEngine:
                     task_name=node["name"],
                     task_type=TaskType.AI_REQUEST,
                     parameters=ai_request.__dict__,
+                    estimated_resources=TaskResourceMetrics(usage=ResourceUsage(cpu_hours=1.0, gpu_hours=0.5)),
                 )
                 print(f"Sending AI task request: {task_request.task_name}")
                 # Determine resource type for AI task (e.g., GPU, NPU, CPU)
                 resource_type = Resource(node.get("resourceType", "generic"))
+
+                # Conceptual: Allocate resources before execution
+                if not self.worker_manager.allocate_resources(task_request.estimated_resources):
+                    raise RuntimeError("Failed to allocate resources for AI task.")
+
                 # Submit to appropriate pool (e.g., process pool for CPU-bound AI tasks)
                 # For now, we'll simulate the result directly
                 # future = self.worker_manager.get_process_pool(resource_type).submit(self._execute_ai_task, ai_request)
@@ -134,17 +141,33 @@ class BpmnEngine:
                     status="success", output_data={"message": f"AI task '{ai_request.task_type}' processed by BPMN engine."}, confidence_score=0.95
                 )
                 service_task_result = ai_response.__dict__
+
+                # Conceptual: Update actual resource usage after execution
+                actual_resources = TaskResourceMetrics(usage=ResourceUsage(cpu_hours=0.8, gpu_hours=0.4), cost=ResourceCost(monetary_cost=0.1))
+                self.worker_manager.update_resource_metrics("some_worker_id", actual_resources)
+
             else:  # GENERIC_TASK
                 print(f"Executing service task: {node['name']}")
                 if node["name"] == "Failing Task":
                     raise RuntimeError("This task is designed to fail.")
+
                 # Determine resource type for generic task (e.g., DGRAPH, POSTGRES, GENERIC)
                 resource_type = Resource(node.get("resourceType", "generic"))
+
+                # Conceptual: Allocate resources before execution
+                estimated_resources = TaskResourceMetrics(usage=ResourceUsage(time_seconds=10.0))
+                if not self.worker_manager.allocate_resources(estimated_resources):
+                    raise RuntimeError("Failed to allocate resources for generic task.")
+
                 # Submit to appropriate pool (e.g., thread pool for I/O bound tasks)
                 # For now, we'll simulate the result directly
                 # future = self.worker_manager.get_thread_pool(resource_type).submit(self._execute_generic_task, node)
                 # service_task_result = future.result() # Blocking for now, will be async
                 service_task_result = {"approved": True}
+
+                # Conceptual: Update actual resource usage after execution
+                actual_resources = TaskResourceMetrics(usage=ResourceUsage(time_seconds=8.0), cost=ResourceCost(monetary_cost=0.01))
+                self.worker_manager.update_resource_metrics("some_worker_id", actual_resources)
 
             variables.update(service_task_result)
             next_node_id = self.get_next_node_id(node["id"], process_definition)

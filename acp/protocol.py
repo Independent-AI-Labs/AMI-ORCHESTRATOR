@@ -23,7 +23,6 @@ from typing import Any, Dict, List
 
 
 @dataclass
-@dataclass
 class AIRequest:
     """Defines a standardized request for an AI agent."""
 
@@ -43,12 +42,43 @@ class AIResponse:
     error_message: str = ""  # Error message if status is "failure"
 
 
+@dataclass
 class RegisterAgent:
     """Message sent by an agent to register with the orchestrator."""
 
     agent_id: str
-    capabilities: List[str]
+    capabilities: List[str] = field(default_factory=list)
     resource_capabilities: List[Resource] = field(default_factory=list)
+
+
+@dataclass
+class ResourceUsage:
+    """Defines resource usage metrics for a task."""
+
+    cpu_hours: float = 0.0
+    gpu_hours: float = 0.0
+    npu_hours: float = 0.0
+    memory_gb_hours: float = 0.0
+    network_gb: float = 0.0
+    time_seconds: float = 0.0
+    co2_kg: float = 0.0
+    # Add other relevant usage metrics as needed (e.g., storage, specific I/O operations)
+
+
+@dataclass
+class ResourceCost:
+    """Defines resource cost metrics for a task."""
+
+    monetary_cost: float = 0.0
+    # Add other relevant cost metrics as needed (e.g., subscription units, HR cost)
+
+
+@dataclass
+class TaskResourceMetrics:
+    """Combines resource usage and cost metrics for a task."""
+
+    usage: ResourceUsage = field(default_factory=ResourceUsage)
+    cost: ResourceCost = field(default_factory=ResourceCost)
 
 
 @dataclass
@@ -59,6 +89,7 @@ class TaskRequest:
     task_name: str
     task_type: TaskType = TaskType.GENERIC_TASK
     parameters: Dict[str, Any] = field(default_factory=dict)
+    estimated_resources: TaskResourceMetrics = field(default_factory=TaskResourceMetrics)
 
 
 @dataclass
@@ -67,6 +98,7 @@ class TaskCompleted:
 
     task_id: str
     result: Dict[str, Any] | AIResponse = field(default_factory=dict)
+    actual_resources: TaskResourceMetrics = field(default_factory=TaskResourceMetrics)
 
 
 @dataclass
