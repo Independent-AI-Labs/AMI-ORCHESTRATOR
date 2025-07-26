@@ -9,6 +9,7 @@ from orchestrator.core.dgraph_client import DgraphClient
 from orchestrator.core.prometheus_client import PrometheusClient
 from orchestrator.core.redis_client import RedisClient
 from orchestrator.core.security import SecurityManager
+from orchestrator.core.worker_manager import WorkerManager
 
 app = Flask(__name__)
 
@@ -16,7 +17,8 @@ dgraph_client = DgraphClient()
 redis_client = RedisClient()
 security_manager = SecurityManager()
 prometheus_client = PrometheusClient()
-bpmn_engine = BpmnEngine(dgraph_client, security_manager, redis_client, prometheus_client)
+worker_manager = WorkerManager(redis_client)
+bpmn_engine = BpmnEngine(dgraph_client, security_manager, redis_client, prometheus_client, worker_manager)
 
 
 @app.route("/api/processes/<process_name>/start", methods=["POST"])

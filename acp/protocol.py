@@ -9,6 +9,15 @@ class TaskType(Enum):
     GENERIC_TASK = "generic_task"
 
 
+class Resource(Enum):
+    DGRAPH = "dgraph"
+    POSTGRES = "postgres"
+    GPU = "gpu"
+    NPU = "npu"
+    CPU = "cpu"
+    GENERIC = "generic"
+
+
 from dataclasses import dataclass, field
 from typing import Any, Dict, List
 
@@ -39,6 +48,7 @@ class RegisterAgent:
 
     agent_id: str
     capabilities: List[str]
+    resource_capabilities: List[Resource] = field(default_factory=list)
 
 
 @dataclass

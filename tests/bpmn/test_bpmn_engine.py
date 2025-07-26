@@ -10,6 +10,7 @@ from orchestrator.core.dgraph_client import DgraphClient
 from orchestrator.core.prometheus_client import PrometheusClient
 from orchestrator.core.redis_client import RedisClient
 from orchestrator.core.security import SecurityManager
+from orchestrator.core.worker_manager import WorkerManager
 
 
 class TestBpmnEngine(unittest.TestCase):
@@ -21,11 +22,13 @@ class TestBpmnEngine(unittest.TestCase):
         self.redis_client = MagicMock(spec=RedisClient)
         self.security_manager = MagicMock(spec=SecurityManager)
         self.prometheus_client = MagicMock(spec=PrometheusClient)
+        self.worker_manager = MagicMock(spec=WorkerManager)
         self.bpmn_engine = BpmnEngine(
             self.dgraph_client,
             self.security_manager,
             self.redis_client,
             self.prometheus_client,
+            self.worker_manager,
         )
 
     @patch("builtins.open")
