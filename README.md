@@ -1,15 +1,15 @@
 # OpenAMI Orchestrator: The Intelligent Process Automation Engine
 
-## 1. Vision: The Core of OpenAMI
+## 1. Vision: The All-Mighty Orchestrator Agent - Your Unified Entry Point for Automation
 
-The OpenAMI Orchestrator is the foundational component of the OpenAMI (Advanced Machine Intelligence) framework. Its purpose is to serve as a multi-purpose, enterprise-grade reasoning engine designed to model, execute, and monitor complex business processes. It provides a robust, compliant, scalable, and intelligent platform for automating even the most dynamic and long-running business scenarios.
+The OpenAMI Orchestrator is the foundational component of the OpenAMI (Advanced Machine Intelligence) framework. Its purpose is to serve as a multi-purpose, enterprise-grade reasoning engine designed to model, execute, and monitor complex business processes. It provides a robust, compliant, scalable, and intelligent platform for automating even the most dynamic and long-running business scenarios. More than just a workflow engine, the Orchestrator acts as a central nervous system, coordinating work, providing actionable insights, and automating across diverse systems and platforms.
 
 ### Core Principles:
 
 - **Auditability & Compliance:** Every action, decision, and state change is immutably logged, creating a comprehensive audit trail.
 - **Resilience & Fault Tolerance:** Designed for high availability, gracefully handling failures with built-in retries, rollbacks, and human-in-the-loop escalations.
 - **Scalability & Performance:** Horizontally scalable architecture, allowing independent scaling of all components to meet any workload demand, now enhanced with fine-grained parallelization and resource-specific worker pools.
-- **Extensibility & Interoperability:** A standardized Agent-Coordinator Protocol (ACP) enables seamless integration of diverse services and AI models, now including a formalized AI Agent Interface and Data Exchange.
+- **Extensibility & Interoperability:** A standardized Agent-Coordinator Protocol (ACP), implemented as a JSONRPC protocol over stdin/stdout (e.g., when Gemini runs in `--experimental-acp` mode), enables seamless integration of diverse services and AI models, now including a formalized AI Agent Interface and Data Exchange built on this protocol.
 - **Intelligence & Adaptability:** More than a static workflow engine, it's a reasoning engine that uses AI for decision-making, real-time process adaptation, and automation of complex, non-deterministic tasks, leveraging dedicated AI agent interfaces.
 - **Comprehensive Resource Management:** Beyond basic task execution, the Orchestrator provides advanced capabilities for managing diverse resources, including local and pooled hardware (CPU, GPU, NPU), remote metered services, subscriptions, human resources, time, and even environmental factors like energy consumption and Co2 emissions. It tracks, estimates, and predicts resource load, usage, and associated costs, enabling optimized allocation and cost control.
 
@@ -60,7 +60,7 @@ graph TD
 - **Dgraph Client:** Manages interactions with the Dgraph graph database, handling process state persistence, audit logging, and schema management.
 - **Redis Streams (Event Bus):** Serves as the high-performance, persistent message broker for all inter-component communication, enabling an event-driven architecture.
 - **Worker & Agent Manager:** Responsible for managing the lifecycle of connected workers and AI agents, including registration, health checks, and task distribution via the Agent-Coordinator Protocol (ACP). Now supports resource-based worker pools (e.g., for Dgraph, Postgres, GPU, NPU) and parallelization using thread and process pools.
-- **Agent Ecosystem (via ACP):** A flexible and extensible framework for integrating diverse specialized agents and workers (e.g., AI agents, file system workers, internal API workers, human task managers) that perform specific tasks within a BPMN process.
+- **Agent Ecosystem (via ACP):** A flexible and extensible framework for integrating diverse specialized agents and workers (e.g., AI agents like Gemini running in `--experimental-acp` mode, file system workers, internal API workers, human task managers) that perform specific tasks within a BPMN process. This ecosystem is the backbone for extending the Orchestrator's automation capabilities.
 
 ## 4. Getting Started
 
@@ -68,7 +68,7 @@ The Orchestrator is a complex system with multiple interacting components. To se
 
 1.  **Start Dependencies:** Ensure that instances of Redis and Dgraph are running and accessible.
 2.  **Launch the Orchestrator:** Run the main Orchestrator service, which will initialize the BPMN engine and connect to the necessary services.
-3.  **Launch Agents/Workers:** Start one or more agent processes (e.g., the Local Files Worker, a Gemini AI Agent). These agents will automatically register themselves with the Orchestrator via the ACP.
+3.  **Launch Agents/Workers:** Start one or more agent processes (e.g., the Local Files Worker, a Gemini AI Agent running with `--experimental-acp`). These agents will automatically register themselves with the Orchestrator via the ACP.
 4.  **Initiate a Process:** Use the REST API or an administrative client to send a request to the Orchestrator to start a new BPMN process instance.
 
 For detailed setup instructions, refer to the `DEVELOPMENT_PLAN.md` and `NEXT_STEPS.md` files.
