@@ -1,3 +1,4 @@
+# pylint: disable=protected-access
 """
 Unit tests for the DgraphClient class.
 """
