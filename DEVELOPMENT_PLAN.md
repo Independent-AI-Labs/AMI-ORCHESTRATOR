@@ -96,6 +96,7 @@ This plan breaks down the development into logical phases, starting with a solid
     *   `sample_worker.py` exists.
     *   Generic Agent Interface: The `Icon` class and `Agent` base class are defined in `acp/agent.py`.
     *   Gemini CLI Adapter: `GeminiCliAdapter` is implemented in `acp/gemini_cli_adapter.py` and unit tested.
+    *   **Llama Index ReAct Agent:** A conversational agent has been implemented in `main.py` to provide a natural language interface to the orchestrator. The agent is equipped with tools to manage workers.
 *   **Tasks to Complete:**
     1.  **Worker Manager Enhancements:** Enhance the `WorkerManager` to handle agent registration, health checks, and capability discovery via ACP. This includes integrating the `GeminiCliAdapter` with the `WorkerManager`.
     2.  **First Generic Adapter:** Implement a simple adapter for a basic Python function worker to demonstrate the end-to-end flow from a `serviceTask` in BPMN to a worker and back, utilizing the enhanced `WorkerManager`.

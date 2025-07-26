@@ -67,9 +67,13 @@ graph TD
 The Orchestrator is a complex system with multiple interacting components. To set up and run the system, the following steps are required:
 
 1.  **Start Dependencies:** Ensure that instances of Redis and Dgraph are running and accessible.
-2.  **Launch the Orchestrator:** Run the main Orchestrator service, which will initialize the BPMN engine and connect to the necessary services.
-3.  **Launch Agents/Workers:** Start one or more agent processes (e.g., the Local Files Worker, a Gemini AI Agent running with `--experimental-acp`). These agents will automatically register themselves with the Orchestrator via the ACP.
-4.  **Initiate a Process:** Use the REST API or an administrative client to send a request to the Orchestrator to start a new BPMN process instance.
+2.  **Launch the Orchestrator Agent:** Run the main Orchestrator agent, which will initialize the BPMN engine and connect to the necessary services.
+
+    ```bash
+    python orchestrator/main.py
+    ```
+
+3.  **Interact with the Agent:** The agent will provide a command-line interface for interacting with the orchestrator. You can use this interface to register workers, start processes, and monitor the system.
 
 For detailed setup instructions, refer to the `DEVELOPMENT_PLAN.md` and `NEXT_STEPS.md` files.
 
