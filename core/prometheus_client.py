@@ -1,5 +1,3 @@
-import os
-import sys
 """
 Prometheus client for the Orchestrator.
 """
