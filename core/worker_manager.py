@@ -2,6 +2,7 @@
 Worker Manager for the Orchestrator.
 """
 import multiprocessing
+import os
 import threading
 from collections import defaultdict
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
@@ -18,10 +19,10 @@ class WorkerManager:
         self.redis_client = redis_client
         self.workers: dict[str, dict] = {}
         self.resource_pools: dict[Resource, list[str]] = {resource: [] for resource in Resource}
-        self._thread_pools: dict[Resource, ThreadPoolExecutor] = defaultdict(lambda: ThreadPoolExecutor(max_workers=threading.cpu_count()))
-        self._process_pools: dict[Resource, ProcessPoolExecutor] = defaultdict(lambda: ProcessPoolExecutor(max_workers=multiprocessing.cpu_count()))
+        self._thread_pools: dict[Resource, ThreadPoolExecutor] = defaultdict(lambda: ThreadPoolExecutor(max_workers=os.cpu_count()))
+        self._process_pools: dict[Resource, ProcessPoolExecutor] = defaultdict(lambda: ProcessPoolExecutor(max_workers=os.cpu_count()))
 
-    def register_worker(self, worker_id: str, capabilities: list, resource_capabilities: list[Resource] = None):
+    def register_worker(self, worker_id: str, capabilities: list, resource_capabilities: list[Resource] | None = None):
         """Register a new worker."""
         if resource_capabilities is None:
             resource_capabilities = [Resource.GENERIC]
