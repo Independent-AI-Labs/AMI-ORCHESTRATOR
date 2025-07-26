@@ -21,13 +21,11 @@ repos:
     hooks:
       - id: pylint
         name: pylint
-        entry: pylint
-        language: python
-        language_version: python3.12
+        entry: python -m pylint
+        language: system
         types: [python]
-        args: [--rcfile=.pylintrc]
+        args: [orchestrator, --rcfile=.pylintrc]
         stages: [pre-push]
-        additional_dependencies: ['.']
 
   # Type checking
   - repo: local
