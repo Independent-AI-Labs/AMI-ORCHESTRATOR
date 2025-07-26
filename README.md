@@ -8,9 +8,9 @@ The OpenAMI Orchestrator is the foundational component of the OpenAMI (Advanced 
 
 - **Auditability & Compliance:** Every action, decision, and state change is immutably logged, creating a comprehensive audit trail.
 - **Resilience & Fault Tolerance:** Designed for high availability, gracefully handling failures with built-in retries, rollbacks, and human-in-the-loop escalations.
-- **Scalability & Performance:** Horizontally scalable architecture, allowing independent scaling of all components to meet any workload demand.
-- **Extensibility & Interoperability:** A standardized Agent-Coordinator Protocol (ACP) enables seamless integration of diverse services and AI models.
-- **Intelligence & Adaptability:** More than a static workflow engine, it's a reasoning engine that uses AI for decision-making, real-time process adaptation, and automation of complex, non-deterministic tasks.
+- **Scalability & Performance:** Horizontally scalable architecture, allowing independent scaling of all components to meet any workload demand, now enhanced with fine-grained parallelization and resource-specific worker pools.
+- **Extensibility & Interoperability:** A standardized Agent-Coordinator Protocol (ACP) enables seamless integration of diverse services and AI models, now including a formalized AI Agent Interface and Data Exchange.
+- **Intelligence & Adaptability:** More than a static workflow engine, it's a reasoning engine that uses AI for decision-making, real-time process adaptation, and automation of complex, non-deterministic tasks, leveraging dedicated AI agent interfaces.
 
 ## 2. Architectural Blueprint
 
@@ -58,7 +58,7 @@ graph TD
 - **BPMN Engine:** The core execution engine responsible for parsing, interpreting, and executing BPMN 2.0 process definitions. It manages process state transitions and interacts with Dgraph for persistence.
 - **Dgraph Client:** Manages interactions with the Dgraph graph database, handling process state persistence, audit logging, and schema management.
 - **Redis Streams (Event Bus):** Serves as the high-performance, persistent message broker for all inter-component communication, enabling an event-driven architecture.
-- **Worker & Agent Manager:** Responsible for managing the lifecycle of connected workers and AI agents, including registration, health checks, and task distribution via the Agent-Coordinator Protocol (ACP).
+- **Worker & Agent Manager:** Responsible for managing the lifecycle of connected workers and AI agents, including registration, health checks, and task distribution via the Agent-Coordinator Protocol (ACP). Now supports resource-based worker pools (e.g., for Dgraph, Postgres, GPU, NPU) and parallelization using thread and process pools.
 - **Agent Ecosystem (via ACP):** A flexible and extensible framework for integrating diverse specialized agents and workers (e.g., AI agents, file system workers, internal API workers, human task managers) that perform specific tasks within a BPMN process.
 
 ## 4. Getting Started
@@ -96,6 +96,6 @@ Security and compliance are not afterthoughts; they are core design principles:
 
 ## 8. Current Status & Next Steps
 
-The Orchestrator project is currently in **Phase 1: Foundational Infrastructure & Security Core** and **Phase 2: Core BPMN Engine & State Machine** of its development plan. Significant progress has been made in establishing the core infrastructure, including a Flask API, Redis client, and a functional BPMN engine with handlers for various BPMN elements. All unit, integration, and end-to-end tests are currently passing.
+The Orchestrator project is currently in **Phase 1: Foundational Infrastructure & Security Core** and **Phase 2: Core BPMN Engine & State Machine** of its development plan. Significant progress has been made in establishing the core infrastructure, including a Flask API, Redis client, a functional BPMN engine with handlers for various BPMN elements, formalized AI agent interfaces, and initial support for parallelization and resource-based worker pools. All unit, integration, and end-to-end tests are currently passing.
 
 For a detailed breakdown of completed tasks, current progress, and the next steps, please refer to the `DEVELOPMENT_PLAN.md` and `NEXT_STEPS.md` files.

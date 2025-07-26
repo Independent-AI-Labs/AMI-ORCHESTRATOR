@@ -1,73 +1,52 @@
-# Next Steps for Orchestrator
+# Next Steps
 
-This document outlines the future improvements and tasks for the `orchestrator` component.
+## Current Status & Completed Tasks
 
-## Testing and Verification
+*   **Formalized AI Agent Interface & Data Exchange:** Defined `AIRequest`, `AIResponse`, `TaskType`, and `Resource` enums in `orchestrator/acp/protocol.py`. Updated `TaskRequest` and `TaskCompleted` to support AI-specific data.
+*   **Enhanced Worker Manager for Parallelization:** Implemented `WorkerManager` in `orchestrator/core/worker_manager.py` with support for process and thread-pool based parallelization, and grouping/per I/O resource worker pools.
+*   **BPMN Engine Integration with Worker Pools:** Modified `orchestrator/bpmn/engine.py` to integrate with the `WorkerManager`, allowing service tasks to specify `taskType` and `resourceType` for potential execution in dedicated pools.
+*   **API Integration:** Updated `orchestrator/api.py` to correctly instantiate and pass the `WorkerManager` to the `BpmnEngine`.
+*   **Test Updates:** Updated unit and integration tests (`orchestrator/tests/bpmn/test_bpmn_engine.py`, `orchestrator/tests/integration/test_bpmn_engine_integration.py`) to accommodate the `WorkerManager` dependency.
 
-*   **Goal:** Ensure the existing code is robust and reliable before adding more features.
-*   **Tasks:**
-    *   [x] **Write Unit Tests:** Write unit tests for all existing modules and functions.
-    *   [x] **Write Integration Tests:** Write integration tests for the interaction between different components.
-    *   [x] **Write End-to-End Tests:** Write end-to-end tests for the main business scenarios.
+## Next Development Tasks
 
-## Phase 1: Foundational Infrastructure & Security Core
+### Core Functionality
 
-*   **Goal:** Establish a secure, auditable, and persistent foundation.
-*   **Tasks:**
-    *   [x] Create core directories and files (`orchestrator/core`, `orchestrator/bpmn`, `orchestrator/main.py`).
-    *   [x] Implement basic configuration management (`orchestrator/core/config.py`).
-    *   [x] **Dgraph Client:** Develop a robust, transactional client for all Dgraph interactions in `orchestrator/core/dgraph_client.py`.
-    *   [x] **Redis Client:** Implement a client for Redis Streams in `orchestrator/core/redis_client.py`.
-    *   [x] **Dgraph Schema:** Design and implement a comprehensive Dgraph schema for process definitions, instances, tasks, a detailed audit log, and user/role definitions for RBAC.
-    *   [x] **Security Kernel:** Implement the core of the security system, including API authentication (e.g., OAuth2) and a basic RBAC framework.
-    *   [x] **Initial Orchestrator Service:** Create the basic service in `orchestrator/main.py` that connects to Dgraph and Redis, with secure configuration management for secrets and endpoints.
-    *   [x] **Testing:** Write unit and integration tests for all components in this phase.
+*   **Dgraph Persistence:** Fully implement `create_process_instance` and `create_human_task` in `orchestrator/core/dgraph_client.py` to ensure proper process and human task persistence.
+*   **Process Definition Storage:** Implement `store_process_definition` in `orchestrator/bpmn/process_loader.py` to persistently store BPMN definitions in Dgraph.
+*   **Security Implementation:** Complete the `SecurityManager` implementation, including robust authentication and authorization logic.
+*   **Full Worker Integration & Asynchronous Execution:**
+    *   Modify `_handle_service_task` in `orchestrator/bpmn/engine.py` to *actually* submit `TaskRequest` messages to appropriate workers (e.g., `sample_worker`, `gemini_cli_adapter`) via Redis or directly to the `WorkerManager`'s pools.
+    *   Implement a mechanism to asynchronously receive `TaskCompleted` or `TaskFailed` messages from workers and update the process state accordingly. This will likely involve callbacks or a dedicated result handling component.
+    *   Replace current simulated results in `_handle_service_task`, `_execute_ai_task`, and `_execute_generic_task` with actual calls to worker pools.
+*   **Robust Expression Language:** Replace the simplified `evaluate_condition` and `evaluate_expression` in `orchestrator/bpmn/engine.py` with a proper expression language for complex conditional logic.
+*   **Real-time Process Status:** Implement the actual logic for the `/api/processes/instances/<process_instance_id>` endpoint in `orchestrator/api.py` to fetch real-time process status from Dgraph.
 
-## Phase 2: Core BPMN Engine & State Machine
+### Testing & Validation
 
-*   **Goal:** Implement the fundamental BPMN execution logic.
-*   **Tasks:**
-    *   [x] **BPMN Process Loader:** Create a service to parse and validate BPMN 2.0 JSON definitions, storing them in Dgraph.
-    *   [x] **BPMN Engine Core:** Develop the engine to execute basic BPMN constructs: `startEvent`, `endEvent`, `sequenceFlow`, and `serviceTask`.
-    *   [x] **State Persistence:** Ensure every state transition of a process instance or task is atomically persisted to Dgraph along with a corresponding entry in the immutable audit log.
-    *   [x] **Testing:** Write unit and integration tests for the BPMN engine and process loader.
+*   **Comprehensive Unit Tests:**
+    *   Add dedicated unit tests for `WorkerManager` to cover pool creation, task submission, and shutdown.
+    *   Expand unit tests for `BpmnEngine` to thoroughly test the new `taskType` and `resourceType` handling within `_handle_service_task`, including scenarios for AI and generic tasks.
+    *   Ensure comprehensive test coverage for `orchestrator/acp/protocol.py` (dataclasses, enums).
+*   **Integration Tests:**
+    *   Develop integration tests that simulate end-to-end task execution using the `WorkerManager`'s pools and actual worker adapters (even if simplified).
+    *   Test the interaction between `BpmnEngine`, `WorkerManager`, and the Redis message queue for task distribution and result handling.
+*   **End-to-End (E2E) Tests:**
+    *   Create E2E tests that define BPMN processes utilizing both AI and generic service tasks, verifying their execution through the new parallelization mechanisms.
+    *   Test various resource types (e.g., `GPU`, `DGRAPH`) to ensure tasks are routed to the correct pools.
 
-## Phase 3: The Agent-Coordinator Protocol (ACP) & First Worker
+### Future Enhancements
 
-*   **Goal:** Define the agent communication standard and integrate the first simple worker.
-*   **Tasks:**
-    *   [x] **ACP Definition:** Formally define and version the ACP, specifying the JSON schemas for all interactions (`register_agent`, `request_task`, `task_completed`, `task_failed`).
-    *   [x] **Generic Agent Interface:** Create a Python abstract base class (`ACPAgent`) that defines the standard methods all agent adapters must implement.
-    *   [x] **Worker Manager:** Implement the service for managing the agent lifecycle (registration, health checks, capability discovery).
-    *   [x] **First Adapter:** Implement a simple adapter for a basic Python function worker, proving the end-to-end flow from a `serviceTask` in BPMN to a worker and back.
-    *   [x] **Testing:** Write unit and integration tests for the ACP, worker manager, and sample adapter.
+*   **Dynamic Resource Allocation:** Implement more sophisticated logic for dynamic allocation of tasks to worker pools based on real-time load and resource availability.
+*   **Fault Tolerance for Worker Pools:** Enhance error handling and recovery mechanisms for tasks executed within thread and process pools.
+*   **Monitoring & Observability:** Integrate metrics and logging for worker pool utilization, task queue lengths, and task execution times.
 
-## Phase 4: Advanced Business Logic & Human-in-the-Loop
+## Development Guidelines Reminder
 
-*   **Goal:** Enable complex business rules and human interaction.
-*   **Tasks:**
-    *   [x] **BPMN Gateways:** Implement support for `exclusiveGateway` (if/else) and `parallelGateway` (fork/join) to enable complex routing.
-    *   [x] **Human Task Integration:** Add support for the `humanTask` BPMN element. This includes creating tasks that are assigned to users/roles and pausing the workflow until a human provides input via an API or UI.
-    *   [x] **Timers and Events:** Implement `timerEvent` (for delays, timeouts, and escalations) and `messageEvent` (for inter-process communication).
-    *   [x] **RBAC Enforcement:** Fully integrate the RBAC model, ensuring that human tasks can only be actioned by authorized users.
-    *   [x] **Testing:** Write unit and integration tests for all new BPMN elements and the RBAC enforcement.
+As outlined in `orchestrator/GEMINI.md`, all development should adhere to the following principles:
 
-## Phase 5: Intelligent Agents & Dynamic Process Execution
-
-*   **Goal:** Infuse the orchestrator with AI-driven decision-making capabilities.
-*   **Tasks:**
-    *   [x] **Gemini CLI Adapter:** Develop a sophisticated adapter for the `gemini-cli` agent, exposing its capabilities (code analysis, refactoring, etc.) as addressable tools within the ACP.
-    *   [x] **Dynamic Routing:** Enhance the `exclusiveGateway` to make routing decisions based on the data returned by an AI agent.
-    *   [x] **Content-Based Correlation:** Implement the ability to correlate events and messages based on their content, allowing for highly dynamic and adaptive workflows.
-    *   [x] **Testing:** Write unit and integration tests for the Gemini CLI adapter and the dynamic routing logic.
-
-## Phase 6: Enterprise Readiness, Scalability & Compliance
-
-*   **Goal:** Prepare the system for production deployment in mission-critical environments.
-*   **Tasks:**
-    *   [x] **Containerization & Orchestration:** Package all components as Docker containers and create Helm charts for Kubernetes deployment.
-    *   [x] **High Availability:** Configure active-active or active-passive setups for all core components.
-    *   [x] **Dead-Letter & Escalation Queues:** Implement robust error handling, automatically routing failed tasks to a DLQ for analysis and triggering human escalation workflows when necessary.
-    *   [x] **Comprehensive Monitoring:** Integrate with Prometheus and Grafana to create dashboards for monitoring system health, process throughput, and agent performance.
-    *   [x] **Compliance Reporting:** Build tools to easily query and export the audit log to satisfy compliance and reporting requirements.
-    *   [x] **Testing:** Write end-to-end tests for the entire system, including the containerized deployment.
+1.  **Plan and Confirm:** Thoroughly plan the approach, identify affected files, understand existing patterns, and consider potential impacts. Confirm the plan with relevant stakeholders or by performing self-verification steps.
+2.  **Create/Update Tests:** Write tests that validate new functionality *before* writing new code.
+3.  **Implement Feature (Atomic Changes):** Focus on small, self-contained, atomic changes.
+4.  **Run All Tests (Frequent Validation):** Validate frequently after each atomic change, and run the entire test suite before submitting.
+5.  **Update Documentation:** Keep all relevant documentation up-to-date.
