@@ -3,8 +3,6 @@
 # by the following command:
 #
 #    pip-compile --output-file=orchestrator/requirements.txt orchestrator/requirements.in
-#
-certifi==2025.7.14
     # via requests
 charset-normalizer==3.4.2
     # via requests
