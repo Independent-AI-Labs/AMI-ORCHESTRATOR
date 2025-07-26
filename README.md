@@ -11,6 +11,7 @@ The OpenAMI Orchestrator is the foundational component of the OpenAMI (Advanced 
 - **Scalability & Performance:** Horizontally scalable architecture, allowing independent scaling of all components to meet any workload demand, now enhanced with fine-grained parallelization and resource-specific worker pools.
 - **Extensibility & Interoperability:** A standardized Agent-Coordinator Protocol (ACP) enables seamless integration of diverse services and AI models, now including a formalized AI Agent Interface and Data Exchange.
 - **Intelligence & Adaptability:** More than a static workflow engine, it's a reasoning engine that uses AI for decision-making, real-time process adaptation, and automation of complex, non-deterministic tasks, leveraging dedicated AI agent interfaces.
+- **Comprehensive Resource Management:** Beyond basic task execution, the Orchestrator provides advanced capabilities for managing diverse resources, including local and pooled hardware (CPU, GPU, NPU), remote metered services, subscriptions, human resources, time, and even environmental factors like energy consumption and Co2 emissions. It tracks, estimates, and predicts resource load, usage, and associated costs, enabling optimized allocation and cost control.
 
 ## 2. Architectural Blueprint
 
