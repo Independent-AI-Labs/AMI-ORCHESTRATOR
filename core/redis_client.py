@@ -12,9 +12,7 @@ class RedisClient:
 
     def __init__(self):
         """Initialize the Redis client."""
-        self._redis_client = redis.Redis(
-            host=Config.REDIS_HOST, port=Config.REDIS_PORT, db=0
-        )
+        self._redis_client = redis.Redis(host=Config.REDIS_HOST, port=Config.REDIS_PORT, db=0)
 
     def publish_message(self, stream, message):
         """Publish a message to a Redis stream."""
@@ -26,9 +24,7 @@ class RedisClient:
 
     def publish_to_dead_letter_queue(self, task, error):
         """Publish a failed task to the dead-letter queue."""
-        return self._redis_client.xadd(
-            "dead_letter_queue", {"task": task, "error": error}
-        )
+        return self._redis_client.xadd("dead_letter_queue", {"task": task, "error": error})
 
     def delete(self, key):
         """Delete a key from Redis."""

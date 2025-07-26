@@ -20,9 +20,7 @@ logger = logging.getLogger(__name__)
 
 # File paths for PID and logs
 PID_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), ".mcp_server.pid"))
-LOG_FILE = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), "logs", "mcp_server.log")
-)
+LOG_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), "logs", "mcp_server.log"))
 
 
 class MCPServerManager:
@@ -73,9 +71,7 @@ class MCPServerManager:
                 check=True,
                 capture_output=True,
             )
-            logger.info(
-                "Successfully sent termination signal to process group %d.", pid
-            )
+            logger.info("Successfully sent termination signal to process group %d.", pid)
         except subprocess.CalledProcessError as e:
             if "not found" in e.stderr.decode(errors="ignore").lower():
                 logger.warning("Process with PID %d was not found.", pid)
@@ -91,16 +87,12 @@ class MCPServerManager:
             if sys.platform != "win32":
                 pgid = os.getpgid(pid)  # pylint: disable=no-member
                 os.killpg(pgid, signal.SIGTERM)  # pylint: disable=no-member
-                logger.info(
-                    "Successfully sent termination signal to process group %d.", pgid
-                )
+                logger.info("Successfully sent termination signal to process group %d.", pgid)
             else:
                 # On Windows, os.getpgid and os.killpg are not available
                 pass
         except (ProcessLookupError, PermissionError) as e:
-            logger.warning(
-                "Process with PID %d not found or permission denied: %s", pid, e
-            )
+            logger.warning("Process with PID %d not found or permission denied: %s", pid, e)
         except OSError as e:
             logger.error("Error getting process group or killing process: %s", e)
 
@@ -114,9 +106,7 @@ class MCPServerManager:
 
         logger.info("Starting MCP server: %s in %s", self.server_script_path, self.cwd)
         try:
-            creation_flags = (
-                subprocess.DETACHED_PROCESS if sys.platform == "win32" else 0
-            )
+            creation_flags = subprocess.DETACHED_PROCESS if sys.platform == "win32" else 0
             preexec_fn = os.setsid if sys.platform != "win32" else None
 
             with open(LOG_FILE, "wb") as log_file:
@@ -149,9 +139,7 @@ class MCPServerManager:
             self.cwd,
         )
         try:
-            creation_flags = (
-                subprocess.CREATE_NEW_PROCESS_GROUP if sys.platform == "win32" else 0
-            )
+            creation_flags = subprocess.CREATE_NEW_PROCESS_GROUP if sys.platform == "win32" else 0
             start_new_session = sys.platform != "win32"
 
             process = subprocess.Popen(

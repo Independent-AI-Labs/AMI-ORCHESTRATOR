@@ -13,12 +13,8 @@ class PrometheusClient:
     def __init__(self):
         """Initialize the Prometheus client."""
         self.port = Config.PROMETHEUS_PORT
-        self.process_starts = Counter(
-            "process_starts", "Total number of started processes"
-        )
-        self.process_failures = Counter(
-            "process_failures", "Total number of failed processes"
-        )
+        self.process_starts = Counter("process_starts", "Total number of started processes")
+        self.process_failures = Counter("process_failures", "Total number of failed processes")
 
     def start_server(self):
         """Start the Prometheus HTTP server."""

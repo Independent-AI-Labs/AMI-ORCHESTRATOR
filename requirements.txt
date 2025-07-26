@@ -1,3 +1,4 @@
-pydgraph
-docker
-python-dotenv
+pydgraph==24.2.1
+protobuf==6.30.0
+docker==7.1.0
+python-dotenv==1.1.1

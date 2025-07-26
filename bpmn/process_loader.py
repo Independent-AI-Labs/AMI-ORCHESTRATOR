@@ -16,7 +16,7 @@ class ProcessLoader:
 
     def load_process_from_file(self, file_path: str) -> dict:
         """Load a BPMN process definition from a JSON file."""
-        with open(file_path, "r") as f:
+        with open(file_path, "r", encoding="utf-8") as f:
             process_definition = json.load(f)
         return process_definition
 
@@ -26,4 +26,4 @@ class ProcessLoader:
         print(f"Storing process definition: {process_definition['name']}")
         # In a real implementation, we would use the dgraph_client to
         # mutate the graph and store the process definition.
-        pass
+        pass  # pylint: disable=unnecessary-pass

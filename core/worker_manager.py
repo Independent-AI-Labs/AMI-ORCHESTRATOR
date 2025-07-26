@@ -11,7 +11,7 @@ class WorkerManager:
     def __init__(self, redis_client: RedisClient):
         """Initialize the worker manager."""
         self.redis_client = redis_client
-        self.workers = {}
+        self.workers: dict[str, dict] = {}
 
     def register_worker(self, worker_id: str, capabilities: list):
         """Register a new worker."""

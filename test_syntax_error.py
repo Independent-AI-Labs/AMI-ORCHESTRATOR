@@ -39,9 +39,7 @@ class MCPServerManager:
 
         print(f"Starting MCP server: {self.server_script_path} in {self.cwd}")
         try:
-            creation_flags = (
-                subprocess.DETACHED_PROCESS if sys.platform == "win32" else 0
-            )
+            creation_flags = subprocess.DETACHED_PROCESS if sys.platform == "win32" else 0
             preexec_fn = os.setsid if sys.platform != "win32" else None
 
             with open(LOG_FILE, "wb") as log_file:
@@ -65,9 +63,7 @@ class MCPServerManager:
         Starts the MCP server for testing purposes (not detached, with pipes).
         Returns the Popen object for direct communication.
         """
-        print(
-            f"Starting MCP server for testing: {self.server_script_path} in {self.cwd}"
-        )
+        print(f"Starting MCP server for testing: {self.server_script_path} in {self.cwd}")
         try:
             creation_flags = 0
             start_new_session = False
@@ -135,9 +131,7 @@ class MCPServerManager:
             if "not found" in e.stderr.decode(errors="ignore").lower():
                 print(f"Process with PID {pid} was not found.")
             else:
-                print(
-                    f"Error stopping MCP server with taskkill: {e.stderr.decode(errors='ignore')}"
-                )
+                print(f"Error stopping MCP server with taskkill: {e.stderr.decode(errors='ignore')}")
         except (ProcessLookupError, PermissionError) as e:
             print(f"Process with PID {pid} not found or permission denied: {e}")
         except Exception as e:  # pylint: disable=broad-exception-caught
@@ -156,12 +150,12 @@ class MCPServerManager:
                     ["tasklist", "/FI", f"PID eq {pid}"],
                     capture_output=True,
                     text=True,
+                    check=False,
                     shell=False,  # nosec B603, B607
                 )
                 return str(pid) in result.stdout
-            else:
-                os.kill(pid, 0)
-                return True
+            os.kill(pid, 0)
+            return True
         except (OSError, subprocess.CalledProcessError):
             return False
 
@@ -175,12 +169,10 @@ if __name__ == "__main__":
     command = sys.argv[1]
     server_script = sys.argv[2]
     # pylint: disable=redefined-outer-name
-    cwd = os.path.abspath(
-        os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..")
-    )  # Project root (AMI-SDA)
+    current_working_dir = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))  # Project root (AMI-SDA)
     # pylint: enable=redefined-outer-name
 
-    manager = MCPServerManager(server_script, cwd)
+    manager = MCPServerManager(server_script, current_working_dir)
 
     if command == "start":
         manager.start_server()

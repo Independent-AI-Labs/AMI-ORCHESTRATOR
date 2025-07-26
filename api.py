@@ -16,9 +16,7 @@ dgraph_client = DgraphClient()
 redis_client = RedisClient()
 security_manager = SecurityManager()
 prometheus_client = PrometheusClient()
-bpmn_engine = BpmnEngine(
-    dgraph_client, security_manager, redis_client, prometheus_client
-)
+bpmn_engine = BpmnEngine(dgraph_client, security_manager, redis_client, prometheus_client)
 
 
 @app.route("/api/processes/<process_name>/start", methods=["POST"])
@@ -26,9 +24,7 @@ def start_process(process_name):
     """Start a new process instance."""
     user = request.headers.get("X-User", "admin")
     variables = request.json
-    process_instance_id = bpmn_engine.start_process(
-        f"orchestrator/bpmn/definitions/{process_name}.json", user, variables
-    )
+    process_instance_id = bpmn_engine.start_process(f"orchestrator/bpmn/definitions/{process_name}.json", user, variables)
     return jsonify({"id": process_instance_id})
 
 

@@ -8,7 +8,7 @@ class SecurityManager:
 
     def __init__(self):
         """Initialize the security manager."""
-        pass
+        pass  # pylint: disable=unnecessary-pass
 
     def authenticate(self, token):
         """Authenticate a user token."""

@@ -3,7 +3,7 @@ Unit tests for the RedisClient class.
 """
 
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from orchestrator.core.config import Config
 from orchestrator.core.redis_client import RedisClient
@@ -17,9 +17,7 @@ class TestRedisClient(unittest.TestCase):
         """Test the __init__ method."""
         client = RedisClient()
         self.assertIsNotNone(client)
-        mock_redis.assert_called_with(
-            host=Config.REDIS_HOST, port=Config.REDIS_PORT, db=0
-        )
+        mock_redis.assert_called_with(host=Config.REDIS_HOST, port=Config.REDIS_PORT, db=0)
 
     @patch("redis.Redis")
     def test_publish_message(self, mock_redis):
@@ -28,6 +26,7 @@ class TestRedisClient(unittest.TestCase):
         stream = "my_stream"
         message = {"hello": "world"}
         client.publish_message(stream, message)
+        # pylint: disable=protected-access
         client._redis_client.xadd.assert_called_once_with(stream, message)
 
     @patch("redis.Redis")
@@ -36,9 +35,8 @@ class TestRedisClient(unittest.TestCase):
         client = RedisClient()
         stream = "my_stream"
         client.read_messages(stream)
-        client._redis_client.xread.assert_called_once_with(
-            {stream: 0}, count=1, block=0
-        )
+        # pylint: disable=protected-access
+        client._redis_client.xread.assert_called_once_with({stream: 0}, count=1, block=0)
 
     @patch("redis.Redis")
     def test_publish_to_dead_letter_queue(self, mock_redis):
@@ -47,9 +45,8 @@ class TestRedisClient(unittest.TestCase):
         task = "my_task"
         error = "my_error"
         client.publish_to_dead_letter_queue(task, error)
-        client._redis_client.xadd.assert_called_once_with(
-            "dead_letter_queue", {"task": task, "error": error}
-        )
+        # pylint: disable=protected-access
+        client._redis_client.xadd.assert_called_once_with("dead_letter_queue", {"task": task, "error": error})
 
     @patch("redis.Redis")
     def test_delete(self, mock_redis):
@@ -57,6 +54,7 @@ class TestRedisClient(unittest.TestCase):
         client = RedisClient()
         key = "my_key"
         client.delete(key)
+        # pylint: disable=protected-access
         client._redis_client.delete.assert_called_once_with(key)
 
 

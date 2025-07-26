@@ -1,9 +1,11 @@
 [MASTER]
 load-plugins=pylint.extensions.docparams
 jobs=0
+init-hook='import sys; sys.path.append(".")'
+
 
 [MESSAGES CONTROL]
-disable=C0114,C0115,C0116,R0903,R0913,W0613,too-many-positional-arguments,subprocess-popen-preexec-fn,consider-using-with
+disable=C0114,C0115,C0116,R0903,R0913,W0613,too-many-positional-arguments,subprocess-popen-preexec-fn,consider-using-with,import-self,broad-exception-raised,too-many-branches
 
 [FORMAT]
 max-line-length=160

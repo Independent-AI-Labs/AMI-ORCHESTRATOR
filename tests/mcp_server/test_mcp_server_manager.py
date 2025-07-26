@@ -2,15 +2,11 @@
 Unit tests for the MCPServerManager class.
 """
 
-import os
 import sys
 import unittest
 from unittest.mock import MagicMock, mock_open, patch
 
-# Add the project root to the Python path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
-
-from mcp.mcp_server_manager import LOG_FILE, PID_FILE, MCPServerManager
+from orchestrator.mcp.mcp_server_manager import LOG_FILE, PID_FILE, MCPServerManager
 
 
 class TestMCPServerManager(unittest.TestCase):
@@ -32,19 +28,19 @@ class TestMCPServerManager(unittest.TestCase):
 
     @patch("builtins.open")
     @patch("os.path.exists")
-    def test_read_pid_file_not_found(self, mock_exists, mock_open):
+    def test_read_pid_file_not_found(self, mock_exists, mock_open_file):
         """Test _read_pid when the PID file does not exist."""
         mock_exists.return_value = True
-        mock_open.side_effect = FileNotFoundError
-        self.assertIsNone(self.manager._read_pid())
+        mock_open_file.side_effect = FileNotFoundError
+        self.assertIsNone(self.manager._read_pid())  # pylint: disable=protected-access
 
     @patch("builtins.open")
     @patch("os.path.exists")
-    def test_read_pid_io_error(self, mock_exists, mock_open):
+    def test_read_pid_io_error(self, mock_exists, mock_open_file):
         """Test _read_pid with an IOError."""
         mock_exists.return_value = True
-        mock_open.side_effect = IOError("test error")
-        self.assertIsNone(self.manager._read_pid())
+        mock_open_file.side_effect = IOError("test error")
+        self.assertIsNone(self.manager._read_pid())  # pylint: disable=protected-access
 
     @patch("subprocess.Popen")
     @patch("builtins.open", new_callable=mock_open)
@@ -64,12 +60,10 @@ class TestMCPServerManager(unittest.TestCase):
         mock_open_file().write.assert_called_once_with("12345")
 
     @patch("os.remove")
-    @patch("mcp.mcp_server_manager.MCPServerManager._terminate_process_windows")
-    @patch("mcp.mcp_server_manager.MCPServerManager._read_pid")
+    @patch("orchestrator.mcp.mcp_server_manager.MCPServerManager._terminate_process_windows")
+    @patch("orchestrator.mcp.mcp_server_manager.MCPServerManager._read_pid")
     @patch("os.path.exists")
-    def test_stop_server_windows(
-        self, mock_exists, mock_read_pid, mock_terminate, mock_remove
-    ):
+    def test_stop_server_windows(self, mock_exists, mock_read_pid, mock_terminate, mock_remove):
         """Test the stop_server method on Windows."""
         sys.platform = "win32"
         mock_read_pid.return_value = 12345

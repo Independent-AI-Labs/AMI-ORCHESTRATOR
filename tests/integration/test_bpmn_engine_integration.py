@@ -29,9 +29,7 @@ class TestBpmnEngineIntegration(unittest.TestCase):
 
     def test_start_process(self):
         """Test the start_process method."""
-        self.bpmn_engine.start_process(
-            "orchestrator/bpmn/definitions/sample_process.json", "admin"
-        )
+        self.bpmn_engine.start_process("orchestrator/bpmn/definitions/sample_process.json", "admin")
 
 
 if __name__ == "__main__":

@@ -4,6 +4,7 @@ repos:
     rev: 23.12.1
     hooks:
       - id: black
+        args: [--line-length=160]
         language_version: python3
         stages: [pre-commit]
 
@@ -20,22 +21,26 @@ repos:
     hooks:
       - id: pylint
         name: pylint
-        entry: python -m pylint
-        language: system
+        entry: pylint
+        language: python
+        language_version: python3.12
         types: [python]
         args: [--rcfile=.pylintrc]
         stages: [pre-push]
+        additional_dependencies: ['.']
 
   # Type checking
   - repo: local
     hooks:
       - id: mypy
         name: mypy
-        entry: python -m mypy
-        language: system
+        entry: mypy
+        language: python
+        language_version: python3.12
         types: [python]
         require_serial: true
         stages: [pre-push]
+        additional_dependencies: ['.']
 
   # Additional useful hooks
   - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -58,10 +63,12 @@ repos:
         stages: [pre-push]
         pass_filenames: false
 
-  - repo: https://github.com/semgrep/semgrep
-    rev: v1.59.0
+  - repo: local
     hooks:
       - id: semgrep
-        args: ['--config=auto', '--error']
+        name: semgrep
+        entry: semgrep --config=auto --error
+        language: system
+        types: [python]
         stages: [pre-push]
         pass_filenames: false

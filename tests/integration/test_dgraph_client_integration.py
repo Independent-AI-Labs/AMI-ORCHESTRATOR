@@ -38,12 +38,12 @@ class TestDgraphClientIntegration(unittest.TestCase):
         self.assertIsNotNone(uid)
 
         # 3. Query Data
-        query = f"""query test_query($a: string) {{
-            q(func: eq(name, $a)) {{
+        query = """query test_query($a: string) {
+            q(func: eq(name, $a)) {
                 uid
                 name
-            }}
-        }}"""
+            }
+        }"""
         variables = {"$a": "Test Process"}
         response = self.client.query(query, variables=variables)
         self.assertIn("Test Process", str(response.json))
