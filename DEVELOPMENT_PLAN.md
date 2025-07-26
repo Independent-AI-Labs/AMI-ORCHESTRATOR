@@ -27,7 +27,7 @@ graph TD
     subgraph "Orchestrator Core"
         B -- Commands --> C{Event Bus: Redis Streams}
         D[BPMN Engine] -- Consumes & Publishes --> C
-        E[Worker & Agent Manager] -- Manages --> F((Agent Fleet (via ACP)))
+        E[Worker & Agent Manager] -- Manages --> F((Agent Fleet via ACP))
         E -- Consumes & Publishes --> C
         G[State & Audit Controller] -- Writes --> H
     end
