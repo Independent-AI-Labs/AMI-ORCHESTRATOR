@@ -1,4 +1,3 @@
-# Test comment for pre-commit hook
 """
 Manages the lifecycle of an MCP (Model-Controller-Presenter) server.
 
@@ -109,14 +108,15 @@ class MCPServerManager:
             creation_flags = subprocess.DETACHED_PROCESS if sys.platform == "win32" else 0
             preexec_fn = os.setsid if sys.platform != "win32" else None
 
-            with open(LOG_FILE, "wb") as log_file:
-                process = subprocess.Popen(
-                    [sys.executable, "-m", "orchestrator.mcp.servers.localfs.local_file_server"],
-                    cwd=self.cwd,
-                    creationflags=creation_flags,
-                    preexec_fn=preexec_fn,  # pylint: disable=W1509,R1732
-                    stdin=subprocess.DEVNULL if sys.platform == "win32" else None,
-                )  # pylint: disable=consider-using-with
+            process = subprocess.Popen(
+                [sys.executable, self.server_script_path],
+                cwd=self.cwd,
+                creationflags=creation_flags,
+                preexec_fn=preexec_fn,  # pylint: disable=W1509,R1732
+                stdin=subprocess.DEVNULL if sys.platform == "win32" else None,
+                stdout=open(LOG_FILE, "wb"),
+                stderr=subprocess.STDOUT,
+            )  # pylint: disable=consider-using-with
             self._write_pid(process.pid)
             logger.info(
                 "MCP server started with PID: %d. Logs are in %s",

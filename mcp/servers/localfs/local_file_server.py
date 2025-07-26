@@ -61,11 +61,10 @@ class LocalFiles:
         if not expected_params:
             return tool_args
 
-        expected = expected_params[tool_name]
-        filtered_args = {k: v for k, v in tool_args.items() if k in expected}
+        filtered_args = {k: v for k, v in tool_args.items() if k in expected_params}
 
         # Log if we filtered out any parameters
-        filtered_out = set(tool_args.keys()) - expected
+        filtered_out = set(tool_args.keys()) - expected_params
         if filtered_out:
             logging.warning("Filtered out unexpected parameters for %s: %s", tool_name, filtered_out)
 
@@ -730,8 +729,6 @@ class LocalFiles:
                     # In a detached process, stdin might not be actively written to.
                     # We should not break, but rather continue to wait for input.
                     # Add a small sleep to prevent busy-waiting.
-                    import time
-
                     time.sleep(0.1)
                     continue
 
