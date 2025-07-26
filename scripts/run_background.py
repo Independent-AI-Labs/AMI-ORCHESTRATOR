@@ -27,26 +27,26 @@ if __name__ == "__main__":
     with open(stdin_file_path, "r", encoding="utf-8") as stdin_f, open(stdout_file_path, "a", encoding="utf-8") as stdout_f, open(
         stderr_file_path, "a", encoding="utf-8"
     ) as stderr_f:
-        creation_flags = 0
-        preexec_fn_val = None
-        close_fds_val = True
+        CREATION_FLAGS = 0
+        PREEXEC_FN_VAL = None
+        CLOSE_FDS_VAL = True
 
         # Platform-specific process creation
         if sys.platform == "win32":
-            creation_flags = subprocess.DETACHED_PROCESS
-            close_fds_val = False  # Must be false for redirection on Windows
+            CREATION_FLAGS = subprocess.DETACHED_PROCESS
+            CLOSE_FDS_VAL = False  # Must be false for redirection on Windows
         elif sys.platform != "win32":
-            preexec_fn_val = os.setsid
-            close_fds_val = True
+            PREEXEC_FN_VAL = os.setsid
+            CLOSE_FDS_VAL = True
 
         process = subprocess.Popen(
             command,
             stdin=stdin_f,
             stdout=stdout_f,
             stderr=stderr_f,
-            creationflags=creation_flags,
-            preexec_fn=preexec_fn_val,
-            close_fds=close_fds_val,
+            creationflags=CREATION_FLAGS,
+            preexec_fn=PREEXEC_FN_VAL,
+            close_fds=CLOSE_FDS_VAL,
         )
 
         with open(pid_file_path, "w", encoding="utf-8") as f:
