@@ -13,11 +13,16 @@ from orchestrator.core.dgraph_client import DgraphClient
 class TestDgraphClient(unittest.TestCase):
     """Unit tests for the DgraphClient class."""
 
-    @patch("pydgraph.DgraphClient")
-    def setUp(self, mock_dgraph_client):
+    def setUp(self):
         """Set up the test case."""
+        self.patcher = patch("pydgraph.DgraphClient")
+        self.mock_dgraph_client = self.patcher.start()
         self.client = DgraphClient()
-        self.client._dgraph_client = mock_dgraph_client
+        self.client._dgraph_client = self.mock_dgraph_client
+
+    def tearDown(self):
+        """Tear down the test case."""
+        self.patcher.stop()
 
     def test_alter(self):
         """Test the alter method."""

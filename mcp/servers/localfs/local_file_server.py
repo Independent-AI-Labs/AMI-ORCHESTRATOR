@@ -2,6 +2,7 @@ import base64
 import json
 import logging
 import os
+import time
 import shutil
 import sys
 from datetime import datetime
@@ -52,7 +53,7 @@ class LocalFiles:
     def _filter_tool_arguments(self, tool_name: str, tool_args: dict) -> dict:
         """Filter tool arguments to only include expected parameters."""
         tool_declarations = get_tool_declarations()
-        expected_params = {}
+        expected_params: set[str] = set()
         for tool_decl in tool_declarations:
             if tool_decl["name"] == tool_name:
                 expected_params = set(tool_decl["inputSchema"]["properties"].keys())
