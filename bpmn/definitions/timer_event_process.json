@@ -1,0 +1,30 @@
+{
+  "id": "timer_event_process",
+  "name": "Timer Event Process",
+  "nodes": [
+    {
+      "id": "start",
+      "type": "startEvent"
+    },
+    {
+      "id": "timer_event",
+      "type": "intermediateCatchEvent",
+      "name": "Wait for 5 seconds",
+      "timerDefinition": "PT5S"
+    },
+    {
+      "id": "end",
+      "type": "endEvent"
+    }
+  ],
+  "edges": [
+    {
+      "from": "start",
+      "to": "timer_event"
+    },
+    {
+      "from": "timer_event",
+      "to": "end"
+    }
+  ]
+}

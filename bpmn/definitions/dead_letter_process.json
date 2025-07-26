@@ -1,0 +1,29 @@
+{
+  "id": "dead_letter_process",
+  "name": "Dead Letter Process",
+  "nodes": [
+    {
+      "id": "start",
+      "type": "startEvent"
+    },
+    {
+      "id": "failing_task",
+      "type": "serviceTask",
+      "name": "Failing Task"
+    },
+    {
+      "id": "end",
+      "type": "endEvent"
+    }
+  ],
+  "edges": [
+    {
+      "from": "start",
+      "to": "failing_task"
+    },
+    {
+      "from": "failing_task",
+      "to": "end"
+    }
+  ]
+}

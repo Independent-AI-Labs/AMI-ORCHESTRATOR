@@ -1,0 +1,53 @@
+{
+  "id": "exclusive_gateway_process",
+  "name": "Exclusive Gateway Process",
+  "nodes": [
+    {
+      "id": "start",
+      "type": "startEvent"
+    },
+    {
+      "id": "exclusive_gateway",
+      "type": "exclusiveGateway",
+      "name": "Exclusive Gateway"
+    },
+    {
+      "id": "task_a",
+      "type": "serviceTask",
+      "name": "Task A"
+    },
+    {
+      "id": "task_b",
+      "type": "serviceTask",
+      "name": "Task B"
+    },
+    {
+      "id": "end",
+      "type": "endEvent"
+    }
+  ],
+  "edges": [
+    {
+      "from": "start",
+      "to": "exclusive_gateway"
+    },
+    {
+      "from": "exclusive_gateway",
+      "to": "task_a",
+      "condition": "${approved}"
+    },
+    {
+      "from": "exclusive_gateway",
+      "to": "task_b",
+      "condition": "${!approved}"
+    },
+    {
+      "from": "task_a",
+      "to": "end"
+    },
+    {
+      "from": "task_b",
+      "to": "end"
+    }
+  ]
+}

@@ -1,0 +1,28 @@
+
+# Dgraph schema for the Orchestrator
+
+type Process {
+    process_id: string @index(exact) .
+    name: string .
+    description: string .
+    created_at: datetime .
+    updated_at: datetime .
+    tasks: [Task] .
+}
+
+type Task {
+    task_id: string @index(exact) .
+    name: string .
+    description: string .
+    status: string @index(exact) .
+    created_at: datetime .
+    updated_at: datetime .
+    process: Process .
+}
+
+type AuditLog {
+    log_id: string @index(exact) .
+    timestamp: datetime .
+    message: string .
+    details: string .
+}

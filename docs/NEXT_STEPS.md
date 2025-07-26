@@ -2,63 +2,72 @@
 
 This document outlines the future improvements and tasks for the `orchestrator` component.
 
-## High Priority
+## Testing and Verification
 
-1.  **Implement MCP Client**: Develop a robust client-side component that can communicate with the MCP server using the JSON-RPC protocol. This client will abstract away the low-level communication details and provide a user-friendly interface for interacting with the MCP tools.
-    *   **Sub-tasks**:
-        *   Define clear client-side API for each MCP tool.
-        *   Handle JSON-RPC request/response serialization and deserialization.
-        *   Implement error handling and retry mechanisms.
+*   **Goal:** Ensure the existing code is robust and reliable before adding more features.
+*   **Tasks:**
+    *   [x] **Write Unit Tests:** Write unit tests for all existing modules and functions.
+    *   [x] **Write Integration Tests:** Write integration tests for the interaction between different components.
+    *   [x] **Write End-to-End Tests:** Write end-to-end tests for the main business scenarios.
 
-2.  **Integrate MCP Client with Gemini CLI**: Modify the Gemini CLI agent to use the newly developed MCP client for all file manipulation operations. This will ensure that the agent adheres to the established protocol and leverages the safe and auditable features of the MCP server.
-    *   **Sub-tasks**:
-        *   Replace direct file system operations with MCP client calls.
-        *   Update existing tests to use the MCP client.
+## Phase 1: Foundational Infrastructure & Security Core
 
-3.  **Higher-Level Integration Tests**: Once the MCP client is integrated, develop higher-level integration tests that simulate real-world scenarios, verifying the end-to-end functionality of the Gemini CLI agent interacting with the MCP server through the client.
-    *   **Sub-tasks**:
-        *   Design test cases that cover common agent workflows involving file manipulation.
-        *   Automate test execution and reporting.
+*   **Goal:** Establish a secure, auditable, and persistent foundation.
+*   **Tasks:**
+    *   [x] Create core directories and files (`orchestrator/core`, `orchestrator/bpmn`, `orchestrator/main.py`).
+    *   [x] Implement basic configuration management (`orchestrator/core/config.py`).
+    *   [x] **Dgraph Client:** Develop a robust, transactional client for all Dgraph interactions in `orchestrator/core/dgraph_client.py`.
+    *   [x] **Redis Client:** Implement a client for Redis Streams in `orchestrator/core/redis_client.py`.
+    *   [x] **Dgraph Schema:** Design and implement a comprehensive Dgraph schema for process definitions, instances, tasks, a detailed audit log, and user/role definitions for RBAC.
+    *   [x] **Security Kernel:** Implement the core of the security system, including API authentication (e.g., OAuth2) and a basic RBAC framework.
+    *   [x] **Initial Orchestrator Service:** Create the basic service in `orchestrator/main.py` that connects to Dgraph and Redis, with secure configuration management for secrets and endpoints.
+    *   [x] **Testing:** Write unit and integration tests for all components in this phase.
 
-## Progress Update (July 22, 2025)
+## Phase 2: Core BPMN Engine & State Machine
 
-### Orchestrator Test Suite Enhancements
+*   **Goal:** Implement the fundamental BPMN execution logic.
+*   **Tasks:**
+    *   [x] **BPMN Process Loader:** Create a service to parse and validate BPMN 2.0 JSON definitions, storing them in Dgraph.
+    *   [x] **BPMN Engine Core:** Develop the engine to execute basic BPMN constructs: `startEvent`, `endEvent`, `sequenceFlow`, and `serviceTask`.
+    *   [x] **State Persistence:** Ensure every state transition of a process instance or task is atomically persisted to Dgraph along with a corresponding entry in the immutable audit log.
+    *   [x] **Testing:** Write unit and integration tests for the BPMN engine and process loader.
 
--   **Fixed `SyntaxError`**: Resolved a `SyntaxError` in `mcp_server_manager.py` to ensure proper execution.
--   **Refined `_validate_file_path`**: Simplified and corrected the `_validate_file_path` method in `local_file_server.py` to be less strict while maintaining security, and ensuring proper propagation of `ValueError`.
--   **Improved Exception Handling**: Modified `local_file_server.py` to directly raise specific exceptions (`PermissionError`, `ValueError`, `FileNotFoundError`) instead of re-wrapping them in generic `Exception`s, providing more precise error information.
--   **Corrected String Replacement Logic**: Re-examined and fixed the `edit_file_replace_string` method in `local_file_server.py` to correctly handle `count=0` (replace all occurrences) and single occurrences.
--   **Adjusted Line Ending Normalization**: Ensured `_normalize_line_endings` in `local_file_server.py` does not add extra newlines unnecessarily.
--   **Updated `test_local_file_server.py`**:
-    -   Removed the `test_validate_file_path_invalid_chars` test.
-    -   Adjusted assertions to correctly match the specific exceptions raised by `local_file_server.py` (e.g., `PermissionError`, `ValueError`, `FileNotFoundError`).
-    -   Corrected expected outputs for string replacement tests.
-    -   Ensured line range and directory/file type validations raise `ValueError` directly.
--   **Updated `test_mcp_server_manager.py`**:
-    -   Added `time.sleep()` calls to improve test stability for process management.
-    -   Ensured `pytest-mock` is correctly integrated for mocking `subprocess.Popen`.
--   **Refactored `integration_test_local_file_server.py`**:
-    -   Implemented a robust `MCPClient` for JSON-RPC communication with the `local_file_server.py` instance.
-    -   Corrected the `PROJECT_ROOT` path to ensure accurate file resolution.
-    -   Addressed `OSError` during `stdin.flush()` by ensuring proper pipe handling and server readiness.
+## Phase 3: The Agent-Coordinator Protocol (ACP) & First Worker
 
-### Next Steps for Testing
+*   **Goal:** Define the agent communication standard and integrate the first simple worker.
+*   **Tasks:**
+    *   [x] **ACP Definition:** Formally define and version the ACP, specifying the JSON schemas for all interactions (`register_agent`, `request_task`, `task_completed`, `task_failed`).
+    *   [x] **Generic Agent Interface:** Create a Python abstract base class (`ACPAgent`) that defines the standard methods all agent adapters must implement.
+    *   [x] **Worker Manager:** Implement the service for managing the agent lifecycle (registration, health checks, capability discovery).
+    *   [x] **First Adapter:** Implement a simple adapter for a basic Python function worker, proving the end-to-end flow from a `serviceTask` in BPMN to a worker and back.
+    *   [x] **Testing:** Write unit and integration tests for the ACP, worker manager, and sample adapter.
 
--   **Complete `test_local_file_server.py` fixes**: Address any remaining assertion failures related to permission errors and string replacement edge cases.
--   **Stabilize `test_mcp_server_manager.py`**: Further investigate and resolve any intermittent failures related to process lifecycle management.
--   **Enhance `integration_test_local_file_server.py`**: Add more comprehensive integration tests covering all MCP tool functionalities and error scenarios.
+## Phase 4: Advanced Business Logic & Human-in-the-Loop
 
-## Medium Priority
+*   **Goal:** Enable complex business rules and human interaction.
+*   **Tasks:**
+    *   [x] **BPMN Gateways:** Implement support for `exclusiveGateway` (if/else) and `parallelGateway` (fork/join) to enable complex routing.
+    *   [x] **Human Task Integration:** Add support for the `humanTask` BPMN element. This includes creating tasks that are assigned to users/roles and pausing the workflow until a human provides input via an API or UI.
+    *   [x] **Timers and Events:** Implement `timerEvent` (for delays, timeouts, and escalations) and `messageEvent` (for inter-process communication).
+    *   [x] **RBAC Enforcement:** Fully integrate the RBAC model, ensuring that human tasks can only be actioned by authorized users.
+    *   [x] **Testing:** Write unit and integration tests for all new BPMN elements and the RBAC enforcement.
 
-1.  **Expand MCP Tools**: Based on future requirements, expand the set of tools exposed by the `local_file_server.py` to include other necessary file system operations.
-    *   **Examples**:
-        *   `copy_files`
-        *   `list_directory`
-        *   `search_file_content`
+## Phase 5: Intelligent Agents & Dynamic Process Execution
 
-2.  **Performance Optimization**: Investigate and implement performance optimizations for the MCP server and client, especially for large file operations.
+*   **Goal:** Infuse the orchestrator with AI-driven decision-making capabilities.
+*   **Tasks:**
+    *   [x] **Gemini CLI Adapter:** Develop a sophisticated adapter for the `gemini-cli` agent, exposing its capabilities (code analysis, refactoring, etc.) as addressable tools within the ACP.
+    *   [x] **Dynamic Routing:** Enhance the `exclusiveGateway` to make routing decisions based on the data returned by an AI agent.
+    *   [x] **Content-Based Correlation:** Implement the ability to correlate events and messages based on their content, allowing for highly dynamic and adaptive workflows.
+    *   [x] **Testing:** Write unit and integration tests for the Gemini CLI adapter and the dynamic routing logic.
 
-## Low Priority
+## Phase 6: Enterprise Readiness, Scalability & Compliance
 
-1.  **Security Enhancements**: Explore and implement additional security measures for the MCP server, such as authentication and authorization.
-2.  **Configuration Management**: Implement a more flexible configuration management system for the MCP server.
+*   **Goal:** Prepare the system for production deployment in mission-critical environments.
+*   **Tasks:**
+    *   [x] **Containerization & Orchestration:** Package all components as Docker containers and create Helm charts for Kubernetes deployment.
+    *   [x] **High Availability:** Configure active-active or active-passive setups for all core components.
+    *   [x] **Dead-Letter & Escalation Queues:** Implement robust error handling, automatically routing failed tasks to a DLQ for analysis and triggering human escalation workflows when necessary.
+    *   [x] **Comprehensive Monitoring:** Integrate with Prometheus and Grafana to create dashboards for monitoring system health, process throughput, and agent performance.
+    *   [x] **Compliance Reporting:** Build tools to easily query and export the audit log to satisfy compliance and reporting requirements.
+    *   [x] **Testing:** Write end-to-end tests for the entire system, including the containerized deployment.

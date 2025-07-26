@@ -1,0 +1,30 @@
+{
+  "id": "human_task_process",
+  "name": "Human Task Process",
+  "nodes": [
+    {
+      "id": "start",
+      "type": "startEvent"
+    },
+    {
+      "id": "human_task",
+      "type": "humanTask",
+      "name": "Sample Human Task",
+      "assignee": "admin"
+    },
+    {
+      "id": "end",
+      "type": "endEvent"
+    }
+  ],
+  "edges": [
+    {
+      "from": "start",
+      "to": "human_task"
+    },
+    {
+      "from": "human_task",
+      "to": "end"
+    }
+  ]
+}

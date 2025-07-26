@@ -1,0 +1,33 @@
+{
+  "id": "message_event_process",
+  "name": "Message Event Process",
+  "nodes": [
+    {
+      "id": "start",
+      "type": "startEvent"
+    },
+    {
+      "id": "message_event",
+      "type": "intermediateCatchEvent",
+      "name": "Wait for message",
+      "messageEventDefinition": {
+        "name": "order_placed",
+        "correlationKey": "${order_id}"
+      }
+    },
+    {
+      "id": "end",
+      "type": "endEvent"
+    }
+  ],
+  "edges": [
+    {
+      "from": "start",
+      "to": "message_event"
+    },
+    {
+      "from": "message_event",
+      "to": "end"
+    }
+  ]
+}
