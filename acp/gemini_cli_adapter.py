@@ -5,6 +5,7 @@ Adapter for the Gemini CLI agent.
 import json
 import subprocess
 from threading import Thread
+from typing import Optional
 
 from orchestrator.acp.gemini_acp_protocol import (
     Agent,
@@ -19,8 +20,8 @@ class GeminiCliAdapter(Agent):
 
     def __init__(self, gemini_cli_path: str):
         self.gemini_cli_path = gemini_cli_path
-        self.process = None
-        self.thread = None
+        self.process: Optional[subprocess.Popen] = None
+        self.thread: Optional[Thread] = None
         self._running = False
 
     def initialize(self, params: InitializeParams) -> InitializeResponse:
@@ -32,9 +33,11 @@ class GeminiCliAdapter(Agent):
             stderr=subprocess.PIPE,
             text=True,
         )
+        assert self.process is not None
 
         self.thread = Thread(target=self._listen_for_messages)
         self.thread.start()
+        assert self.thread is not None
 
         request = {"jsonrpc": "2.0", "id": 0, "method": "initialize", "params": params.__dict__}
         self.process.stdin.write(json.dumps(request) + "\n")
