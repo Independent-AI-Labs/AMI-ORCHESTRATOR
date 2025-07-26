@@ -2,7 +2,7 @@
 
 ## 1. Vision: The Core of OpenAMI
 
-The Orchestrator is the foundational component of the OpenAMI (Advanced Machine Intelligence) framework. Its purpose is to serve as a multi-purpose, enterprise-grade reasoning engine. It is designed to model, execute, and monitor complex business processes in a manner that is robust, compliant, scalable, and intelligent. By leveraging industry standards like BPMN 2.0 and a graph-based architecture, the Orchestrator provides a transparent and auditable platform for automating even the most dynamic and long-running business scenarios.
+Its purpose is to serve as a multi-purpose, enterprise-grade reasoning engine. It is designed to model, execute, and monitor complex business processes in a manner that is robust, compliant, scalable, and intelligent. By leveraging industry standards like BPMN 2.0 and a graph-based architecture, the Orchestrator provides a transparent and auditable platform for automating even the most dynamic and long-running business scenarios.
 
 ### Core Principles:
 
@@ -28,6 +28,7 @@ graph TD
         B -- Commands --> C{Event Bus: Redis Streams}
         D[BPMN Engine] -- Consumes & Publishes --> C
         E[Worker & Agent Manager] -- Manages --> F((Agent Fleet))
+(via ACP)
         E -- Consumes & Publishes --> C
         G[State & Audit Controller] -- Writes --> H
     end
@@ -56,37 +57,48 @@ graph TD
 
 This plan breaks down the development into logical phases, starting with a solid foundation and progressively adding more advanced capabilities.
 
-### Phase 1: Foundational Infrastructure & Security Core
+### Phase 1: Foundational Infrastructure & Security Core (In Progress)
 
 *   **Goal:** Establish a secure, auditable, and persistent foundation.
-*   **Tasks:**
-    1.  **Dgraph Schema:** Design and implement a comprehensive Dgraph schema for process definitions, instances, tasks, a detailed audit log, and user/role definitions for RBAC.
-    2.  **Dgraph Client:** Develop a robust, transactional client for all Dgraph interactions.
-    3.  **Redis Setup:** Configure a high-availability Redis cluster.
-    4.  **Security Kernel:** Implement the core of the security system, including API authentication (e.g., OAuth2) and a basic RBAC framework.
-    5.  **Initial Orchestrator Service:** Create the basic service that connects to Dgraph and Redis, with secure configuration management for secrets and endpoints.
-    6.  **Testing:** Write unit and integration tests for all components in this phase.
+*   **Current Status:**
+    *   Dgraph Client: Basic client implemented, but `create_process_instance` and `create_human_task` are placeholders.
+    *   Redis Setup: Client implemented for messaging and dead-letter queue.
+    *   Security Kernel: `SecurityManager` exists, but authorization logic (e.g., `is_authorized_for_human_task`) is not fully implemented.
+    *   Initial Orchestrator Service: Flask API is set up.
+    *   Testing: Unit, integration, and E2E tests are passing.
+*   **Tasks to Complete:**
+    1.  **Dgraph Persistence:** Fully implement `create_process_instance` and `create_human_task` in `DgraphClient` to ensure proper process and human task persistence.
+    2.  **Process Definition Storage:** Implement `store_process_definition` in `ProcessLoader` to persistently store BPMN definitions in Dgraph.
+    3.  **Security Implementation:** Complete the `SecurityManager` implementation, including robust authorization logic.
+    4.  **Testing:** Write comprehensive unit and integration tests for all components in this phase.
 
-### Phase 2: Core BPMN Engine & State Machine
+### Phase 2: Core BPMN Engine & State Machine (In Progress)
 
-*   **Goal:** Implement the fundamental BPMN execution logic.
-*   **Tasks:**
-    1.  **BPMN Process Loader:** Create a service to parse and validate BPMN 2.0 JSON definitions, storing them in Dgraph.
-    2.  **BPMN Engine Core:** Develop the engine to execute basic BPMN constructs: `startEvent`, `endEvent`, `sequenceFlow`, and `serviceTask`.
-    3.  **State Persistence:** Ensure every state transition of a process instance or task is atomically persisted to Dgraph along with a corresponding entry in the immutable audit log.
-    4.  **Testing:** Write unit and integration tests for the BPMN engine and process loader.
+*   **Goal:** Implement the fundamental BPMN execution logic and integrate with workers.
+*   **Current Status:**
+    *   BPMN Process Loader: Loads definitions from JSON files.
+    *   BPMN Engine Core: Handlers for `startEvent`, `exclusiveGateway`, `serviceTask`, `humanTask`, `intermediateCatchEvent` (timer and message events), and `endEvent` are present.
+    *   State Persistence: Placeholder calls to Dgraph client exist.
+    *   Service Task Execution: Currently simulated; actual worker integration is pending.
+    *   Expression Evaluation: Simplified evaluators are in place.
+    *   Testing: Unit, integration, and E2E tests are passing.
+*   **Tasks to Complete:**
+    1.  **Worker Integration:** Modify `_handle_service_task` to send `TaskRequest` messages to appropriate workers (e.g., `sample_worker`, `gemini_cli_adapter`) via Redis. Implement a mechanism to receive `TaskCompleted` or `TaskFailed` messages from workers and update the process state accordingly.
+    2.  **Robust Expression Language:** Replace the simplified `evaluate_condition` and `evaluate_expression` with a proper expression language.
+    3.  **Real-time Process Status:** Implement the actual logic for the `/api/processes/instances/<process_instance_id>` endpoint in `api.py` to fetch real-time process status from Dgraph.
+    4.  **Testing:** Write comprehensive unit and integration tests for the BPMN engine, process loader, and worker integration.
 
-### Phase 3: The Agent-Coordinator Protocol (ACP) & First Worker
+### Phase 3: The Agent-Coordinator Protocol (ACP) & First Worker (Planned)
 
 *   **Goal:** Define the agent communication standard and integrate the first simple worker.
+*   **Current Status:** ACP definition (`acp/protocol.py`) is complete. A `sample_worker.py` exists.
 *   **Tasks:**
-    1.  **ACP Definition:** Formally define and version the ACP, specifying the JSON schemas for all interactions (`register_agent`, `request_task`, `task_completed`, `task_failed`).
-    2.  **Generic Agent Interface:** Create a Python abstract base class (`ACPAgent`) that defines the standard methods all agent adapters must implement.
-    3.  **Worker Manager:** Implement the service for managing the agent lifecycle (registration, health checks, capability discovery).
-    4.  **First Adapter:** Implement a simple adapter for a basic Python function worker, proving the end-to-end flow from a `serviceTask` in BPMN to a worker and back.
-    5.  **Testing:** Write unit and integration tests for the ACP, worker manager, and sample adapter.
+    1.  **Generic Agent Interface:** Create a Python abstract base class (`ACPAgent`) that defines the standard methods all agent adapters must implement.
+    2.  **Worker Manager Enhancements:** Enhance the `WorkerManager` to handle agent registration, health checks, and capability discovery via ACP.
+    3.  **First Adapter:** Implement a simple adapter for a basic Python function worker, proving the end-to-end flow from a `serviceTask` in BPMN to a worker and back.
+    4.  **Testing:** Write unit and integration tests for the ACP, worker manager, and sample adapter.
 
-### Phase 4: Advanced Business Logic & Human-in-the-Loop
+### Phase 4: Advanced Business Logic & Human-in-the-Loop (Planned)
 
 *   **Goal:** Enable complex business rules and human interaction.
 *   **Tasks:**
@@ -96,16 +108,17 @@ This plan breaks down the development into logical phases, starting with a solid
     4.  **RBAC Enforcement:** Fully integrate the RBAC model, ensuring that human tasks can only be actioned by authorized users.
     5.  **Testing:** Write unit and integration tests for all new BPMN elements and the RBAC enforcement.
 
-### Phase 5: Intelligent Agents & Dynamic Process Execution
+### Phase 5: Intelligent Agents & Dynamic Process Execution (Planned)
 
 *   **Goal:** Infuse the orchestrator with AI-driven decision-making capabilities.
+*   **Current Status:** A placeholder `GeminiCliAdapter` exists.
 *   **Tasks:**
     1.  **Gemini CLI Adapter:** Develop a sophisticated adapter for the `gemini-cli` agent, exposing its capabilities (code analysis, refactoring, etc.) as addressable tools within the ACP.
     2.  **Dynamic Routing:** Enhance the `exclusiveGateway` to make routing decisions based on the data returned by an AI agent.
     3.  **Content-Based Correlation:** Implement the ability to correlate events and messages based on their content, allowing for highly dynamic and adaptive workflows.
     4.  **Testing:** Write unit and integration tests for the Gemini CLI adapter and the dynamic routing logic.
 
-### Phase 6: Enterprise Readiness, Scalability & Compliance
+### Phase 6: Enterprise Readiness, Scalability & Compliance (Planned)
 
 *   **Goal:** Prepare the system for production deployment in mission-critical environments.
 *   **Tasks:**
