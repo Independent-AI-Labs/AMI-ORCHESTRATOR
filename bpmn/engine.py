@@ -6,6 +6,14 @@ import json
 import time
 from typing import Any, Optional
 
+from orchestrator.acp.protocol import (
+    AIRequest,
+    AIResponse,
+    TaskCompleted,
+    TaskFailed,
+    TaskRequest,
+    TaskType,
+)
 from orchestrator.bpmn.process_loader import ProcessLoader
 from orchestrator.core.dgraph_client import DgraphClient
 from orchestrator.core.prometheus_client import PrometheusClient
@@ -96,12 +104,35 @@ class BpmnEngine:
 
     def _handle_service_task(self, node, process_definition, user, variables):
         try:
-            # In a real implementation, this would involve sending a task request to a worker
-            print(f"Executing service task: {node['name']}")
-            if node["name"] == "Failing Task":
-                raise RuntimeError("This task is designed to fail.")
-            # This is a placeholder for getting the result of the service task
-            service_task_result = {"approved": True}
+            task_type = TaskType.GENERIC_TASK  # Default to GENERIC_TASK
+            if "taskType" in node:
+                try:
+                    task_type = TaskType(node["taskType"])
+                except ValueError:
+                    print(f"Warning: Unknown task type '{node['taskType']}' for service task '{node['name']}'. Defaulting to GENERIC_TASK.")
+
+            if task_type == TaskType.AI_REQUEST:
+                ai_request = AIRequest(task_type=node.get("aiTaskType", "unknown"), input_data=node.get("inputData", {}), parameters=node.get("parameters", {}))
+                task_request = TaskRequest(
+                    task_id="some_ai_task_id",  # Replace with actual task ID generation
+                    task_name=node["name"],
+                    task_type=TaskType.AI_REQUEST,
+                    parameters=ai_request.__dict__,
+                )
+                print(f"Sending AI task request: {task_request.task_name}")
+                # Placeholder for sending task request to worker and getting result
+                # For now, simulate a response
+                ai_response = AIResponse(
+                    status="success", output_data={"message": f"AI task '{ai_request.task_type}' processed by BPMN engine."}, confidence_score=0.95
+                )
+                service_task_result = ai_response.__dict__
+            else:  # GENERIC_TASK
+                print(f"Executing service task: {node['name']}")
+                if node["name"] == "Failing Task":
+                    raise RuntimeError("This task is designed to fail.")
+                # This is a placeholder for getting the result of the service task
+                service_task_result = {"approved": True}
+
             variables.update(service_task_result)
             next_node_id = self.get_next_node_id(node["id"], process_definition)
             if next_node_id:
