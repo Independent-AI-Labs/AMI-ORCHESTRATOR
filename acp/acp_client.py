@@ -1,0 +1,283 @@
+"""
+Client for the Agent-Coordinator Protocol (ACP).
+"""
+
+import json
+import subprocess
+from dataclasses import dataclass
+from threading import Event, Lock, Thread
+from typing import Any, Callable, Dict, Generic, List, Optional, TypeVar, cast
+from unittest.mock import MagicMock
+
+from orchestrator.acp.agent import Icon
+
+# region: Data Classes
+
+
+@dataclass
+class StreamAssistantMessageChunkParams:
+    chunk: Dict[str, Any]
+
+
+@dataclass
+class ToolCallLocation:
+    path: str
+    line: Optional[int] = None
+
+
+@dataclass
+class RequestToolCallConfirmationParams:
+    confirmation: Dict[str, Any]
+    icon: Icon
+    label: str
+    content: Optional[Dict[str, Any]] = None
+    locations: Optional[List[ToolCallLocation]] = None
+
+
+@dataclass
+class PushToolCallParams:
+    icon: Icon
+    label: str
+    content: Optional[Dict[str, Any]] = None
+    locations: Optional[List[ToolCallLocation]] = None
+
+
+@dataclass
+class UpdateToolCallParams:
+    content: Optional[Dict[str, Any]]
+    status: str
+    tool_call_id: int
+
+
+@dataclass
+class RequestToolCallConfirmationResponse:
+    id: int
+    outcome: str
+
+
+@dataclass
+class PushToolCallResponse:
+    id: int
+
+
+@dataclass
+class InitializeParams:
+    protocol_version: str
+
+
+@dataclass
+class SendUserMessageParams:
+    chunks: List[Dict[str, Any]]
+
+
+@dataclass
+class InitializeResponse:
+    is_authenticated: bool
+    protocol_version: str
+
+
+@dataclass
+class Error:
+    code: int
+    message: str
+    data: Optional[Any] = None
+
+
+# endregion: Data Classes
+
+
+class RequestError(Exception):
+    def __init__(self, code: int, message: str, data: Optional[Any] = None):
+        super().__init__(f"[{code}] {message}")
+        self.code = code
+        self.message = message
+        self.data = data
+
+
+D = TypeVar("D")
+
+
+class Connection(Generic[D]):
+    def __init__(self, delegate: D, process: subprocess.Popen, test_mode=False):
+        self._delegate = delegate
+        self._process = process
+        self._next_request_id = 0
+        self._pending_responses: Dict[int, Callable[[Any], None]] = {}
+        self._lock = Lock()
+        self._running = False
+        self._test_mode = test_mode
+        if not self._test_mode:
+            self._listener_thread = Thread(target=self._listen)
+            self._listener_thread.daemon = True
+
+    def start(self):
+        if not self._test_mode:
+            self._running = True
+            self._listener_thread.start()
+
+    def stop(self):
+        if not self._test_mode and self._running:
+            self._running = False
+            if self._process.stdout:
+                try:
+                    self._process.stdout.close()
+                except IOError:
+                    pass  # Pipe might already be closed
+            if self._listener_thread.is_alive():
+                self._listener_thread.join(timeout=1)
+
+    def _listen(self):
+        while self._running and self._process.stdout:
+            try:
+                line = self._process.stdout.readline()
+                if not line:
+                    break
+                message = json.loads(line)
+                self._process_message(message)
+            except (IOError, json.JSONDecodeError):
+                break
+
+    def _process_message(self, message: Dict[str, Any]):
+        if "method" in message:
+            self._handle_request(message)
+        else:
+            self._handle_response(message)
+
+    def _handle_request(self, request: Dict[str, Any]):
+        method_name = request["method"]
+        params = request.get("params")
+        request_id = request.get("id")
+
+        if not hasattr(self._delegate, method_name):
+            if request_id is not None:
+                self._send_error(request_id, -32601, "Method not found")
+            return
+
+        method = getattr(self._delegate, method_name)
+        try:
+            result = method(params)
+            if request_id is not None:
+                self._send_response(request_id, result)
+        except Exception as e:
+            if request_id is not None:
+                self._send_error(request_id, -32603, str(e))
+
+    def _handle_response(self, response: Dict[str, Any]):
+        response_id = response["id"]
+        with self._lock:
+            callback = self._pending_responses.pop(response_id, None)
+
+        if callback:
+            if "result" in response:
+                callback(response["result"])
+            elif "error" in response:
+                error = response["error"]
+                callback(RequestError(error["code"], error["message"], error.get("data")))
+
+    def send_request(self, method: str, params: Optional[Dict[str, Any]] = None) -> Any:
+        request_id = self._get_next_request_id()
+        request = {"jsonrpc": "2.0", "id": request_id, "method": method, "params": params}
+        self._send_message(request)
+
+        if self._test_mode:
+            # In test mode, we manually read the response
+            response_line = self._process.stdout.readline()
+            if response_line:
+                response = json.loads(response_line)
+                if "result" in response:
+                    return response["result"]
+                elif "error" in response:
+                    err = response["error"]
+                    raise RequestError(err["code"], err["message"], err.get("data"))
+            return None  # Should not happen in tests
+
+        # In normal mode, wait for the listener thread
+        event = Event()
+        result = None
+
+        def callback(response):
+            nonlocal result
+            result = response
+            event.set()
+
+        with self._lock:
+            self._pending_responses[request_id] = callback
+
+        event.wait(timeout=5)
+        if not event.is_set():
+            raise TimeoutError(f"Request '{method}' timed out")
+
+        if isinstance(result, RequestError):
+            raise result
+        return result
+
+    def _send_response(self, request_id: int, result: Any):
+        response = {"jsonrpc": "2.0", "id": request_id, "result": result}
+        self._send_message(response)
+
+    def _send_error(self, request_id: int, code: int, message: str, data: Optional[Any] = None):
+        error = {"code": code, "message": message}
+        if data:
+            error["data"] = data
+        response = {"jsonrpc": "2.0", "id": request_id, "error": error}
+        self._send_message(response)
+
+    def _send_message(self, message: Dict[str, Any]):
+        if self._process.stdin:
+            try:
+                self._process.stdin.write(json.dumps(message) + "\n")
+                self._process.stdin.flush()
+            except IOError:
+                pass
+
+    def _get_next_request_id(self) -> int:
+        with self._lock:
+            self._next_request_id += 1
+            return self._next_request_id
+
+
+class AcpClient:
+    """Client for the Agent-Coordinator Protocol (ACP)."""
+
+    def __init__(self, gemini_cli_path: str, delegate: Any, test_mode=False):
+        self.gemini_cli_path = gemini_cli_path
+        self.process: Optional[subprocess.Popen] = None
+        self.connection: Optional[Connection] = None
+        self._delegate = delegate
+        self._test_mode = test_mode
+
+    def start(self):
+        if not self._test_mode:
+            self.process = cast(
+                subprocess.Popen,
+                subprocess.Popen(
+                    ["node", self.gemini_cli_path, "--experimental-acp"],
+                    stdin=subprocess.PIPE,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                ),
+            )
+        else:
+            # In test mode, the process is a mock
+            self.process = MagicMock()
+
+        self.connection = Connection(self._delegate, self.process, self._test_mode)
+        self.connection.start()
+
+    def stop(self):
+        if self.connection:
+            self.connection.stop()
+        if self.process and not self._test_mode:
+            self.process.terminate()
+            self.process.wait()
+
+    def initialize(self, params: InitializeParams) -> InitializeResponse:
+        result = self.connection.send_request("initialize", params.__dict__)
+        return InitializeResponse(**result)
+
+    def send_user_message(self, params: SendUserMessageParams) -> None:
+        self.connection.send_request("sendUserMessage", params.__dict__)
+
+    def cancel_send_message(self) -> None:
+        self.connection.send_request("cancelSendMessage")

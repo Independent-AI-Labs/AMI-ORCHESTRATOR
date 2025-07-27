@@ -157,7 +157,8 @@ data
 pytorch
 modelcache
 
-*agent*
+*agent*bat
+*agent*sh
 *commit_message*
 bandit-report.json
 *temp_*
