@@ -10,8 +10,11 @@ from datetime import datetime
 from orchestrator.mcp.servers.localfs.file_utils import FileUtils
 from orchestrator.mcp.servers.localfs.tool_definitions import get_tool_declarations
 
+# Define the root directory for file operations
+_ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+
 # Create a /logs directory in the project root if it doesn't exist
-LOGS_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "logs"))
+LOGS_DIR = os.path.join(_ROOT_DIR, "logs")
 os.makedirs(LOGS_DIR, exist_ok=True)
 
 # Generate a unique log file name with a timestamp
@@ -28,6 +31,7 @@ class LocalFiles:
 
     def __init__(self):
         self.tools = {tool_decl["name"]: getattr(self, tool_decl["name"]) for tool_decl in get_tool_declarations()}
+        self.root_dir = _ROOT_DIR
 
     def _send_response(self, response):
         """Send a JSON-RPC response to stdout."""
@@ -75,7 +79,7 @@ class LocalFiles:
         """Read content from a file."""
         try:
             logging.info("Reading file: %s (mode: %s, encoding: %s)", file_path, mode, encoding)
-            content = FileUtils.read_file_content(file_path, mode, encoding)
+            content = FileUtils.read_file_content(file_path, self.root_dir, mode, encoding)
 
             if mode == "binary":
                 # Return base64 encoded content for binary files
@@ -134,12 +138,12 @@ class LocalFiles:
             original_content = ""
             if file_exists and mode == "text":
                 try:
-                    original_content = FileUtils.read_file_content(file_path, mode, encoding)
+                    original_content = FileUtils.read_file_content(file_path, self.root_dir, mode, encoding)
                 except Exception as e:  # pylint: disable=broad-exception-caught
                     logging.warning("Could not read existing file for diff: %s", e)
 
             # Write the content
-            FileUtils.write_file_content(file_path, content, mode, encoding)
+            FileUtils.write_file_content(file_path, content, self.root_dir, mode, encoding)
 
             # Generate success message with content statistics
             if mode == "binary":
@@ -192,7 +196,7 @@ class LocalFiles:
             )
 
             # Read original content for diff
-            original_content = FileUtils.read_file_content(file_path, mode, encoding)
+            original_content = FileUtils.read_file_content(file_path, self.root_dir, mode, encoding)
 
             if mode == "binary":
                 try:
@@ -259,7 +263,7 @@ class LocalFiles:
                 )
                 return f"No changes made to '{file_path}': replacement resulted in identical content."
 
-            FileUtils.write_file_content(file_path, new_content, mode, encoding)
+            FileUtils.write_file_content(file_path, new_content, self.root_dir, mode, encoding)
 
             # Generate diff for text mode
             diff_output = ""
@@ -301,7 +305,7 @@ class LocalFiles:
                 raise ValueError(f"Start line ({start_line}) must be less than or equal to end line ({end_line})")
 
             # Read original content for diff
-            original_content = FileUtils.read_file_content(file_path, "text", encoding)
+            original_content = FileUtils.read_file_content(file_path, self.root_dir, "text", encoding)
             lines = original_content.splitlines(keepends=True)  # Keep ends here
             total_lines = len(lines)
 
@@ -323,7 +327,7 @@ class LocalFiles:
             modified_lines = lines[:start_idx] + new_lines + lines[end_idx:]
             new_content = "".join(modified_lines)
 
-            FileUtils.write_file_content(file_path, new_content, "text", encoding)
+            FileUtils.write_file_content(file_path, new_content, self.root_dir, "text", encoding)
 
             # Generate diff
             diff_output = FileUtils.generate_diff(original_content, new_content, file_path)
@@ -360,7 +364,7 @@ class LocalFiles:
                 raise ValueError(f"Start line ({start_line}) must be less than or equal to end line ({end_line})")
 
             # Read original content for diff
-            original_content = FileUtils.read_file_content(file_path, "text", encoding)
+            original_content = FileUtils.read_file_content(file_path, self.root_dir, "text", encoding)
             lines = original_content.splitlines(keepends=True)  # Keep ends here
             total_lines = len(lines)
 
@@ -378,7 +382,7 @@ class LocalFiles:
             modified_lines = lines[:start_idx] + lines[end_idx:]
             new_content = "".join(modified_lines)
 
-            FileUtils.write_file_content(file_path, new_content, "text", encoding)
+            FileUtils.write_file_content(file_path, new_content, self.root_dir, "text", encoding)
 
             # Generate diff
             diff_output = FileUtils.generate_diff(original_content, new_content, file_path)
@@ -407,7 +411,7 @@ class LocalFiles:
                 raise ValueError("Line number must be positive (1-based indexing)")
 
             # Read original content for diff
-            original_content = FileUtils.read_file_content(file_path, "text", encoding)
+            original_content = FileUtils.read_file_content(file_path, self.root_dir, "text", encoding)
             lines = original_content.splitlines(keepends=True)  # Keep ends here
             total_lines = len(lines)
 
@@ -428,7 +432,7 @@ class LocalFiles:
             modified_lines = lines[:insert_idx] + insert_lines_with_ends + lines[insert_idx:]
             new_content = "".join(modified_lines)
 
-            FileUtils.write_file_content(file_path, new_content, "text", encoding)
+            FileUtils.write_file_content(file_path, new_content, self.root_dir, "text", encoding)
 
             # Generate diff
             diff_output = FileUtils.generate_diff(original_content, new_content, file_path)
@@ -468,7 +472,7 @@ class LocalFiles:
 
         for file_path in file_paths:
             try:
-                validated_path = FileUtils.validate_file_path(file_path)
+                validated_path = FileUtils.validate_file_path(file_path, self.root_dir)
 
                 if not os.path.exists(validated_path):
                     errors.append(f"File not found: '{file_path}'")
@@ -523,8 +527,8 @@ class LocalFiles:
 
         for source_path, dest_path in zip(source_paths, destination_paths):
             try:
-                validated_source = FileUtils.validate_file_path(source_path)
-                validated_dest = FileUtils.validate_file_path(dest_path)
+                validated_source = FileUtils.validate_file_path(source_path, self.root_dir)
+                validated_dest = FileUtils.validate_file_path(dest_path, self.root_dir)
 
                 # Check if source exists and is a file
                 if not os.path.exists(validated_source):
@@ -592,7 +596,7 @@ class LocalFiles:
     def create_directory(self, directory_path: str):
         """Create a directory and any necessary parent directories."""
         try:
-            validated_path = FileUtils.validate_file_path(directory_path)
+            validated_path = FileUtils.validate_file_path(directory_path, self.root_dir)
 
             if os.path.exists(validated_path):
                 if os.path.isdir(validated_path):
@@ -618,7 +622,7 @@ class LocalFiles:
     def delete_directory(self, directory_path: str):
         """Delete a directory and all its contents."""
         try:
-            validated_path = FileUtils.validate_file_path(directory_path)
+            validated_path = FileUtils.validate_file_path(directory_path, self.root_dir)
 
             if not os.path.exists(validated_path):
                 raise FileNotFoundError(f"Directory not found: '{directory_path}'")

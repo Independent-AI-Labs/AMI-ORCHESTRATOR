@@ -2,8 +2,8 @@ import json
 import os
 
 from dotenv import load_dotenv
-from llama_index.agent.openai import ReActAgent
-from llama_index.core.tools import FunctionTool
+from llama_index.core.agent import ReActAgent
+from llama_index.core.tools import BaseTool, FunctionTool
 from llama_index.llms.openai import OpenAI
 
 from orchestrator.acp.protocol import Resource
@@ -74,7 +74,7 @@ if not api_key:
     raise ValueError("OPENAI_API_KEY environment variable not set.")
 
 llm = OpenAI(model="gpt-4-0613", api_key=api_key)
-tools = [register_worker_tool, get_workers_tool]
+tools: list[BaseTool] = [register_worker_tool, get_workers_tool]
 agent = ReActAgent.from_tools(tools, llm=llm, verbose=True)
 
 # 5. Main execution loop

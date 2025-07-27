@@ -14,15 +14,16 @@ class FileUtils:
     max_file_size = 100 * 1024 * 1024  # 100MB limit
 
     @staticmethod
-    def validate_file_path(file_path: str) -> str:
-        """Validate and normalize file path for security."""
+    def validate_file_path(file_path: str, root_dir: str) -> str:
+        """Validate and normalize file path for security, confining it to root_dir."""
         try:
             # Convert to Path object and resolve to absolute path
             path_obj = Path(file_path).resolve()
+            root_path_obj = Path(root_dir).resolve()
 
-            # Basic security check - prevent directory traversal attacks
-            if ".." in str(path_obj) and not str(path_obj).startswith(os.path.abspath(os.getcwd())):
-                raise ValueError("Invalid file path: directory traversal not allowed")
+            # Ensure the resolved path is a child of the root directory
+            if not path_obj.is_relative_to(root_path_obj):
+                raise ValueError(f"Path '{file_path}' is outside the allowed root directory '{root_dir}'")
 
             return str(path_obj)
         except Exception as e:  # pylint: disable=broad-exception-caught
@@ -79,9 +80,9 @@ class FileUtils:
             return f"Failed to generate diff: {e}"
 
     @staticmethod
-    def read_file_content(file_path: str, mode: str = "text", encoding: str = "utf-8"):
+    def read_file_content(file_path: str, root_dir: str, mode: str = "text", encoding: str = "utf-8"):
         """Read file content with proper error handling and normalization."""
-        validated_path = FileUtils.validate_file_path(file_path)
+        validated_path = FileUtils.validate_file_path(file_path, root_dir)
 
         if not os.path.exists(validated_path):
             raise FileNotFoundError(f"File not found: '{file_path}'. Please check the path and ensure the file exists.")
@@ -113,9 +114,9 @@ class FileUtils:
             raise IOError(f"Unexpected error reading file '{validated_path}': {e}") from e
 
     @staticmethod
-    def write_file_content(file_path: str, content, mode: str = "text", encoding: str = "utf-8"):
+    def write_file_content(file_path: str, content, root_dir: str, mode: str = "text", encoding: str = "utf-8"):
         """Write file content with proper error handling."""
-        validated_path = FileUtils.validate_file_path(file_path)
+        validated_path = FileUtils.validate_file_path(file_path, root_dir)
 
         # Create directory if it doesn't exist
         parent_dir = os.path.dirname(validated_path)

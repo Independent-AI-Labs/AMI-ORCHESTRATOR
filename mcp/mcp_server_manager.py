@@ -127,7 +127,7 @@ class MCPServerManager:
             logger.error("Error starting MCP server: %s", e)
             raise
 
-    def start_server_for_testing(self):
+    def start_server_for_testing(self, env: dict | None = None):
         """
         Starts the MCP server for testing (not detached).
         Returns the Popen object for direct communication.
@@ -141,6 +141,22 @@ class MCPServerManager:
             creation_flags = subprocess.CREATE_NEW_PROCESS_GROUP if sys.platform == "win32" else 0
             start_new_session = sys.platform != "win32"
 
+            env = os.environ.copy()
+            # Add the project root (parent of orchestrator) to PYTHONPATH
+            project_root = os.path.abspath(os.path.join(self.cwd, os.pardir))
+            if "PYTHONPATH" in env:
+                env["PYTHONPATH"] = f"{project_root}{os.pathsep}{env["PYTHONPATH"]}"
+            else:
+                env["PYTHONPATH"] = project_root
+
+            env = os.environ.copy()
+            # Add the project root (parent of orchestrator) to PYTHONPATH
+            project_root = os.path.abspath(os.path.join(self.cwd, os.pardir))
+            if "PYTHONPATH" in env:
+                env["PYTHONPATH"] = f"{project_root}{os.pathsep}{env["PYTHONPATH"]}"
+            else:
+                env["PYTHONPATH"] = project_root
+
             process = subprocess.Popen(
                 [sys.executable, self.server_script_path],
                 stdin=subprocess.PIPE,
@@ -149,6 +165,7 @@ class MCPServerManager:
                 cwd=self.cwd,
                 creationflags=creation_flags,
                 start_new_session=start_new_session,
+                env=env,
             )
             return process
         except (IOError, OSError) as e:

@@ -17,6 +17,7 @@ This document outlines the best practices and development guidelines for working
 1.  **Plan and Confirm:** Before making any changes, thoroughly plan the approach. This includes identifying affected files, understanding existing patterns, and considering potential impacts. Confirm the plan with relevant stakeholders or by performing self-verification steps (e.g., outlining expected test outcomes).
 2.  **Create/Update Tests:** Before writing any new code, first write the tests that will validate the new functionality. This ensures that the code is written with testability in mind and that the tests accurately reflect the requirements of the new feature.
 3.  **Implement the Feature (Atomic Changes):** Write the code to make the tests pass, focusing on making small, atomic changes. Each change should be self-contained and address a single concern.
+6. **Commit Changes (Thoroughly):** Before committing, always inspect the changes using `git diff --staged`. Stage all relevant changes using `git add .`. Write a clear and comprehensive commit message that accurately describes the changes made. Use a temporary commit message file for this purpose.
 4.  **Run All Tests (Frequent Validation):** After each atomic change, run the relevant tests (unit, integration, E2E) to ensure immediate validation and catch regressions early. Before submitting any changes, run the entire test suite.
 5.  **Update Documentation:** Update the `NEXT_STEPS.md` file and any other relevant documentation to reflect the changes.
 

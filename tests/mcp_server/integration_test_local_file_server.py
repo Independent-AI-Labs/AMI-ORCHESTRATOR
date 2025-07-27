@@ -1,6 +1,7 @@
 import base64
 import json
 import os
+import shutil
 import signal
 import stat
 import subprocess
@@ -105,13 +106,15 @@ class MCPClient:
 
 
 @pytest.fixture(scope="module")
-def mcp_server_client_fixture() -> Generator[MCPClient, None, None]:
+def client() -> Generator[MCPClient, None, None]:
     """Pytest fixture to provide an MCPClient instance for testing."""
     manager = MCPServerManager(SERVER_SCRIPT, PROJECT_ROOT)
     process = None
     try:
         manager.stop_server()
-        process = manager.start_server_for_testing()
+        env = os.environ.copy()
+        env["PYTHONPATH"] = PROJECT_ROOT
+        process = manager.start_server_for_testing(env=env)
         time.sleep(1)
         if process.poll() is not None:
             stderr_output = process.stderr.read().decode(errors="ignore")
@@ -141,50 +144,71 @@ def mcp_server_client_fixture() -> Generator[MCPClient, None, None]:
 
 
 @pytest.fixture
-def temp_integration_file_fixture(tmp_path: Path) -> str:
+def temp_file(tmp_path: Path) -> str:
     """Creates a temporary text file for integration tests."""
-    file_path = tmp_path / "integration_test_file.txt"
+    # Create temporary files within the orchestrator directory
+    orchestrator_temp_dir = Path(PROJECT_ROOT) / "orchestrator" / "temp_test_files"
+    orchestrator_temp_dir.mkdir(parents=True, exist_ok=True)
+    file_path = orchestrator_temp_dir / "integration_test_file.txt"
     file_path.write_text("Line 1\nLine 2\nLine 3\n")
     return str(file_path)
 
 
 @pytest.fixture
-def temp_integration_binary_file_fixture(tmp_path: Path) -> str:
+def temp_binary_file(tmp_path: Path) -> str:
     """Creates a temporary binary file for integration tests."""
-    file_path = tmp_path / "integration_test_binary_file.bin"
+    # Create temporary files within the orchestrator directory
+    orchestrator_temp_dir = Path(PROJECT_ROOT) / "orchestrator" / "temp_test_files"
+    orchestrator_temp_dir.mkdir(parents=True, exist_ok=True)
+    file_path = orchestrator_temp_dir / "integration_test_binary_file.bin"
     content = b"\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09"
     file_path.write_bytes(content)
     return str(file_path)
 
 
 @pytest.fixture
-def read_only_dir_fixture(tmp_path: Path) -> Generator[Path, None, None]:
-    """Creates a temporary read-only directory for permission tests."""
-    dir_path = tmp_path / "read_only_dir"
-    dir_path.mkdir()
+def read_only_dir(tmp_path: Path) -> Generator[Path, None, None]:
+    """Creates a temporary read-only directory for permission tests within PROJECT_ROOT."""
+    # Create temporary read-only directory within the orchestrator directory
+    orchestrator_temp_dir = Path(PROJECT_ROOT) / "orchestrator" / "temp_read_only_dir"
+    orchestrator_temp_dir.mkdir(parents=True, exist_ok=True)
+    dir_path = orchestrator_temp_dir
+
+    # Set read-only permissions
     if sys.platform == "win32":
+        # On Windows, deny write access for the current user
         user = os.getlogin()
         subprocess.run(
             ["icacls", str(dir_path), "/deny", f"{user}:(W)"],
             check=True,
             capture_output=True,
-            shell=False,  # nosec B603, B607
+            shell=False,
         )
     else:
-        os.chmod(dir_path, stat.S_IREAD | stat.S_IEXEC)
+        # On Unix-like systems, remove write permissions for owner, group, others
+        os.chmod(dir_path, stat.S_IREAD | stat.S_IEXEC)  # r-x for owner, no write for anyone
 
     yield dir_path
 
+    # Clean up: restore permissions and remove directory
     if sys.platform == "win32":
         user = os.getlogin()
         subprocess.run(
-            ["icacls", str(dir_path), "/grant", f"{user}:(F)"],
-            check=True,
+            ["icacls", str(dir_path), "/remove", f"{user}:(W)"],  # Remove explicit deny
+            check=False,  # May fail if permissions were already changed
             capture_output=True,
-            shell=False,  # nosec B603, B607
+            shell=False,
         )
+        # Attempt to remove the directory, handle if it's still read-only
+        try:
+            shutil.rmtree(dir_path)
+        except OSError as e:
+            print(f"Error removing read-only directory on Windows: {e}")
+            # Fallback: try to force remove
+            subprocess.run(["rmdir", "/s", "/q", str(dir_path)], shell=True)
     else:
-        os.chmod(dir_path, stat.S_IWRITE | stat.S_IREAD | stat.S_IEXEC)
+        os.chmod(dir_path, stat.S_IWRITE | stat.S_IREAD | stat.S_IEXEC)  # Restore write for owner
+        shutil.rmtree(dir_path)
 
 
 def test_mcp_list_tools(client: MCPClient):
@@ -237,6 +261,79 @@ def test_mcp_replace_content_text(client: MCPClient, temp_file: str):
         mode="text",
     )
     assert "Successfully replaced 1 occurrence(s)" in result  # nosec B101
+
+
+def test_mcp_read_file_outside_root_error(client: MCPClient, tmp_path: Path):
+    """Tests read_file error for a file outside the allowed root directory."""
+    # Create a file outside the project root
+    outside_file = tmp_path.parent / "outside_file.txt"
+    outside_file.write_text("This is outside.")
+    with pytest.raises(MCPError, match=r"Path '.*outside_file.txt' is outside the allowed root directory"):
+        client.call_tool("read_file", file_path=str(outside_file))
+
+
+def test_mcp_write_file_outside_root_error(client: MCPClient, tmp_path: Path):
+    """Tests write_file error for a file outside the allowed root directory."""
+    outside_file = tmp_path.parent / "outside_write.txt"
+    with pytest.raises(MCPError, match=r"Path '.*outside_write.txt' is outside the allowed root directory"):
+        client.call_tool("write_file", file_path=str(outside_file), content="Attempt to write outside.")
+
+
+def test_mcp_replace_string_outside_root_error(client: MCPClient, tmp_path: Path):
+    """Tests edit_file_replace_string error for a file outside the allowed root directory."""
+    outside_file = tmp_path.parent / "outside_replace.txt"
+    outside_file.write_text("original content")
+    with pytest.raises(MCPError, match=r"Path '.*outside_replace.txt' is outside the allowed root directory"):
+        client.call_tool("edit_file_replace_string", file_path=str(outside_file), old_string="original", new_string="new")
+
+
+def test_mcp_replace_lines_outside_root_error(client: MCPClient, tmp_path: Path):
+    """Tests edit_file_replace_lines error for a file outside the allowed root directory."""
+    outside_file = tmp_path.parent / "outside_replace_lines.txt"
+    outside_file.write_text("line1\nline2")
+    with pytest.raises(MCPError, match=r"Path '.*outside_replace_lines.txt' is outside the allowed root directory"):
+        client.call_tool("edit_file_replace_lines", file_path=str(outside_file), start_line=1, end_line=1, new_string="newline")
+
+
+def test_mcp_delete_files_outside_root_error(client: MCPClient, tmp_path: Path):
+    """Tests delete_files error for a file outside the allowed root directory."""
+    outside_file = tmp_path.parent / "outside_delete.txt"
+    outside_file.write_text("delete me")
+    with pytest.raises(MCPError, match=r"Path '.*outside_delete.txt' is outside the allowed root directory"):
+        client.call_tool("delete_files", file_paths=[str(outside_file)])
+
+
+def test_mcp_move_files_source_outside_root_error(client: MCPClient, tmp_path: Path):
+    """Tests move_files error when source is outside the allowed root directory."""
+    outside_source = tmp_path.parent / "outside_source.txt"
+    outside_source.write_text("source content")
+    inside_dest = tmp_path / "inside_dest.txt"
+    with pytest.raises(MCPError, match=r"Path '.*outside_source.txt' is outside the allowed root directory"):
+        client.call_tool("move_files", source_paths=[str(outside_source)], destination_paths=[str(inside_dest)])
+
+
+def test_mcp_move_files_destination_outside_root_error(client: MCPClient, tmp_path: Path):
+    """Tests move_files error when destination is outside the allowed root directory."""
+    inside_source = tmp_path / "inside_source.txt"
+    inside_source.write_text("source content")
+    outside_dest = tmp_path.parent / "outside_dest.txt"
+    with pytest.raises(MCPError, match=r"Path '.*outside_dest.txt' is outside the allowed root directory"):
+        client.call_tool("move_files", source_paths=[str(inside_source)], destination_paths=[str(outside_dest)])
+
+
+def test_mcp_create_directory_outside_root_error(client: MCPClient, tmp_path: Path):
+    """Tests create_directory error for a directory outside the allowed root directory."""
+    outside_dir = tmp_path.parent / "outside_new_dir"
+    with pytest.raises(MCPError, match=r"Path '.*outside_new_dir' is outside the allowed root directory"):
+        client.call_tool("create_directory", directory_path=str(outside_dir))
+
+
+def test_mcp_delete_directory_outside_root_error(client: MCPClient, tmp_path: Path):
+    """Tests delete_directory error for a directory outside the allowed root directory."""
+    outside_dir = tmp_path.parent / "outside_delete_dir"
+    outside_dir.mkdir()
+    with pytest.raises(MCPError, match=r"Path '.*outside_delete_dir' is outside the allowed root directory"):
+        client.call_tool("delete_directory", directory_path=str(outside_dir))
     with open(temp_file, "r", encoding="utf-8") as f:
         assert f.read() == "Line 1\nReplaced Line 2\nLine 3\n"  # nosec B101
 
