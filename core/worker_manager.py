@@ -2,9 +2,7 @@
 Worker Manager for the Orchestrator.
 """
 
-import multiprocessing
 import os
-import threading
 from collections import defaultdict
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 
@@ -61,6 +59,6 @@ class WorkerManager:
 
     def update_resource_metrics(self, worker_id: str, actual_resources: TaskResourceMetrics):
         """Conceptual: Update resource usage and cost metrics for a completed task."""
-        print(f"Worker {worker_id} reported actual resource usage: {actual_resources.usage.cpu_hours} CPU hours, cost: {actual_resources.cost.monetary_cost}")
+        cost_str = f", cost: {actual_resources.cost.monetary_cost}" if actual_resources.cost else ""
+        print(f"Worker {worker_id} reported actual resource usage: {actual_resources.usage.cpu_hours} CPU hours{cost_str}")
         # In a real system, this would update a persistent store or monitoring system.
-        pass

@@ -4,9 +4,8 @@ Client for the Agent-Coordinator Protocol (ACP).
 
 import json
 import subprocess
-from dataclasses import dataclass
 from threading import Event, Lock, Thread
-from typing import Any, Callable, Dict, Generic, List, Optional, TypeVar, cast
+from typing import Any, Callable, Dict, Generic, Optional, TypeVar, cast
 from unittest.mock import MagicMock
 
 from orchestrator.acp.protocol import (
@@ -66,20 +65,20 @@ class Connection(Generic[D]):
         self._lock = Lock()
         self._running = False
         self._test_mode = test_mode
-        if not self._test_mode:
-            self._listener_thread = Thread(target=self._listen)
-            self._listener_thread.daemon = True
+        self._listener_thread: Optional[Thread] = None
 
     def start(self):
         if not self._test_mode:
             self._running = True
+            self._listener_thread = Thread(target=self._listen)
+            self._listener_thread.daemon = True
             self._listener_thread.start()
 
     def stop(self):
         if not self._test_mode and self._running:
             self._running = False
             self._stream.close()
-            if self._listener_thread.is_alive():
+            if self._listener_thread and self._listener_thread.is_alive():
                 self._listener_thread.join(timeout=1)
 
     def _listen(self):
@@ -114,7 +113,7 @@ class Connection(Generic[D]):
             result = method(params)
             if request_id is not None:
                 self._send_response(request_id, result)
-        except Exception as e:
+        except (TypeError, AttributeError) as e:
             if request_id is not None:
                 self._send_error(request_id, -32603, str(e))
 
@@ -142,14 +141,14 @@ class Connection(Generic[D]):
                 response = json.loads(response_line)
                 if "result" in response:
                     return response["result"]
-                elif "error" in response:
+                if "error" in response:
                     err = response["error"]
                     raise RequestError(err["code"], err["message"], err.get("data"))
             return None  # Should not happen in tests
 
         # In normal mode, wait for the listener thread
         event = Event()
-        result = None
+        result: Optional[Any] = None
 
         def callback(response):
             nonlocal result
@@ -165,6 +164,8 @@ class Connection(Generic[D]):
 
         if isinstance(result, RequestError):
             raise result
+        if result is None:
+            raise TimeoutError(f"Request '{method}' timed out")
         return result
 
     def _send_response(self, request_id: int, result: Any):
@@ -225,11 +226,17 @@ class AcpClient:
             self.process.wait()
 
     def initialize(self, params: InitializeParams) -> InitializeResponse:
-        result = self.connection.send_request("initialize", params.__dict__)
+        if self.connection is None:
+            raise ConnectionError("Connection not initialized.")
+        result = self.connection.send_request("initialize", params.__dict__)  # type: ignore
         return InitializeResponse(**result)
 
     def send_user_message(self, params: SendUserMessageParams) -> None:
-        self.connection.send_request("sendUserMessage", params.__dict__)
+        if self.connection is None:
+            raise ConnectionError("Connection not initialized.")
+        self.connection.send_request("sendUserMessage", params.__dict__)  # type: ignore
 
     def cancel_send_message(self) -> None:
-        self.connection.send_request("cancelSendMessage")
+        if self.connection is None:
+            raise ConnectionError("Connection not initialized.")
+        self.connection.send_request("cancelSendMessage")  # type: ignore

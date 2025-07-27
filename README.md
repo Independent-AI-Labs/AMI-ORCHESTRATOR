@@ -104,3 +104,13 @@ Security and compliance are not afterthoughts; they are core design principles:
 The Orchestrator project is currently in **Phase 1: Foundational Infrastructure & Security Core** and **Phase 2: Core BPMN Engine & State Machine** of its development plan. Significant progress has been made in establishing the core infrastructure, including a FastAPI, Redis client, a functional BPMN engine with handlers for various BPMN elements, formalized AI agent interfaces, and initial support for parallelization and resource-based worker pools, and the integration with the Gemini CLI via the `--experimental-acp` flag. All unit, integration, and end-to-end tests are currently passing.
 
 For a detailed breakdown of completed tasks, current progress, and the next steps, please refer to the `DEVELOPMENT_PLAN.md` and `NEXT_STEPS.md` files.
+
+## 9. Linting and Code Quality
+
+This project uses `pylint` for code quality and style checking. To ensure consistent results for all developers, the configuration is managed in the `.pylintrc` file at the root of the `orchestrator` directory.
+
+### Pylint Configuration
+
+The `.pylintrc` file is configured to automatically handle Python path issues that can arise from the project's structure. It uses an `init-hook` to add the `orchestrator` directory to `sys.path` when `pylint` is run.
+
+This ensures that commands like `pylint .` executed from the `orchestrator` directory will correctly resolve all module imports without requiring manual changes to the `PYTHONPATH` environment variable.

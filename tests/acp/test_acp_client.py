@@ -1,3 +1,4 @@
+# pylint: disable=protected-access
 import json
 import unittest
 from unittest.mock import MagicMock, patch
@@ -8,6 +9,11 @@ from orchestrator.acp.protocol import InitializeParams, SendUserMessageParams
 
 class TestAcpClient(unittest.TestCase):
     """Tests for the Gemini CLI adapter."""
+
+    def setUp(self):
+        """Set up the test case."""
+        self.adapter = AcpClient("path/to/gemini.js", MagicMock(), test_mode=True)
+        self.adapter.start()
 
     @patch("orchestrator.acp.acp_client.Stream")
     def test_initialize(self, mock_stream_class):
@@ -25,8 +31,6 @@ class TestAcpClient(unittest.TestCase):
         )
         mock_stream_class.return_value = mock_stream
 
-        self.adapter = AcpClient("path/to/gemini.js", MagicMock(), test_mode=True)
-        self.adapter.start()
         self.adapter.connection._stream = mock_stream
         response = self.adapter.initialize(InitializeParams(protocol_version="0.0.9"))
 
@@ -48,8 +52,6 @@ class TestAcpClient(unittest.TestCase):
         mock_stream.read.return_value = json.dumps({"jsonrpc": "2.0", "id": 1, "result": None})
         mock_stream_class.return_value = mock_stream
 
-        self.adapter = AcpClient("path/to/gemini.js", MagicMock(), test_mode=True)
-        self.adapter.start()
         self.adapter.connection._stream = mock_stream
 
         self.adapter.send_user_message(SendUserMessageParams(chunks=[{"text": "Hello, world!"}]))

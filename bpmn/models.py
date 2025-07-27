@@ -27,25 +27,17 @@ class Edge(Element):
 class Event(Element):
     """Base model for an event."""
 
-    pass
-
 
 class StartEvent(Event):
     """Model for a start event."""
-
-    pass
 
 
 class EndEvent(Event):
     """Model for an end event."""
 
-    pass
-
 
 class IntermediateCatchEvent(Event):
     """Model for an intermediate catch event."""
-
-    pass
 
 
 class TimerEventDefinition(BaseModel):
@@ -65,8 +57,6 @@ class MessageEventDefinition(BaseModel):
 class Gateway(Element):
     """Base model for a gateway."""
 
-    pass
-
 
 class ExclusiveGateway(Gateway):
     """Model for an exclusive gateway."""
@@ -77,13 +67,9 @@ class ExclusiveGateway(Gateway):
 class ParallelGateway(Gateway):
     """Model for a parallel gateway."""
 
-    pass
-
 
 class Task(Element):
     """Base model for a task."""
-
-    pass
 
 
 class ServiceTask(Task):

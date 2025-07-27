@@ -1,22 +1,19 @@
-from datetime import datetime
-
 """
 Dgraph schema generator from Pydantic models.
 """
 import inspect
 import sys
+from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Type
-
-# Add project root to the Python path
-project_root = Path(__file__).resolve().parents[2]
-sys.path.append(str(project_root))
-
-from typing import Any, Dict, List, Type
+from typing import Any, List, Type
 
 from pydantic import BaseModel
 
 from orchestrator.bpmn import models
+
+# Add project root to the Python path
+project_root = Path(__file__).resolve().parents[2]
+sys.path.append(str(project_root))
 
 
 def get_pydantic_models() -> List[Type[BaseModel]]:

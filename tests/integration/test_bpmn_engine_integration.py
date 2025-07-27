@@ -5,31 +5,11 @@ Integration tests for the BpmnEngine class.
 import os
 import unittest
 
-from orchestrator.bpmn.engine import BpmnEngine
-from orchestrator.core.dgraph_client import DgraphClient
-from orchestrator.core.prometheus_client import PrometheusClient
-from orchestrator.core.redis_client import RedisClient
-from orchestrator.core.security import SecurityManager
-from orchestrator.core.worker_manager import WorkerManager
+from tests.base_test import BaseTestCase
 
 
-class TestBpmnEngineIntegration(unittest.TestCase):
+class TestBpmnEngineIntegration(BaseTestCase):
     """Integration tests for the BpmnEngine class."""
-
-    def setUp(self):
-        """Set up the test case."""
-        self.dgraph_client = DgraphClient()
-        self.redis_client = RedisClient()
-        self.security_manager = SecurityManager()
-        self.prometheus_client = PrometheusClient()
-        self.worker_manager = WorkerManager(self.redis_client)
-        self.bpmn_engine = BpmnEngine(
-            self.dgraph_client,
-            self.security_manager,
-            self.redis_client,
-            self.prometheus_client,
-            self.worker_manager,
-        )
 
     def test_start_process(self):
         """Test the start_process method."""

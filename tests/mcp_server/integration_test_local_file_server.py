@@ -1,3 +1,4 @@
+# pylint: disable=redefined-outer-name
 import base64
 import json
 import os
@@ -205,7 +206,7 @@ def read_only_dir(tmp_path: Path) -> Generator[Path, None, None]:
         except OSError as e:
             print(f"Error removing read-only directory on Windows: {e}")
             # Fallback: try to force remove
-            subprocess.run(["rmdir", "/s", "/q", str(dir_path)], shell=True)
+            subprocess.run(["rmdir", "/s", "/q", str(dir_path)], shell=True, check=True)
     else:
         os.chmod(dir_path, stat.S_IWRITE | stat.S_IREAD | stat.S_IEXEC)  # Restore write for owner
         shutil.rmtree(dir_path)

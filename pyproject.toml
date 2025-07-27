@@ -1,3 +1,5 @@
+[tool.pylint.main]
+pythonpath = ["."]
 [tool.black]
 line-length = 160
 exclude = "temp_read_only_dir"

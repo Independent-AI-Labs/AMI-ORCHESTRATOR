@@ -6,7 +6,7 @@ from llama_index.core.agent import ReActAgent
 from llama_index.core.tools import BaseTool, FunctionTool
 from llama_index.llms.openai import OpenAI
 
-from orchestrator.acp.protocol import Resource
+from orchestrator.bpmn.models import Resource
 from orchestrator.core.redis_client import RedisClient
 from orchestrator.core.worker_manager import WorkerManager
 
@@ -43,7 +43,7 @@ def register_worker(worker_id: str, capabilities: str, resources: str = "GENERIC
 
         worker_manager.register_worker(worker_id, cap_list, res_list_enum)
         return f"Successfully registered worker '{worker_id}' with capabilities {cap_list} and resources {res_list_str}."
-    except Exception as e:
+    except (ValueError, TypeError) as e:
         return f"Error registering worker: {e}"
 
 
