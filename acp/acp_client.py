@@ -9,78 +9,13 @@ from threading import Event, Lock, Thread
 from typing import Any, Callable, Dict, Generic, List, Optional, TypeVar, cast
 from unittest.mock import MagicMock
 
-from orchestrator.acp.agent import Icon
+from orchestrator.acp.protocol import (
+    InitializeParams,
+    InitializeResponse,
+    SendUserMessageParams,
+)
 
 # region: Data Classes
-
-
-@dataclass
-class StreamAssistantMessageChunkParams:
-    chunk: Dict[str, Any]
-
-
-@dataclass
-class ToolCallLocation:
-    path: str
-    line: Optional[int] = None
-
-
-@dataclass
-class RequestToolCallConfirmationParams:
-    confirmation: Dict[str, Any]
-    icon: Icon
-    label: str
-    content: Optional[Dict[str, Any]] = None
-    locations: Optional[List[ToolCallLocation]] = None
-
-
-@dataclass
-class PushToolCallParams:
-    icon: Icon
-    label: str
-    content: Optional[Dict[str, Any]] = None
-    locations: Optional[List[ToolCallLocation]] = None
-
-
-@dataclass
-class UpdateToolCallParams:
-    content: Optional[Dict[str, Any]]
-    status: str
-    tool_call_id: int
-
-
-@dataclass
-class RequestToolCallConfirmationResponse:
-    id: int
-    outcome: str
-
-
-@dataclass
-class PushToolCallResponse:
-    id: int
-
-
-@dataclass
-class InitializeParams:
-    protocol_version: str
-
-
-@dataclass
-class SendUserMessageParams:
-    chunks: List[Dict[str, Any]]
-
-
-@dataclass
-class InitializeResponse:
-    is_authenticated: bool
-    protocol_version: str
-
-
-@dataclass
-class Error:
-    code: int
-    message: str
-    data: Optional[Any] = None
 
 
 # endregion: Data Classes
@@ -97,10 +32,35 @@ class RequestError(Exception):
 D = TypeVar("D")
 
 
-class Connection(Generic[D]):
-    def __init__(self, delegate: D, process: subprocess.Popen, test_mode=False):
-        self._delegate = delegate
+class Stream:
+    def __init__(self, process: subprocess.Popen):
         self._process = process
+
+    def read(self) -> Optional[str]:
+        if self._process.stdout:
+            return self._process.stdout.readline()
+        return None
+
+    def write(self, message: str):
+        if self._process.stdin:
+            try:
+                self._process.stdin.write(message)
+                self._process.stdin.flush()
+            except IOError:
+                pass
+
+    def close(self):
+        if self._process.stdout:
+            try:
+                self._process.stdout.close()
+            except IOError:
+                pass
+
+
+class Connection(Generic[D]):
+    def __init__(self, delegate: D, stream: Stream, test_mode=False):
+        self._delegate = delegate
+        self._stream = stream
         self._next_request_id = 0
         self._pending_responses: Dict[int, Callable[[Any], None]] = {}
         self._lock = Lock()
@@ -118,18 +78,14 @@ class Connection(Generic[D]):
     def stop(self):
         if not self._test_mode and self._running:
             self._running = False
-            if self._process.stdout:
-                try:
-                    self._process.stdout.close()
-                except IOError:
-                    pass  # Pipe might already be closed
+            self._stream.close()
             if self._listener_thread.is_alive():
                 self._listener_thread.join(timeout=1)
 
     def _listen(self):
-        while self._running and self._process.stdout:
+        while self._running:
             try:
-                line = self._process.stdout.readline()
+                line = self._stream.read()
                 if not line:
                     break
                 message = json.loads(line)
@@ -177,11 +133,11 @@ class Connection(Generic[D]):
     def send_request(self, method: str, params: Optional[Dict[str, Any]] = None) -> Any:
         request_id = self._get_next_request_id()
         request = {"jsonrpc": "2.0", "id": request_id, "method": method, "params": params}
-        self._send_message(request)
+        self._send_message(json.dumps(request) + "\n")
 
         if self._test_mode:
             # In test mode, we manually read the response
-            response_line = self._process.stdout.readline()
+            response_line = self._stream.read()
             if response_line:
                 response = json.loads(response_line)
                 if "result" in response:
@@ -213,22 +169,17 @@ class Connection(Generic[D]):
 
     def _send_response(self, request_id: int, result: Any):
         response = {"jsonrpc": "2.0", "id": request_id, "result": result}
-        self._send_message(response)
+        self._send_message(json.dumps(response) + "\n")
 
     def _send_error(self, request_id: int, code: int, message: str, data: Optional[Any] = None):
         error = {"code": code, "message": message}
         if data:
             error["data"] = data
         response = {"jsonrpc": "2.0", "id": request_id, "error": error}
-        self._send_message(response)
+        self._send_message(json.dumps(response) + "\n")
 
-    def _send_message(self, message: Dict[str, Any]):
-        if self._process.stdin:
-            try:
-                self._process.stdin.write(json.dumps(message) + "\n")
-                self._process.stdin.flush()
-            except IOError:
-                pass
+    def _send_message(self, message: str):
+        self._stream.write(message)
 
     def _get_next_request_id(self) -> int:
         with self._lock:
@@ -258,11 +209,12 @@ class AcpClient:
                     text=True,
                 ),
             )
+            stream = Stream(self.process)
         else:
-            # In test mode, the process is a mock
-            self.process = MagicMock()
+            # In test mode, the stream is a mock
+            stream = MagicMock()
 
-        self.connection = Connection(self._delegate, self.process, self._test_mode)
+        self.connection = Connection(self._delegate, stream, self._test_mode)
         self.connection.start()
 
     def stop(self):

@@ -56,31 +56,33 @@ graph TD
 
 This plan breaks down the development into logical phases, starting with a solid foundation and progressively adding more advanced capabilities.
 
-### Phase 1: Foundational Infrastructure & Security Core (In Progress)
+### Phase 1: Model-Driven Foundation & Security Core (In Progress)
 
-*   **Goal:** Establish a secure, auditable, and persistent foundation.
+*   **Goal:** Establish a secure, auditable, and persistent foundation based on a comprehensive, model-driven architecture.
 *   **Current Status:**
-    *   Dgraph Client: Basic client implemented, but `create_process_instance` and `create_human_task` are placeholders.
+    *   **Pydantic BPMN Models:** A comprehensive set of Pydantic models for BPMN 2.0 has been defined in `orchestrator/bpmn/models.py`.
+    *   **Dgraph Schema Generator:** A script at `orchestrator/core/schema_generator.py` automatically generates the Dgraph schema from the Pydantic models.
+    *   **Automated Schema Application:** The `apply_schema.py` script now integrates the schema generator, ensuring the Dgraph schema is always in sync with the models.
+    *   Dgraph Client: Basic client implemented.
     *   Redis Setup: Client implemented for messaging and dead-letter queue.
-    *   Security Kernel: `SecurityManager` exists, but authorization logic (e.g., `is_authorized_for_human_task`) is not fully implemented.
+    *   Security Kernel: `SecurityManager` exists, but authorization logic is not fully implemented.
     *   Initial Orchestrator Service: FastAPI is set up.
-    *   Testing: Unit, integration, and E2E tests are passing.
 *   **Tasks to Complete:**
-    1.  **Dgraph Persistence:** Fully implement `create_process_instance` and `create_human_task` in `DgraphClient` to ensure proper process and human task persistence.
-    2.  **Process Definition Storage:** Implement `store_process_definition` in `ProcessLoader` to persistently store BPMN definitions in Dgraph.
+    1.  **Dgraph Persistence:** Fully implement `create_process_instance` and `create_human_task` in `DgraphClient` using the new Pydantic models to ensure proper process and human task persistence.
+    2.  **Process Definition Storage:** Implement `store_process_definition` in `ProcessLoader` to persistently store BPMN definitions in Dgraph, using the Pydantic models as the data contract.
     3.  **Security Implementation:** Complete the `SecurityManager` implementation, including robust authorization logic.
     4.  **Testing:** Write comprehensive unit and integration tests for all components in this phase.
 
 ### Phase 2: Core BPMN Engine & State Machine (In Progress)
 
-*   **Goal:** Implement the fundamental BPMN execution logic and integrate with workers.
+*   **Goal:** Implement the fundamental BPMN execution logic, fully integrating the new Pydantic models.
 *   **Current Status:**
+    *   **BPMN Engine Refactoring:** The `BpmnEngine` has been refactored to use the Pydantic models from `orchestrator.bpmn.models`.
     *   BPMN Process Loader: Loads definitions from JSON files.
     *   BPMN Engine Core: Handlers for `startEvent`, `exclusiveGateway`, `serviceTask`, `humanTask`, `intermediateCatchEvent` (timer and message events), and `endEvent` are present.
     *   State Persistence: Placeholder calls to Dgraph client exist.
     *   Service Task Execution: Currently simulated; actual worker integration is pending.
     *   Expression Evaluation: Simplified evaluators are in place.
-    *   Testing: Unit, integration, and E2E tests are passing.
 *   **Tasks to Complete:**
     1.  **Worker Integration:** Modify `_handle_service_task` to send `TaskRequest` messages to appropriate workers (e.g., `sample_worker`, `gemini_cli_adapter`) via Redis. Implement a mechanism to receive `TaskCompleted` or `TaskFailed` messages from workers and update the process state accordingly.
     2.  **Robust Expression Language:** Replace the simplified `evaluate_condition` and `evaluate_expression` with a proper expression language.
@@ -92,10 +94,9 @@ This plan breaks down the development into logical phases, starting with a solid
 *   **Goal:** Define the agent communication standard and integrate the first simple worker.
 *   **Current Status:**
     *   ACP definition (`acp/protocol.py`) is complete.
-    *   Gemini CLI specific ACP definition (`acp/gemini_acp_protocol.py`) is defined.
+    *   `acp_client.py` is implemented and unit tested.
     *   `sample_worker.py` exists.
     *   Generic Agent Interface: The `Icon` class and `Agent` base class are defined in `acp/agent.py`.
-    *   Gemini CLI Adapter: `GeminiCliAdapter` is implemented in `acp/gemini_cli_adapter.py` and unit tested.
     *   **Llama Index ReAct Agent:** A conversational agent has been implemented in `main.py` to provide a natural language interface to the orchestrator. The agent is equipped with tools to manage workers.
 *   **Tasks to Complete:**
     1.  **Worker Manager Enhancements:** Enhance the `WorkerManager` to handle agent registration, health checks, and capability discovery via ACP. This includes integrating the `GeminiCliAdapter` with the `WorkerManager`.

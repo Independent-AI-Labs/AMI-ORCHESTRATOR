@@ -8,7 +8,7 @@ import threading
 from collections import defaultdict
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 
-from orchestrator.acp.protocol import Resource, TaskResourceMetrics
+from orchestrator.bpmn.models import Resource, TaskResourceMetrics
 from orchestrator.core.redis_client import RedisClient
 
 

@@ -1,28 +1,130 @@
-
-# Dgraph schema for the Orchestrator
-
-type Process {
-    process_id: string @index(exact) .
+type AiTask {
+    id: string .
     name: string .
-    description: string .
-    created_at: datetime .
-    updated_at: datetime .
-    tasks: [Task] .
-}
-
-type Task {
-    task_id: string @index(exact) .
-    name: string .
-    description: string .
-    status: string @index(exact) .
-    created_at: datetime .
-    updated_at: datetime .
-    process: Process .
-}
+    documentation: string .
+    prompt: string .
+    context: string .
+}}
 
 type AuditLog {
-    log_id: string @index(exact) .
+    id: string .
     timestamp: datetime .
+    instance_id: string .
+    element_id: string .
+    element_name: string .
     message: string .
     details: string .
-}
+}}
+
+type BaseModel {
+
+}}
+
+type Edge {
+    id: string .
+    name: string .
+    documentation: string .
+    source_ref: string .
+    target_ref: string .
+    condition_expression: string .
+}}
+
+type Element {
+    id: string .
+    name: string .
+    documentation: string .
+}}
+
+type EndEvent {
+    id: string .
+    name: string .
+    documentation: string .
+}}
+
+type Event {
+    id: string .
+    name: string .
+    documentation: string .
+}}
+
+type ExclusiveGateway {
+    id: string .
+    name: string .
+    documentation: string .
+    default: string .
+}}
+
+type Gateway {
+    id: string .
+    name: string .
+    documentation: string .
+}}
+
+type HumanTask {
+    id: string .
+    name: string .
+    documentation: string .
+    assignee: string .
+    candidate_users: string .
+    candidate_groups: string .
+}}
+
+type IntermediateCatchEvent {
+    id: string .
+    name: string .
+    documentation: string .
+}}
+
+type MessageEventDefinition {
+    message_ref: string .
+}}
+
+type ParallelGateway {
+    id: string .
+    name: string .
+    documentation: string .
+}}
+
+type ProcessDefinition {
+    id: string .
+    name: string .
+    documentation: string .
+    nodes: string .
+    edges: string .
+    created_at: datetime .
+}}
+
+type ProcessInstance {
+    id: string .
+    definition_id: string .
+    status: string .
+    variables: string .
+    created_at: datetime .
+    updated_at: datetime .
+    history: string .
+}}
+
+type ServiceTask {
+    id: string .
+    name: string .
+    documentation: string .
+    implementation: string .
+}}
+
+type StartEvent {
+    id: string .
+    name: string .
+    documentation: string .
+}}
+
+type Task {
+    id: string .
+    name: string .
+    documentation: string .
+}}
+
+type TimerEventDefinition {
+    time_duration: string .
+    time_date: string .
+    time_cycle: string .
+}}
