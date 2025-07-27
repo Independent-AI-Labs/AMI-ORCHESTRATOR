@@ -1,4 +1,5 @@
 [tool.black]
 line-length = 160
+exclude = "temp_read_only_dir"
 [tool.pytest.ini_options]
 norecursedirs = ["temp_read_only_dir"]

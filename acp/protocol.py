@@ -1,6 +1,7 @@
 """
 Defines the Agent-Coordinator Protocol (ACP) data structures.
 """
+
 from enum import Enum
 
 

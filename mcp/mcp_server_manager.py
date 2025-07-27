@@ -145,15 +145,7 @@ class MCPServerManager:
             # Add the project root (parent of orchestrator) to PYTHONPATH
             project_root = os.path.abspath(os.path.join(self.cwd, os.pardir))
             if "PYTHONPATH" in env:
-                env["PYTHONPATH"] = f"{project_root}{os.pathsep}{env["PYTHONPATH"]}"
-            else:
-                env["PYTHONPATH"] = project_root
-
-            env = os.environ.copy()
-            # Add the project root (parent of orchestrator) to PYTHONPATH
-            project_root = os.path.abspath(os.path.join(self.cwd, os.pardir))
-            if "PYTHONPATH" in env:
-                env["PYTHONPATH"] = f"{project_root}{os.pathsep}{env["PYTHONPATH"]}"
+                env["PYTHONPATH"] = f"{project_root}{os.pathsep}{env['PYTHONPATH']}"
             else:
                 env["PYTHONPATH"] = project_root
 

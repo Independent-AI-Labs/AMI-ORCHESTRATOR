@@ -39,7 +39,7 @@ graph TD
 
     subgraph "Agent Ecosystem (via ACP)"
         F -- Consumes & Publishes --> C
-        F -- Adapters --> I[Gemini AI Agent (via --experimental-acp)]
+        F -- Adapters --> I["Gemini AI Agent (via --experimental-acp)"]
         F -- Adapters --> J[Local Files Worker]
         F -- Adapters --> K[Internal API Worker]
         F -- Adapters --> L[Human Task Manager]
@@ -101,6 +101,6 @@ Security and compliance are not afterthoughts; they are core design principles:
 
 ## 8. Current Status & Next Steps
 
-The Orchestrator project is currently in **Phase 1: Foundational Infrastructure & Security Core** and **Phase 2: Core BPMN Engine & State Machine** of its development plan. Significant progress has been made in establishing the core infrastructure, including a Flask API, Redis client, a functional BPMN engine with handlers for various BPMN elements, formalized AI agent interfaces, and initial support for parallelization and resource-based worker pools, and the integration with the Gemini CLI via the `--experimental-acp` flag. All unit, integration, and end-to-end tests are currently passing.
+The Orchestrator project is currently in **Phase 1: Foundational Infrastructure & Security Core** and **Phase 2: Core BPMN Engine & State Machine** of its development plan. Significant progress has been made in establishing the core infrastructure, including a FastAPI, Redis client, a functional BPMN engine with handlers for various BPMN elements, formalized AI agent interfaces, and initial support for parallelization and resource-based worker pools, and the integration with the Gemini CLI via the `--experimental-acp` flag. All unit, integration, and end-to-end tests are currently passing.
 
 For a detailed breakdown of completed tasks, current progress, and the next steps, please refer to the `DEVELOPMENT_PLAN.md` and `NEXT_STEPS.md` files.

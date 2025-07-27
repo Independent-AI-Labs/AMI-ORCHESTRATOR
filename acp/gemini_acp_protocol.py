@@ -1,6 +1,7 @@
 """
 Defines the Agent-Coordinator Protocol (ACP) data structures for the JSON-RPC protocol used by the Gemini CLI.
 """
+
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Union
 
