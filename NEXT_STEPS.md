@@ -13,6 +13,13 @@
 
 ### Core Functionality
 
+*   **Agent Operational Guidelines Implementation:**
+    *   Implement mechanisms for creating and managing temporary work directories for agents within a pre-defined secure space.
+    *   Configure `local_file_server` instances to match the agent's temporary work directory, enforcing file access restrictions.
+    *   Develop functionality to clone or copy specified host directories into the agent's temporary work directory.
+    *   Implement a flag to control the deletion of temporary working directories upon task completion or voiding (default to YES).
+    *   Add logic for manually killing and restarting agent sessions within the context of the same task, acknowledging the separate lifecycles of ACP sessions and agent tasks.
+
 *   **Dgraph Persistence:** Fully implement `create_process_instance` and `create_human_task` in `orchestrator/core/dgraph_client.py` to ensure proper process and human task persistence.
 *   **Process Definition Storage:** Implement `store_process_definition` in `orchestrator/bpmn/process_loader.py` to persistently store BPMN definitions in Dgraph.
 *   **Security Implementation:** Complete the `SecurityManager` implementation, including robust authentication and authorization logic.

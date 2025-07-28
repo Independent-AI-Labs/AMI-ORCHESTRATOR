@@ -89,19 +89,24 @@ This plan breaks down the development into logical phases, starting with a solid
     
     4.  **Testing:** Write comprehensive unit and integration tests for the BPMN engine, process loader, and worker integration.
 
-### Phase 3: The Agent-Coordinator Protocol (ACP) & First Worker (In Progress)
+### Phase 3: The Agent-Coordinator Protocol (ACP) & Agent Operational Guidelines (In Progress)
 
-*   **Goal:** Define the agent communication standard and integrate the first simple worker.
+*   **Goal:** Define the agent communication standard, integrate the first simple worker, and establish robust operational guidelines for agent execution.
 *   **Current Status:**
     *   ACP definition (`acp/protocol.py`) is complete.
     *   `acp_client.py` is implemented and unit tested.
-    *   `sample_worker.py` exists.
-    
-    *   **Llama Index ReAct Agent:** A conversational agent has been implemented in `main.py` to provide a natural language interface to the orchestrator. The agent is equipped with tools to manage workers.
+    *   **Llama Index ReAct Agent:** A conversational agent has been implemented in `main.py` to provide a natural language interface to the orchestrator. This agent interacts with the `WorkerManager` to manage tasks.
+*   **Agent Operational Guidelines:**
+    1.  **Restricted Operating Environment:** Agents can only operate inside a pre-defined, secure directory on the host system.
+    2.  **Temporary Work Directories:** Spawning a worker agent creates a new, temporary work directory inside the pre-defined space on the host for each task.
+    3.  **.gemini/settings.json Configuration:** A `.gemini/settings.json` file is created for each individual task, defining the available MCP servers for the agent. The `local_file_server` is included by default, and its root directory is configured to match the agent's temporary work directory to enforce file access restrictions.
+    4.  **Host Directory Cloning:** As a separate argument to the worker spawn process, a directory on the host device can be specified. This directory is "cloned" or copied in full inside the temporary work directory for the agent task.
+    5.  **Temporary Directory Lifecycle:** When a task is voided or completed, a flag determines whether the entire temporary working directory is deleted (default is YES).
+    6.  **Session Management:** The orchestrator should be able to manually kill and restart agent sessions within the context of the same task. ACP sessions have a separate lifecycle from an agent task, which may involve multiple sessions within the same temporary work environment and configuration.
 *   **Tasks to Complete:**
-    1.  **Worker Manager Enhancements:** Enhance the `WorkerManager` to handle agent registration, health checks, and capability discovery via ACP. This includes integrating the `GeminiCliAdapter` with the `WorkerManager`.
-    
-    3.  **Testing:** Write comprehensive unit and integration tests for the `WorkerManager` enhancements and the first generic adapter.
+    1.  **Worker Manager Enhancements:** Enhance the `WorkerManager` to handle agent registration, health checks, and capability discovery via ACP. This includes integrating with generic ACP-compliant agents.
+    2.  **Implement Agent Operational Guidelines:** Implement the mechanisms for creating and managing temporary work directories, configuring `local_file_server` roots, cloning host directories, handling the deletion flag, and managing agent session lifecycles.
+    3.  **Testing:** Write comprehensive unit and integration tests for the `WorkerManager` enhancements and the new agent operational guidelines.
 
 ### Phase 4: Advanced Business Logic & Human-in-the-Loop (Planned)
 
