@@ -1,21 +1,13 @@
 import json
-import os
 
-from dotenv import load_dotenv
 from llama_index.core.agent import ReActAgent
 from llama_index.core.tools import BaseTool, FunctionTool
 from llama_index.llms.openai import OpenAI
 
 from orchestrator.bpmn.models import Resource
+from orchestrator.core.config import Config
 from orchestrator.core.redis_client import RedisClient
 from orchestrator.core.worker_manager import WorkerManager
-
-# Load environment variables from .env file
-load_dotenv()
-
-# 1. Initialize necessary components
-redis_client = RedisClient()
-worker_manager = WorkerManager(redis_client)
 
 
 # 2. Define tool functions that wrap WorkerManager methods
@@ -69,11 +61,7 @@ get_workers_tool = FunctionTool.from_defaults(
 )
 
 # 4. Initialize the LLM and Agent
-api_key = os.getenv("OPENAI_API_KEY")
-if not api_key:
-    raise ValueError("OPENAI_API_KEY environment variable not set.")
-
-llm = OpenAI(model="gpt-4-0613", api_key=api_key)
+llm = OpenAI(model="gpt-4-0613", api_key=Config.OPENAI_API_KEY)
 tools: list[BaseTool] = [register_worker_tool, get_workers_tool]
 agent = ReActAgent.from_tools(tools, llm=llm, verbose=True)
 

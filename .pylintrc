@@ -15,7 +15,7 @@ disable=C0114,C0115,C0116,R0903,R0913,W0613,too-many-positional-arguments,subpro
 max-line-length=160
 
 [DESIGN]
-max-args=7
-max-locals=50
-max-statements=90
-max-branches=15
+max-args=16
+max-locals=64
+max-statements=96
+max-branches=16

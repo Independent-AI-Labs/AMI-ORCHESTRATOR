@@ -18,3 +18,4 @@ class Config:
     REDIS_PORT = int(os.environ.get("REDIS_PORT", "6379"))
     PROMETHEUS_HOST = os.environ.get("PROMETHEUS_HOST", "localhost")
     PROMETHEUS_PORT = int(os.environ.get("PROMETHEUS_PORT", "8000"))
+    OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
