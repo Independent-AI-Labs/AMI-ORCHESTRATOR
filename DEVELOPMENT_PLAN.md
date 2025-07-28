@@ -27,6 +27,33 @@ graph TD
     subgraph "Orchestrator Core"
         B -- Commands --> C{Event Bus: Redis Streams}
         D[BPMN Engine] -- Consumes & Publishes --> C
+## 3. BPMN and Operational Management: Bridging Model and Execution
+
+The OpenAMI Orchestrator leverages BPMN 2.0 not just for process modeling, but as a blueprint for robust operational management and resource orchestration. While BPMN defines the "what" and "who" of a process, the Orchestrator provides the "how" and "when" in a dynamic, intelligent execution environment.
+
+### Resource Allocation and Workload Distribution
+
+BPMN's **Pools** and **Lanes** are directly translated into the Orchestrator's resource management capabilities:
+- **Pools** represent distinct participants (e.g., departments, external systems) and define the boundaries of responsibility within a process.
+- **Lanes** within a Pool are used to assign specific roles, teams, or automated agents to activities, enabling clear visualization and execution of workload distribution. The Orchestrator dynamically allocates tasks to available workers and agents based on these assignments, considering factors like current load, resource availability, and performance metrics.
+
+### Dynamic Resource Optimization and Real-time Adaptation
+
+The Orchestrator goes beyond static process execution by incorporating AI-driven intelligence for real-time operational adjustments:
+- **Intelligent Task Routing:** Based on defined BPMN flows and real-time operational data, the Orchestrator can intelligently route tasks to the most suitable and available resources (human or automated), optimizing for speed, cost, or specific performance targets.
+- **Adaptive Process Flows:** In response to unforeseen events or changing conditions (e.g., resource unavailability, system failures, high demand), the Orchestrator can dynamically adapt process flows, re-routing tasks, initiating alternative paths, or escalating to human intervention as modeled in BPMN.
+- **Resource-Specific Worker Pools:** The "Worker & Agent Manager" supports resource-based worker pools (e.g., for CPU, GPU, NPU, specific software licenses), allowing the Orchestrator to manage and optimize the utilization of diverse computational and human resources.
+
+### Operational Insights and Performance Metrics
+
+The Orchestrator's comprehensive monitoring and observability features provide deep insights into process performance and resource utilization, directly supporting operational management:
+- **Key Performance Indicators (KPIs):** Metrics such as process cycle times, task execution durations, resource utilization rates, and throughput are collected and made available for analysis.
+- **Real-time Monitoring:** Dashboards and alerting mechanisms provide real-time visibility into the health and progress of processes, allowing operators to identify and address bottlenecks or anomalies proactively.
+- **Auditability:** Every process step and resource interaction is logged, providing a complete audit trail for compliance and post-mortem analysis.
+
+By integrating these operational management capabilities with BPMN, the OpenAMI Orchestrator transforms process models into living, adaptable, and highly efficient automated workflows.
+
+## 4. Phased Development Plan
         E[Worker & Agent Manager] -- Manages --> F((Agent Fleet via ACP))
         E -- Consumes & Publishes --> C
         G[State & Audit Controller] -- Writes --> H
@@ -52,11 +79,11 @@ graph TD
     style F fill:#4CAF50,stroke:#2E7D32,stroke-width:2px,color:#fff
 ```
 
-## 3. Phased Development Plan
+## 4. Phased Development Plan
 
 This plan breaks down the development into logical phases, starting with a solid foundation and progressively adding more advanced capabilities.
 
-### Phase 1: Model-Driven Foundation & Security Core (In Progress)
+### Phase 2: Model-Driven Foundation & Security Core (In Progress)
 
 *   **Goal:** Establish a secure, auditable, and persistent foundation based on a comprehensive, model-driven architecture.
 *   **Current Status:**
@@ -73,7 +100,7 @@ This plan breaks down the development into logical phases, starting with a solid
     3.  **Security Implementation:** Complete the `SecurityManager` implementation, including robust authorization logic.
     4.  **Testing:** Write comprehensive unit and integration tests for all components in this phase.
 
-### Phase 2: Core BPMN Engine & State Machine (In Progress)
+### Phase 3: Core BPMN Engine & State Machine (In Progress)
 
 *   **Goal:** Implement the fundamental BPMN execution logic, fully integrating the new Pydantic models.
 *   **Current Status:**
@@ -89,7 +116,7 @@ This plan breaks down the development into logical phases, starting with a solid
     
     4.  **Testing:** Write comprehensive unit and integration tests for the BPMN engine, process loader, and worker integration.
 
-### Phase 3: The Agent-Coordinator Protocol (ACP) & Agent Operational Guidelines (In Progress)
+### Phase 4: The Agent-Coordinator Protocol (ACP) & Agent Operational Guidelines (In Progress)
 
 *   **Goal:** Define the agent communication standard, integrate the first simple worker, and establish robust operational guidelines for agent execution.
 *   **Current Status:**
