@@ -17,7 +17,7 @@
 *   **Process Definition Storage:** Implement `store_process_definition` in `orchestrator/bpmn/process_loader.py` to persistently store BPMN definitions in Dgraph.
 *   **Security Implementation:** Complete the `SecurityManager` implementation, including robust authentication and authorization logic.
 *   **Full Worker Integration & Asynchronous Execution:**
-    *   Modify `_handle_service_task` in `orchestrator/bpmn/engine.py` to *actually* submit `TaskRequest` messages to appropriate workers (e.g., `sample_worker`, `gemini_cli_adapter`) via Redis or directly to the `WorkerManager`'s pools.
+    *   Modify `_handle_service_task` in `orchestrator/bpmn/engine.py` to *actually* submit `TaskRequest` messages to appropriate workers (e.g., generic ACP-compliant agents) via Redis or directly to the `WorkerManager`'s pools.
     *   Implement a mechanism to asynchronously receive `TaskCompleted` or `TaskFailed` messages from workers and update the process state accordingly. This will likely involve callbacks or a dedicated result handling component.
     *   Replace current simulated results in `_handle_service_task`, `_execute_ai_task`, and `_execute_generic_task` with actual calls to worker pools.
 *   **Robust Expression Language:** Replace the simplified `evaluate_condition` and `evaluate_expression` in `orchestrator/bpmn/engine.py` with a proper expression language for complex conditional logic.
