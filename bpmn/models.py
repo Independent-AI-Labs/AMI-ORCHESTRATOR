@@ -1,9 +1,10 @@
 """
 Pydantic models for the BPMN 2.0 specification.
 """
+
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -12,8 +13,8 @@ class Element(BaseModel):
     """Base model for any BPMN element."""
 
     id: str
-    name: Optional[str] = None
-    documentation: Optional[str] = None
+    name: str | None = None
+    documentation: str | None = None
 
 
 class Edge(Element):
@@ -21,7 +22,7 @@ class Edge(Element):
 
     source_ref: str
     target_ref: str
-    condition_expression: Optional[str] = None
+    condition_expression: str | None = None
 
 
 class Event(Element):
@@ -43,9 +44,9 @@ class IntermediateCatchEvent(Event):
 class TimerEventDefinition(BaseModel):
     """Model for a timer event definition."""
 
-    time_duration: Optional[str] = None
-    time_date: Optional[str] = None
-    time_cycle: Optional[str] = None
+    time_duration: str | None = None
+    time_date: str | None = None
+    time_cycle: str | None = None
 
 
 class MessageEventDefinition(BaseModel):
@@ -61,7 +62,7 @@ class Gateway(Element):
 class ExclusiveGateway(Gateway):
     """Model for an exclusive gateway."""
 
-    default: Optional[str] = None
+    default: str | None = None
 
 
 class ParallelGateway(Gateway):
@@ -75,29 +76,29 @@ class Task(Element):
 class ServiceTask(Task):
     """Model for a service task."""
 
-    implementation: Optional[str] = None
+    implementation: str | None = None
 
 
 class HumanTask(Task):
     """Model for a human task."""
 
-    assignee: Optional[str] = None
-    candidate_users: List[str] = []
-    candidate_groups: List[str] = []
+    assignee: str | None = None
+    candidate_users: list[str] = []
+    candidate_groups: list[str] = []
 
 
 class AiTask(Task):
     """Model for an AI task."""
 
     prompt: str
-    context: Optional[Dict[str, Any]] = None
+    context: dict[str, Any] | None = None
 
 
 class ProcessDefinition(Element):
     """Model for a BPMN process definition."""
 
-    nodes: List[Union[StartEvent, EndEvent, IntermediateCatchEvent, ExclusiveGateway, ParallelGateway, ServiceTask, HumanTask, AiTask]]
-    edges: List[Edge]
+    nodes: list[StartEvent | EndEvent | IntermediateCatchEvent | ExclusiveGateway | ParallelGateway | ServiceTask | HumanTask | AiTask]
+    edges: list[Edge]
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
@@ -107,10 +108,10 @@ class ProcessInstance(BaseModel):
     id: str
     definition_id: str
     status: str
-    variables: Dict[str, Any] = {}
+    variables: dict[str, Any] = {}
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
-    history: List["AuditLog"] = []
+    history: list["AuditLog"] = []
 
 
 class AuditLog(BaseModel):
@@ -120,9 +121,9 @@ class AuditLog(BaseModel):
     timestamp: datetime = Field(default_factory=datetime.utcnow)
     instance_id: str
     element_id: str
-    element_name: Optional[str] = None
+    element_name: str | None = None
     message: str
-    details: Optional[Dict[str, Any]] = None
+    details: dict[str, Any] | None = None
 
 
 # Add a forward reference to AuditLog in ProcessInstance
@@ -143,19 +144,19 @@ class Resource(str, Enum):
 class ResourceUsage(BaseModel):
     """Model for resource usage."""
 
-    cpu_hours: Optional[float] = None
-    gpu_hours: Optional[float] = None
-    time_seconds: Optional[float] = None
+    cpu_hours: float | None = None
+    gpu_hours: float | None = None
+    time_seconds: float | None = None
 
 
 class ResourceCost(BaseModel):
     """Model for resource cost."""
 
-    monetary_cost: Optional[float] = None
+    monetary_cost: float | None = None
 
 
 class TaskResourceMetrics(BaseModel):
     """Model for task resource metrics."""
 
     usage: ResourceUsage
-    cost: Optional[ResourceCost] = None
+    cost: ResourceCost | None = None

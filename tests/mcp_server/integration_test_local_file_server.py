@@ -1,34 +1,22 @@
-# pylint: disable=redefined-outer-name
 import base64
 import json
 import os
-import shutil
 import signal
 import stat
 import subprocess
 import sys
 import time
+from collections.abc import Generator
 from pathlib import Path
 from subprocess import Popen
-from typing import Generator
 
 import pytest
 
 from orchestrator.mcp.mcp_server_manager import MCPServerManager
 
 # Define paths relative to the project root
-SERVER_SCRIPT = os.path.abspath(
-    os.path.join(
-        os.path.dirname(__file__),
-        "..",
-        "..",
-        "mcp",
-        "servers",
-        "localfs",
-        "local_file_server.py",
-    )
-)
-PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+SERVER_SCRIPT_PATH = Path(__file__).resolve().parent.parent.parent / "mcp" / "servers" / "localfs" / "local_file_server.py"
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 
 
 class MCPError(Exception):
@@ -43,9 +31,10 @@ class MCPError(Exception):
 class MCPClient:
     """A simple client to communicate with the MCP server via JSON-RPC."""
 
-    def __init__(self, process: Popen):
+    def __init__(self, process: Popen, root_dir: Path):
         self.process = process
         self.request_id = 0
+        self.root_dir = root_dir
         self._initialize_server()
 
     def _send_request(self, method: str, params: dict):
@@ -84,7 +73,7 @@ class MCPClient:
             except json.JSONDecodeError:
                 if not buffer.strip().startswith("{"):
                     buffer = ""
-                pass  # pylint: disable=unnecessary-pass
+                # pylint: disable=unnecessary-pass
 
     def _send_and_read(self, method: str, params: dict):
         self._send_request(method, params)
@@ -107,35 +96,37 @@ class MCPClient:
 
 
 @pytest.fixture(scope="module")
-def client() -> Generator[MCPClient, None, None]:
+def client(tmp_path_factory) -> Generator[MCPClient, None, None]:
     """Pytest fixture to provide an MCPClient instance for testing."""
-    manager = MCPServerManager(SERVER_SCRIPT, PROJECT_ROOT)
+    # Create a unique root directory for this test session
+    test_root_dir = tmp_path_factory.mktemp("mcp_test_root")
+    manager = MCPServerManager(str(SERVER_SCRIPT_PATH), str(test_root_dir))
     process = None
     try:
         manager.stop_server()
-        env = os.environ.copy()
-        env["PYTHONPATH"] = PROJECT_ROOT
-        process = manager.start_server_for_testing(env=env)
+        process = manager.start_server_for_testing(cwd=str(test_root_dir))
         time.sleep(1)
         if process.poll() is not None:
             stderr_output = process.stderr.read().decode(errors="ignore")
             raise RuntimeError(f"MCP server failed to start. Exit code: {process.poll()}\n{stderr_output}")
-        client = MCPClient(process)
+        client = MCPClient(process, test_root_dir)
         yield client
     finally:
         if process and process.poll() is not None:
             try:
                 if sys.platform == "win32":
-                    subprocess.run(
-                        ["taskkill", "/F", "/T", "/PID", str(process.pid)],
+                    subprocess.run(  # noqa: S603, S607
+                        ["taskkill", "/F", "/T", "/PID", str(process.pid)],  # noqa: S603, S607
+                        # `taskkill` is a trusted system executable, and `process.pid` is an integer, not untrusted input.
                         check=False,
                         capture_output=True,
-                        shell=False,  # nosec B603, B607
+                        shell=False,
                     )
                 else:
                     try:
                         # pylint: disable=no-member
-                        pgid = os.getpgid(process.pid)
+                        pgid = process.pid  # os.getpgid(process.pid)
+                        signal.signal(signal.SIGTERM, signal.SIG_IGN)
                         os.killpg(pgid, signal.SIGTERM)  # pylint: disable=no-member
                     except OSError:
                         pass  # Process already gone
@@ -145,23 +136,17 @@ def client() -> Generator[MCPClient, None, None]:
 
 
 @pytest.fixture
-def temp_file(tmp_path: Path) -> str:
+def temp_file(client: MCPClient) -> str:
     """Creates a temporary text file for integration tests."""
-    # Create temporary files within the orchestrator directory
-    orchestrator_temp_dir = Path(PROJECT_ROOT) / "orchestrator" / "temp_test_files"
-    orchestrator_temp_dir.mkdir(parents=True, exist_ok=True)
-    file_path = orchestrator_temp_dir / "integration_test_file.txt"
+    file_path = Path(client.root_dir) / "integration_test_file.txt"
     file_path.write_text("Line 1\nLine 2\nLine 3\n")
     return str(file_path)
 
 
 @pytest.fixture
-def temp_binary_file(tmp_path: Path) -> str:
+def temp_binary_file(client: MCPClient) -> str:
     """Creates a temporary binary file for integration tests."""
-    # Create temporary files within the orchestrator directory
-    orchestrator_temp_dir = Path(PROJECT_ROOT) / "orchestrator" / "temp_test_files"
-    orchestrator_temp_dir.mkdir(parents=True, exist_ok=True)
-    file_path = orchestrator_temp_dir / "integration_test_binary_file.bin"
+    file_path = Path(client.root_dir) / "integration_test_binary_file.bin"
     content = b"\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09"
     file_path.write_bytes(content)
     return str(file_path)
@@ -169,47 +154,23 @@ def temp_binary_file(tmp_path: Path) -> str:
 
 @pytest.fixture
 def read_only_dir(tmp_path: Path) -> Generator[Path, None, None]:
-    """Creates a temporary read-only directory for permission tests within PROJECT_ROOT."""
-    # Create temporary read-only directory within the orchestrator directory
-    orchestrator_temp_dir = Path(PROJECT_ROOT) / "orchestrator" / "temp_read_only_dir"
-    orchestrator_temp_dir.mkdir(parents=True, exist_ok=True)
-    dir_path = orchestrator_temp_dir
+    """Creates a temporary read-only directory for permission tests within the test's tmp_path."""
+    dir_path = tmp_path / "temp_read_only_dir"
+    dir_path.mkdir(parents=True, exist_ok=True)
 
     # Set read-only permissions
     if sys.platform == "win32":
-        # On Windows, deny write access for the current user
-        user = os.getlogin()
-        subprocess.run(
-            ["icacls", str(dir_path), "/deny", f"{user}:(W)"],
-            check=True,
-            capture_output=True,
-            shell=False,
-        )
+        dir_path.chmod(stat.S_IREAD)
     else:
-        # On Unix-like systems, remove write permissions for owner, group, others
-        os.chmod(dir_path, stat.S_IREAD | stat.S_IEXEC)  # r-x for owner, no write for anyone
+        dir_path.chmod(stat.S_IREAD | stat.S_IEXEC)  # r-x for owner, no write for anyone
 
     yield dir_path
 
-    # Clean up: restore permissions and remove directory
+    # Cleanup is handled by tmp_path_factory, but ensure write permissions are restored for robust cleanup
     if sys.platform == "win32":
-        user = os.getlogin()
-        subprocess.run(
-            ["icacls", str(dir_path), "/remove", f"{user}:(W)"],  # Remove explicit deny
-            check=False,  # May fail if permissions were already changed
-            capture_output=True,
-            shell=False,
-        )
-        # Attempt to remove the directory, handle if it's still read-only
-        try:
-            shutil.rmtree(dir_path)
-        except OSError as e:
-            print(f"Error removing read-only directory on Windows: {e}")
-            # Fallback: try to force remove
-            subprocess.run(["rmdir", "/s", "/q", str(dir_path)], shell=True, check=True)
+        dir_path.chmod(stat.S_IWRITE | stat.S_IREAD | stat.S_IEXEC)
     else:
-        os.chmod(dir_path, stat.S_IWRITE | stat.S_IREAD | stat.S_IEXEC)  # Restore write for owner
-        shutil.rmtree(dir_path)
+        dir_path.chmod(stat.S_IWRITE | stat.S_IREAD | stat.S_IEXEC)
 
 
 def test_mcp_list_tools(client: MCPClient):
@@ -329,13 +290,13 @@ def test_mcp_create_directory_outside_root_error(client: MCPClient, tmp_path: Pa
         client.call_tool("create_directory", directory_path=str(outside_dir))
 
 
-def test_mcp_delete_directory_outside_root_error(client: MCPClient, tmp_path: Path):
+def test_mcp_delete_directory_outside_root_error(client: MCPClient, tmp_path: Path, temp_file: str):
     """Tests delete_directory error for a directory outside the allowed root directory."""
     outside_dir = tmp_path.parent / "outside_delete_dir"
     outside_dir.mkdir()
     with pytest.raises(MCPError, match=r"Path '.*outside_delete_dir' is outside the allowed root directory"):
         client.call_tool("delete_directory", directory_path=str(outside_dir))
-    with open(temp_file, "r", encoding="utf-8") as f:
+    with Path(temp_file).open(encoding="utf-8") as f:
         assert f.read() == "Line 1\nReplaced Line 2\nLine 3\n"  # nosec B101
 
 
@@ -351,7 +312,7 @@ def test_mcp_replace_content_binary(client: MCPClient, temp_binary_file: str):
         mode="binary",
     )
     assert "Successfully replaced 1 occurrence(s)" in result  # nosec B101
-    with open(temp_binary_file, "rb") as f:
+    with Path(temp_binary_file).open("rb") as f:
         assert f.read() == b"\x00\xff\xfe\x03\x04\x05\x06\x07\x08\x09"  # nosec B101
 
 
@@ -366,7 +327,7 @@ def test_mcp_replace_lines(client: MCPClient, temp_file: str):
         new_string=new_content,
     )
     assert "Successfully replaced lines 2-3" in result  # nosec B101
-    with open(temp_file, "r", encoding="utf-8") as f:
+    with Path(temp_file).open(encoding="utf-8") as f:
         assert f.read() == "Line 1\nNew line 2\nNew line 3\n"  # nosec B101
 
 

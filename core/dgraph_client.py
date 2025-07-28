@@ -40,12 +40,12 @@ class DgraphClient:
         txn = self._dgraph_client.txn(read_only=True)
         return txn.query(query, variables=variables)
 
-    def create_process_instance(self, process_definition):
+    def create_process_instance(self):
         """Create a new process instance in Dgraph."""
         # This is a placeholder for the actual implementation.
         return "0x123"
 
-    def create_human_task(self, task_definition):
+    def create_human_task(self):
         """Create a new human task in Dgraph."""
         # This is a placeholder for the actual implementation.
         return "0x456"

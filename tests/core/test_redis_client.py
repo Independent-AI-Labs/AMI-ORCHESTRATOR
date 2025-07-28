@@ -20,7 +20,7 @@ class TestRedisClient(unittest.TestCase):
         mock_redis.assert_called_with(host=Config.REDIS_HOST, port=Config.REDIS_PORT, db=0)
 
     @patch("redis.Redis")
-    def test_publish_message(self, mock_redis):
+    def test_publish_message(self, _):
         """Test the publish_message method."""
         client = RedisClient()
         stream = "my_stream"
@@ -30,7 +30,7 @@ class TestRedisClient(unittest.TestCase):
         client._redis_client.xadd.assert_called_once_with(stream, message)
 
     @patch("redis.Redis")
-    def test_read_messages(self, mock_redis):
+    def test_read_messages(self, _):
         """Test the read_messages method."""
         client = RedisClient()
         stream = "my_stream"
@@ -39,7 +39,7 @@ class TestRedisClient(unittest.TestCase):
         client._redis_client.xread.assert_called_once_with({stream: 0}, count=1, block=0)
 
     @patch("redis.Redis")
-    def test_publish_to_dead_letter_queue(self, mock_redis):
+    def test_publish_to_dead_letter_queue(self, _):
         """Test the publish_to_dead_letter_queue method."""
         client = RedisClient()
         task = "my_task"
@@ -49,7 +49,7 @@ class TestRedisClient(unittest.TestCase):
         client._redis_client.xadd.assert_called_once_with("dead_letter_queue", {"task": task, "error": error})
 
     @patch("redis.Redis")
-    def test_delete(self, mock_redis):
+    def test_delete(self, _):
         """Test the delete method."""
         client = RedisClient()
         key = "my_key"

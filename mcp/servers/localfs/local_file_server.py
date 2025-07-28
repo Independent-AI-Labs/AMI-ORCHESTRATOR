@@ -1,37 +1,36 @@
+import argparse
 import base64
 import json
 import logging
-import os
 import shutil
 import sys
 import time
 from datetime import datetime
+from pathlib import Path
+from typing import cast
 
 from orchestrator.mcp.servers.localfs.file_utils import FileUtils
 from orchestrator.mcp.servers.localfs.tool_definitions import get_tool_declarations
-
-# Define the root directory for file operations
-_ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
-
-# Create a /logs directory in the project root if it doesn't exist
-LOGS_DIR = os.path.join(_ROOT_DIR, "logs")
-os.makedirs(LOGS_DIR, exist_ok=True)
-
-# Generate a unique log file name with a timestamp
-LOG_FILE = os.path.join(LOGS_DIR, f"mcp_server_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.log")
-logging.basicConfig(
-    filename=LOG_FILE,
-    level=logging.INFO,
-    format="[%(asctime)s] [%(levelname)s] %(funcName)s:%(lineno)d - %(message)s",
-)
 
 
 class LocalFiles:
     """Provides file manipulation tools via the MCP protocol."""
 
-    def __init__(self):
+    def __init__(self, root_dir: str):
         self.tools = {tool_decl["name"]: getattr(self, tool_decl["name"]) for tool_decl in get_tool_declarations()}
-        self.root_dir = _ROOT_DIR
+        self.root_dir = root_dir
+
+        # Create a /logs directory in the project root if it doesn't exist
+        logs_dir = Path(self.root_dir) / "logs"
+        logs_dir.mkdir(parents=True, exist_ok=True)
+
+        # Generate a unique log file name with a timestamp
+        log_file = logs_dir / f"mcp_server_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.log"
+        logging.basicConfig(
+            filename=log_file,
+            level=logging.INFO,
+            format="[%(asctime)s] [%(levelname)s] %(funcName)s:%(lineno)d - %(message)s",
+        )
 
     def _send_response(self, response):
         """Send a JSON-RPC response to stdout."""
@@ -75,7 +74,7 @@ class LocalFiles:
 
         return filtered_args
 
-    def read_file(self, file_path: str, mode: str = "text", encoding: str = "utf-8"):
+    def read_file(self, file_path: str, mode: str = "text", encoding: str = "utf-8") -> str:
         """Read content from a file."""
         try:
             logging.info("Reading file: %s (mode: %s, encoding: %s)", file_path, mode, encoding)
@@ -102,90 +101,201 @@ class LocalFiles:
             logging.error("Failed to read file %s: %s", file_path, e)
             raise e
 
-    def write_file(self, file_path: str, content, mode: str = "text", encoding: str = "utf-8"):
+    def _validate_and_decode_content(self, content: str | bytes, mode: str) -> str | bytes:
+        """Validates and decodes content based on mode."""
+        if content is None:
+            raise ValueError("content cannot be None")
+
+        if mode == "binary":
+            if isinstance(content, str):
+                try:
+                    decoded_content = base64.b64decode(content.encode("utf-8"))
+                    logging.info("Decoded base64 content: %s bytes", len(decoded_content))
+                    return decoded_content
+                except (TypeError, ValueError) as e:
+                    raise ValueError(f"Invalid base64 content for binary mode: {e}") from e
+            elif isinstance(content, bytes):
+                return content
+            else:
+                raise ValueError("Binary mode requires base64-encoded string or bytes content")
+        elif mode == "text":
+            if isinstance(content, bytes):
+                try:
+                    return content.decode("utf-8")
+                except UnicodeDecodeError as e:
+                    raise ValueError(f"Cannot decode bytes to string in text mode: {e}") from e
+            elif isinstance(content, str):
+                return content
+            else:
+                raise ValueError("Text mode requires string or bytes content")
+        else:
+            raise ValueError("Mode must be 'text' or 'binary'")
+
+    def _get_write_success_message_binary(self, file_path: str, content: bytes) -> str:
+        """Generates the success message for binary file writes."""
+        content_bytes: bytes = content
+        content_size = len(content_bytes)
+        logging.info(
+            "Successfully wrote binary file: %s (%s bytes)",
+            file_path,
+            content_size,
+        )
+        return f"Successfully wrote binary content to '{file_path}' ({content_size} bytes)."
+
+    def _get_write_success_message_text(self, file_path: str, content: str, original_content: str | None) -> str:
+        """Generates the success message for text file writes."""
+        diff_output = ""
+        if original_content is not None:
+            diff_output = FileUtils.generate_diff(original_content, content, file_path)
+
+        line_count = content.count("\n") + 1
+        char_count = len(content)
+
+        message = f"Successfully wrote text content to '{file_path}' ({char_count} characters, {line_count} lines)."
+        if diff_output:
+            message += f"\n\nDiff:\n{diff_output}"
+        return message
+
+    def _get_write_success_message(self, file_path: str, content: str | bytes, mode: str, original_content: str | bytes | None) -> str:
+        """Generates the success message for write_file, dispatching to specific handlers."""
+        if mode == "binary":
+            # MyPy knows content is bytes here due to the mode check
+            return self._get_write_success_message_binary(file_path, cast(bytes, content))
+        # MyPy knows content is str here due to the mode check
+        # MyPy knows original_content is str | None here
+        return self._get_write_success_message_text(file_path, cast(str, content), cast(str | None, original_content))
+
+    def write_file(self, file_path: str, content: str | bytes, mode: str = "text", encoding: str = "utf-8") -> str:
         """Write content to a file."""
         try:
             logging.info("Writing file: %s (mode: %s, encoding: %s)", file_path, mode, encoding)
 
-            # Validate inputs
             if not file_path:
                 raise ValueError("file_path cannot be empty")
 
-            if content is None:
-                raise ValueError("content cannot be None")
+            processed_content_raw = self._validate_and_decode_content(content, mode)
+            processed_content: str | bytes
 
-            # Handle binary mode content decoding
             if mode == "binary":
-                if isinstance(content, str):
-                    try:
-                        decoded_content = base64.b64decode(content.encode("utf-8"))
-                        logging.info("Decoded base64 content: %s bytes", len(decoded_content))
-                    except (TypeError, ValueError) as e:
-                        raise ValueError(f"Invalid base64 content for binary mode: {e}") from e
-                    content = decoded_content
-                elif not isinstance(content, bytes):
-                    raise ValueError("Binary mode requires base64-encoded string or bytes content")
-            else:
-                # Text mode - ensure content is a string
-                if not isinstance(content, str):
-                    try:
-                        content = str(content)
-                    except Exception as e:  # pylint: disable=broad-exception-caught
-                        raise ValueError(f"Cannot convert content to string: {e}") from e
+                assert isinstance(processed_content_raw, bytes)
+                processed_content = processed_content_raw
+            else:  # mode == "text"
+                assert isinstance(processed_content_raw, str)
+                processed_content = processed_content_raw
 
-            # Check if file exists to generate diff for text mode
-            file_exists = os.path.exists(file_path)
-            original_content = ""
-            if file_exists and mode == "text":
+            file_path_obj = Path(file_path)
+            file_exists = file_path_obj.exists()
+            original_content: str | bytes | None = None
+
+            if file_exists:
                 try:
-                    original_content = FileUtils.read_file_content(file_path, self.root_dir, mode, encoding)
+                    read_content = FileUtils.read_file_content(file_path, self.root_dir, mode, encoding)
+                    original_content = cast(bytes, read_content) if mode == "binary" else cast(str, read_content)
                 except Exception as e:  # pylint: disable=broad-exception-caught
                     logging.warning("Could not read existing file for diff: %s", e)
 
-            # Write the content
-            FileUtils.write_file_content(file_path, content, self.root_dir, mode, encoding)
-
-            # Generate success message with content statistics
-            if mode == "binary":
-                content_size = len(content)
-                logging.info(
-                    "Successfully wrote binary file: %s (%s bytes)",
-                    file_path,
-                    content_size,
-                )
-                result_msg = f"Successfully wrote binary content to '{file_path}' ({content_size} bytes)."
-            else:
-                content_length = len(content)
-                line_count = content.count("\n") + (1 if content and not content.endswith("\n") else 0)
-                logging.info(
-                    "Successfully wrote text file: %s (%s characters, %s lines)",
-                    file_path,
-                    content_length,
-                    line_count,
-                )
-                result_msg = f"Successfully wrote text content to '{file_path}' ({content_length} characters, {line_count} lines)."
-
-                # Add diff if file existed before and content changed
-                if file_exists and original_content != content:
-                    diff_output = FileUtils.generate_diff(original_content, content, file_path)
-                    if diff_output and diff_output != "No changes detected in diff":
-                        result_msg += f"\n\nDiff:\n{diff_output}"
-
-            return result_msg
+            FileUtils.write_file_content(file_path, processed_content, self.root_dir, mode, encoding)
+            return self._get_write_success_message(file_path, processed_content, mode, original_content)
 
         except Exception as e:  # pylint: disable=broad-exception-caught
             logging.error("Failed to write file %s: %s", file_path, e)
             raise e
 
+    def _process_text_replacement(self, file_path: str, current_content: str, old_string: str, new_string: str, count: int) -> tuple[str, int]:
+        """Handles text mode string replacement logic."""
+        if not isinstance(old_string, str) or not isinstance(new_string, str):
+            raise ValueError("old_string and new_string must be strings in text mode")
+
+        if not old_string:
+            raise ValueError("old_string cannot be empty - this would insert new_string between every character")
+
+        old_string_normalized = FileUtils.normalize_line_endings(old_string, "\n")
+        new_string_normalized = FileUtils.normalize_line_endings(new_string, "\n")
+
+        occurrence_count = current_content.count(old_string_normalized)
+        if occurrence_count == 0:
+            logging.info("No occurrences found of search string in %s", file_path)
+            return "No changes made to '{file_path}': search string not found.", 0
+
+        if count == 0:
+            new_content = current_content.replace(old_string_normalized, new_string_normalized)
+            actual_replacements = current_content.count(old_string_normalized)
+        else:
+            new_content = current_content.replace(old_string_normalized, new_string_normalized, count)
+            actual_replacements = count
+
+        return new_content, actual_replacements
+
+    def _process_binary_replacement(self, file_path: str, current_content: bytes, old_string: bytes, new_string: bytes, count: int) -> tuple[bytes, int]:
+        """Handles binary mode string replacement logic."""
+        if not isinstance(old_string, bytes) or not isinstance(new_string, bytes):
+            raise ValueError("old_string and new_string must be bytes in binary mode")
+
+        if not old_string:
+            raise ValueError("old_string cannot be empty - this would insert new_string between every byte")
+
+        occurrence_count = current_content.count(old_string)
+        if occurrence_count == 0:
+            logging.info("No occurrences found of search bytes in %s", file_path)
+            return b"No changes made to '{file_path}': search bytes not found.", 0
+
+        if count == 0:
+            new_content = current_content.replace(old_string, new_string)
+            actual_replacements = current_content.count(old_string)
+        else:
+            new_content = current_content.replace(old_string, new_string, count)
+            actual_replacements = count
+
+        return new_content, actual_replacements
+
+    def _handle_no_replacements(self, file_path: str) -> dict:
+        logging.info(
+            "No changes made to %s - search string not found or no replacements occurred",
+            file_path,
+        )
+        return {"status": "success", "message": f"No changes made to '{file_path}': search string not found or no replacements occurred."}
+
+    def _handle_identical_content(self, file_path: str) -> dict:
+        logging.info(
+            "No changes made to %s - content identical after replacement",
+            file_path,
+        )
+        return {"status": "success", "message": f"No changes made to '{file_path}': replacement resulted in identical content."}
+
+    def _read_file_content(self, file_path: str, mode: str, encoding: str) -> str | bytes:
+        try:
+            return FileUtils.read_file_content(file_path, self.root_dir, mode, encoding)
+        except Exception as e:
+            logging.warning("Could not read existing file for diff: %s", e)
+            return b"" if mode == "binary" else ""
+
+    def _perform_replacement(
+        self, file_path: str, original_content: str | bytes, old_string: str | bytes, new_string: str | bytes, mode: str, count: int
+    ) -> tuple[str | bytes, int]:
+        if mode == "binary":
+            if not isinstance(original_content, bytes):
+                raise TypeError("Original content must be bytes in binary mode")
+            try:
+                old_bytes = base64.b64decode(cast(str, old_string).encode("utf-8"))
+                new_bytes = base64.b64decode(cast(str, new_string).encode("utf-8"))
+            except (TypeError, ValueError) as e:
+                raise ValueError(f"Invalid base64 content for binary mode: {e}") from e
+            return self._process_binary_replacement(file_path, original_content, old_bytes, new_bytes, count)
+        if mode == "text":
+            if not isinstance(original_content, str):
+                raise TypeError("Original content must be string in text mode")
+            return self._process_text_replacement(file_path, original_content, cast(str, old_string), cast(str, new_string), count)
+        raise ValueError("Mode must be 'text' or 'binary'")
+
     def edit_file_replace_string(
         self,
         file_path: str,
-        old_string,
-        new_string,
+        old_string: str | bytes,
+        new_string: str | bytes,
         mode: str = "text",
         encoding: str = "utf-8",
         count: int = 0,
-    ):
+    ) -> dict:
         """Replace occurrences of old_string with new_string in a file."""
         try:
             logging.info(
@@ -195,80 +305,29 @@ class LocalFiles:
                 count,
             )
 
-            # Read original content for diff
-            original_content = FileUtils.read_file_content(file_path, self.root_dir, mode, encoding)
+            original_content = self._read_file_content(file_path, mode, encoding)
+            new_content: str | bytes
+            actual_replacements: int
 
-            if mode == "binary":
-                try:
-                    old_bytes = base64.b64decode(old_string.encode("utf-8"))
-                    new_bytes = base64.b64decode(new_string.encode("utf-8"))
-                except (TypeError, ValueError) as e:
-                    raise ValueError(f"Invalid base64 content for binary mode: {e}") from e
-                old_string, new_string = old_bytes, new_bytes
+            new_content, actual_replacements = self._perform_replacement(file_path, original_content, old_string, new_string, mode, count)
 
-            current_content = original_content
-
-            if mode == "text":
-                if not isinstance(old_string, str) or not isinstance(new_string, str):
-                    raise ValueError("old_string and new_string must be strings in text mode")
-
-                # Prevent empty string replacement which would corrupt the file
-                if not old_string:
-                    raise ValueError("old_string cannot be empty - this would insert new_string between every character")
-
-                # Normalize line endings in search strings to match file content
-                old_string_normalized = FileUtils.normalize_line_endings(old_string, "\n")
-                new_string_normalized = FileUtils.normalize_line_endings(new_string, "\n")
-
-                # Count occurrences before replacement
-                occurrence_count = current_content.count(old_string_normalized)
-                if occurrence_count == 0:
-                    logging.info("No occurrences found of search string in %s", file_path)
-                    return f"No changes made to '{file_path}': search string not found."
-
-                # Perform replacement
-                if count == 0:
-                    new_content = current_content.replace(old_string_normalized, new_string_normalized)
-                    actual_replacements = current_content.count(old_string_normalized)  # Count after replacement
-                else:
-                    new_content = current_content.replace(old_string_normalized, new_string_normalized, count)
-                    actual_replacements = count
-
-            elif mode == "binary":
-                if not isinstance(old_string, bytes) or not isinstance(new_string, bytes):
-                    raise ValueError("old_string and new_string must be bytes in binary mode")
-
-                # Prevent empty bytes replacement which would corrupt the file
-                if not old_string:
-                    raise ValueError("old_string cannot be empty - this would insert new_string between every byte")
-
-                occurrence_count = current_content.count(old_string)
-                if occurrence_count == 0:
-                    logging.info("No occurrences found of search bytes in %s", file_path)
-                    return f"No changes made to '{file_path}': search bytes not found."
-
-                if count == 0:
-                    new_content = current_content.replace(old_string, new_string)
-                    actual_replacements = current_content.count(old_string)  # Count after replacement
-                else:
-                    new_content = current_content.replace(old_string, new_string, count)
-                    actual_replacements = count
-            else:
-                raise ValueError("Mode must be 'text' or 'binary'")
-
-            if new_content == current_content:
+            if actual_replacements == 0:
                 logging.info(
-                    "No changes made to %s - content identical after replacement",
+                    "No changes made to %s - search string not found or no replacements occurred",
                     file_path,
                 )
-                return f"No changes made to '{file_path}': replacement resulted in identical content."
+                return self._handle_no_replacements(file_path)
+
+            if new_content == original_content:
+                return self._handle_identical_content(file_path)
 
             FileUtils.write_file_content(file_path, new_content, self.root_dir, mode, encoding)
 
-            # Generate diff for text mode
             diff_output = ""
-            if mode == "text":
-                diff_output = FileUtils.generate_diff(original_content, new_content, file_path)
+            if mode == "binary":
+                diff_output = "Binary content changed."
+            else:
+                diff_output = FileUtils.generate_diff(cast(str, original_content), cast(str, new_content), file_path)
 
             logging.info(
                 "Successfully replaced %s occurrences in %s",
@@ -280,7 +339,7 @@ class LocalFiles:
             if diff_output:
                 result_msg += f"\n\nDiff:\n{diff_output}"
 
-            return result_msg
+            return {"status": "success", "message": result_msg}
 
         except Exception as e:  # pylint: disable=broad-exception-caught
             logging.error("Failed to replace string in file %s: %s", file_path, e)
@@ -293,7 +352,7 @@ class LocalFiles:
         end_line: int,
         new_string: str,
         encoding: str = "utf-8",
-    ):
+    ) -> str:
         """Replace content within a specified range of lines."""
         try:
             logging.info("Replacing lines %s-%s in file: %s", start_line, end_line, file_path)
@@ -352,7 +411,7 @@ class LocalFiles:
             logging.error("Failed to replace lines in file %s: %s", file_path, e)
             raise e
 
-    def edit_file_delete_lines(self, file_path: str, start_line: int, end_line: int, encoding: str = "utf-8"):
+    def edit_file_delete_lines(self, file_path: str, start_line: int, end_line: int, encoding: str = "utf-8") -> str:
         """Delete lines within a specified range."""
         try:
             logging.info("Deleting lines %s-%s in file: %s", start_line, end_line, file_path)
@@ -402,7 +461,7 @@ class LocalFiles:
             logging.error("Failed to delete lines from file %s: %s", file_path, e)
             raise e
 
-    def edit_file_insert_lines(self, file_path: str, line_number: int, content: str, encoding: str = "utf-8"):
+    def edit_file_insert_lines(self, file_path: str, line_number: int, content: str, encoding: str = "utf-8") -> str:
         """Insert content at a specified line number."""
         try:
             logging.info("Inserting content at line %s in file: %s", line_number, file_path)
@@ -457,7 +516,7 @@ class LocalFiles:
             logging.error("Failed to insert lines in file %s: %s", file_path, e)
             raise e
 
-    def delete_files(self, file_paths: list):
+    def delete_files(self, file_paths: list) -> str:
         """Delete multiple files."""
         if not isinstance(file_paths, list):
             raise ValueError("file_paths must be a list")
@@ -473,16 +532,17 @@ class LocalFiles:
         for file_path in file_paths:
             try:
                 validated_path = FileUtils.validate_file_path(file_path, self.root_dir)
+                path_obj = Path(validated_path)
 
-                if not os.path.exists(validated_path):
+                if not path_obj.exists():
                     errors.append(f"File not found: '{file_path}'")
                     continue
 
-                if not os.path.isfile(validated_path):
+                if not path_obj.is_file():
                     errors.append(f"Path is not a file: '{file_path}'")
                     continue
 
-                os.remove(validated_path)
+                path_obj.unlink()
                 deleted_files.append(file_path)
                 logging.info("Successfully deleted file: %s", file_path)
 
@@ -503,108 +563,99 @@ class LocalFiles:
 
         return f"Successfully deleted {len(deleted_files)} file(s): {', '.join(deleted_files)}"
 
-    def move_files(self, source_paths: list, destination_paths: list, create_dirs: bool = True):
-        """Move/rename files from source paths to destination paths."""
-        if not isinstance(source_paths, list):
-            raise ValueError("source_paths must be a list")
-
-        if not isinstance(destination_paths, list):
-            raise ValueError("destination_paths must be a list")
-
-        if not source_paths:
-            raise ValueError("source_paths list cannot be empty")
-
-        if not destination_paths:
-            raise ValueError("destination_paths list cannot be empty")
-
+    def _validate_move_paths(self, source_paths: list, destination_paths: list):
+        if not isinstance(source_paths, list) or not isinstance(destination_paths, list):
+            raise ValueError("source_paths and destination_paths must be lists")
+        if not source_paths or not destination_paths:
+            raise ValueError("source_paths and destination_paths lists cannot be empty")
         if len(source_paths) != len(destination_paths):
             raise ValueError(f"Number of source paths ({len(source_paths)}) must match destination paths ({len(destination_paths)})")
+
+    def _handle_destination_directory(self, dest_path_obj: Path, create_dirs: bool, source_path: str) -> str | None:
+        dest_dir = dest_path_obj.parent
+        if dest_dir and not dest_dir.exists():
+            if create_dirs:
+                try:
+                    dest_dir.mkdir(parents=True, exist_ok=True)
+                    logging.info("Created destination directory: %s", dest_dir)
+                except Exception as e:  # pylint: disable=broad-exception-caught
+                    return f"Failed to create destination directory '{dest_dir}' for '{source_path}': {e}"
+            else:
+                return f"Destination directory does not exist: '{dest_dir}' for '{source_path}'"
+        return None
+
+    def _perform_single_file_move(self, source_path: str, dest_path: str, create_dirs: bool) -> tuple[bool, str | None]:
+        result: tuple[bool, str | None] = (False, None)
+        try:
+            validated_source = FileUtils.validate_file_path(source_path, self.root_dir)
+            validated_dest = FileUtils.validate_file_path(dest_path, self.root_dir)
+
+            source_path_obj = Path(validated_source)
+            if not source_path_obj.exists():
+                result = False, f"Source file not found: '{source_path}'"
+            elif not source_path_obj.is_file():
+                result = False, f"Source path is not a file: '{source_path}'"
+            else:
+                dest_path_obj = Path(validated_dest)
+                dir_error = self._handle_destination_directory(dest_path_obj, create_dirs, source_path)
+                if dir_error:
+                    result = False, dir_error
+                elif dest_path_obj.exists():
+                    result = False, f"Destination already exists: '{dest_path}' for source '{source_path}'"
+                else:
+                    file_size = source_path_obj.stat().st_size if source_path_obj.exists() else 0
+                    shutil.move(validated_source, validated_dest)
+                    logging.info("Successfully moved file: %s -> %s (%s bytes)", source_path, dest_path, file_size)
+                    result = True, None
+        except PermissionError as e:
+            result = False, f"Permission denied moving file: '{source_path}' -> '{dest_path}': {e}"
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            result = False, f"Error moving file '{source_path}' -> '{dest_path}': {e}"
+        return result
+
+    def move_files(self, source_paths: list, destination_paths: list, create_dirs: bool = True) -> str:
+        """Move/rename files from source paths to destination paths."""
+        self._validate_move_paths(source_paths, destination_paths)
 
         moved_files = []
         errors = []
 
         logging.info("Attempting to move %s file(s)", len(source_paths))
 
-        for source_path, dest_path in zip(source_paths, destination_paths):
-            try:
-                validated_source = FileUtils.validate_file_path(source_path, self.root_dir)
-                validated_dest = FileUtils.validate_file_path(dest_path, self.root_dir)
-
-                # Check if source exists and is a file
-                if not os.path.exists(validated_source):
-                    errors.append(f"Source file not found: '{source_path}'")
-                    continue
-
-                if not os.path.isfile(validated_source):
-                    errors.append(f"Source path is not a file: '{source_path}'")
-                    continue
-
-                # Create destination directory if requested and it doesn't exist
-                dest_dir = os.path.dirname(validated_dest)
-                if dest_dir and not os.path.exists(dest_dir):
-                    if create_dirs:
-                        try:
-                            os.makedirs(dest_dir, exist_ok=True)
-                            logging.info("Created destination directory: %s", dest_dir)
-                        except Exception as e:  # pylint: disable=broad-exception-caught
-                            errors.append(f"Failed to create destination directory '{dest_dir}' for '{source_path}': {e}")
-                            continue
-                    else:
-                        errors.append(f"Destination directory does not exist: '{dest_dir}' for '{source_path}'")
-                        continue
-
-                # Check if destination already exists
-                if os.path.exists(validated_dest):
-                    errors.append(f"Destination already exists: '{dest_path}' for source '{source_path}'")
-                    continue
-
-                # Check file size before moving (just for logging)
-                try:
-                    file_size = os.path.getsize(validated_source)
-                except OSError:
-                    file_size = 0
-
-                # Perform the move operation
-                shutil.move(validated_source, validated_dest)
+        for source_path, dest_path in zip(source_paths, destination_paths, strict=False):
+            success, error_msg = self._perform_single_file_move(source_path, dest_path, create_dirs)
+            if success:
                 moved_files.append((source_path, dest_path))
-                logging.info(
-                    "Successfully moved file: %s -> %s (%s bytes)",
-                    source_path,
-                    dest_path,
-                    file_size,
-                )
+            else:
+                errors.append(error_msg)
 
-            except PermissionError as e:
-                errors.append(f"Permission denied moving file: '{source_path}' -> '{dest_path}': {e}")
-            except Exception as e:  # pylint: disable=broad-exception-caught
-                errors.append(f"Error moving file '{source_path}' -> '{dest_path}': {e}")
-
-        # Prepare result message
         if errors:
-            error_msg = f"Some files could not be moved: {'; '.join(errors)}"
+            # Filter out None values before joining
+            filtered_errors = [err for err in errors if err is not None]
+            error_msg = f"Some files could not be moved: {'; '.join(filtered_errors)}"
             if moved_files:
                 moved_list = [f"{src} -> {dst}" for src, dst in moved_files]
                 error_msg += f". Successfully moved: {', '.join(moved_list)}"
-
             logging.error(error_msg)
-            raise Exception(error_msg) from None  # pylint: disable=raise-missing-from
+            raise Exception(error_msg) from None
 
         logging.info("Successfully moved all %s file(s)", len(moved_files))
         moved_list = [f"{src} -> {dst}" for src, dst in moved_files]
         return f"Successfully moved {len(moved_files)} file(s): {', '.join(moved_list)}"
 
-    def create_directory(self, directory_path: str):
+    def create_directory(self, directory_path: str) -> str:
         """Create a directory and any necessary parent directories."""
         try:
             validated_path = FileUtils.validate_file_path(directory_path, self.root_dir)
+            path_obj = Path(validated_path)
 
-            if os.path.exists(validated_path):
-                if os.path.isdir(validated_path):
+            if path_obj.exists():
+                if path_obj.is_dir():
                     logging.info("Directory already exists: %s", directory_path)
                     return f"Directory already exists: '{directory_path}'"
                 raise ValueError(f"Path exists but is not a directory: '{directory_path}'")
 
-            os.makedirs(validated_path, exist_ok=True)
+            path_obj.mkdir(parents=True, exist_ok=True)
             logging.info("Successfully created directory: %s", directory_path)
             return f"Successfully created directory: '{directory_path}'"
 
@@ -619,19 +670,20 @@ class LocalFiles:
             logging.error(error_msg)
             raise Exception(error_msg) from e
 
-    def delete_directory(self, directory_path: str):
+    def delete_directory(self, directory_path: str) -> str:
         """Delete a directory and all its contents."""
         try:
             validated_path = FileUtils.validate_file_path(directory_path, self.root_dir)
+            path_obj = Path(validated_path)
 
-            if not os.path.exists(validated_path):
+            if not path_obj.exists():
                 raise FileNotFoundError(f"Directory not found: '{directory_path}'")
 
-            if not os.path.isdir(validated_path):
+            if not path_obj.is_dir():
                 raise ValueError(f"Path is not a directory: '{directory_path}'")
 
             # Count items before deletion for informative message
-            item_count = sum(1 for _ in os.walk(validated_path))
+            item_count = sum(1 for _ in path_obj.rglob("*")) + 1  # +1 for the directory itself
 
             shutil.rmtree(validated_path)
             logging.info("Successfully deleted directory: %s", directory_path)
@@ -757,12 +809,18 @@ class LocalFiles:
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="MCP File Manipulation Server")
+    parser.add_argument(
+        "--root-dir",
+        type=str,
+        default=Path.cwd(),
+        help="Root directory for file operations",
+    )
+    args = parser.parse_args()
+
     try:
-        server = LocalFiles()
-
+        server = LocalFiles(args.root_dir)
         server.run()
-
     except Exception as e:  # pylint: disable=broad-exception-caught
         logging.error("Failed to start server: %s", e, exc_info=True)
-
         sys.exit(1)

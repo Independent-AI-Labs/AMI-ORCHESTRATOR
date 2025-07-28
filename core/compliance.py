@@ -2,6 +2,8 @@
 Compliance tools for the Orchestrator.
 """
 
+from pathlib import Path
+
 from orchestrator.core.dgraph_client import DgraphClient
 
 
@@ -21,6 +23,4 @@ class Compliance:
         audit_log = self.get_audit_log(query)
         # This is a placeholder for the actual implementation.
         print(f"Exporting audit log to {file_path}")
-        with open(file_path, "w", encoding="utf-8") as f:
-            for entry in audit_log:
-                f.write(str(entry) + "\n")
+        Path(file_path).write_text("\n".join(str(entry) for entry in audit_log), encoding="utf-8")

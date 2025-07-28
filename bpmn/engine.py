@@ -4,7 +4,8 @@ Core BPMN Engine for the Orchestrator.
 
 import json
 import time
-from typing import Any, Optional
+from collections.abc import Callable
+from typing import Any, cast
 
 from orchestrator.bpmn.models import AiTask, ServiceTask, Task
 from orchestrator.bpmn.process_loader import ProcessLoader
@@ -13,6 +14,14 @@ from orchestrator.core.prometheus_client import PrometheusClient
 from orchestrator.core.redis_client import RedisClient
 from orchestrator.core.security import SecurityManager
 from orchestrator.core.worker_manager import WorkerManager
+
+# Define type aliases for node handlers
+StartEventHandler = Callable[[dict, dict, str, dict], None]
+ExclusiveGatewayHandler = Callable[[dict, dict, str, dict], None]
+ServiceTaskHandler = Callable[[dict, dict, str, dict], None]
+HumanTaskHandler = Callable[[dict, str], None]
+IntermediateCatchEventHandler = Callable[[dict, dict, str, dict], None]
+EndEventHandler = Callable[[], None]
 
 
 class BpmnEngine:
@@ -33,7 +42,7 @@ class BpmnEngine:
         self.prometheus_client = prometheus_client
         self.worker_manager = worker_manager
         self.process_loader = ProcessLoader(dgraph_client)
-        self.node_handlers = {
+        self.node_handlers: dict[str, Any] = {
             "startEvent": self._handle_start_event,
             "exclusiveGateway": self._handle_exclusive_gateway,
             "serviceTask": self._handle_service_task,
@@ -46,7 +55,7 @@ class BpmnEngine:
         self,
         process_definition_path: str,
         user: str,
-        variables: Optional[dict[str, Any]] = None,
+        variables: dict[str, Any] | None = None,
     ) -> str:
         """Start a new BPMN process instance."""
         if variables is None:
@@ -75,7 +84,12 @@ class BpmnEngine:
 
         handler = self.node_handlers.get(node["type"])
         if handler:
-            handler(node, process_definition, user, variables)
+            if node["type"] == "humanTask":
+                cast(HumanTaskHandler, handler)(node, user)
+            elif node["type"] == "endEvent":
+                cast(EndEventHandler, handler)()
+            else:
+                cast(Callable[[dict, dict, str, dict], None], handler)(node, process_definition, user, variables)
         else:
             print(f"Error: Unknown node type {node['type']}")
 
@@ -86,10 +100,9 @@ class BpmnEngine:
 
     def _handle_exclusive_gateway(self, node, process_definition, user, variables):
         for edge in process_definition["edges"]:
-            if edge["from"] == node["id"]:
-                if "condition" in edge and self.evaluate_condition(edge["condition"], variables):
-                    self.execute_node(edge["to"], process_definition, user, variables)
-                    return
+            if edge["from"] == node["id"] and "condition" in edge and self.evaluate_condition(edge["condition"], variables):
+                self.execute_node(edge["to"], process_definition, user, variables)
+                return
         # If no condition is met, follow the default flow (if any)
         default_edge = next(
             (e for e in process_definition["edges"] if e["from"] == node["id"] and "condition" not in e),
@@ -120,7 +133,7 @@ class BpmnEngine:
             self.prometheus_client.increment_process_failures()
             self.redis_client.publish_to_dead_letter_queue(json.dumps(node), str(e))
 
-    def _handle_human_task(self, node, process_definition, user, variables):
+    def _handle_human_task(self, node, user):
         if self.security_manager.is_authorized_for_human_task(user, node):
             self.dgraph_client.create_human_task(node)
             print(f"Human task created: {node['name']}. Waiting for completion...")
@@ -133,7 +146,7 @@ class BpmnEngine:
         elif "messageEventDefinition" in node:
             self.handle_message_event(node, process_definition, user, variables)
 
-    def _handle_end_event(self, node, process_definition, user, variables):
+    def _handle_end_event(self):
         print("Process finished.")
 
     def handle_timer_event(self, node: dict, process_definition: dict, user: str, variables: dict):
@@ -165,7 +178,7 @@ class BpmnEngine:
             return int(duration_str[2:-1])
         return 0
 
-    def get_next_node_id(self, current_node_id: str, process_definition: dict) -> Optional[str]:
+    def get_next_node_id(self, current_node_id: str, process_definition: dict) -> str | None:
         """Get the ID of the next node in the process."""
         edge = next(
             (e for e in process_definition["edges"] if e["from"] == current_node_id),

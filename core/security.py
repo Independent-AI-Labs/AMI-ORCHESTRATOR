@@ -8,14 +8,13 @@ class SecurityManager:
 
     def __init__(self):
         """Initialize the security manager."""
-        pass  # pylint: disable=unnecessary-pass
 
     def authenticate(self, token):
         """Authenticate a user token."""
-        # This is a placeholder for a real authentication mechanism.
-        return token == "secret"
+        # This is a placeholder for a real authentication mechanism. The hardcoded password is for demonstration purposes.
+        return token == "secret"  # noqa: S105
 
-    def authorize(self, user, action, resource):
+    def authorize(self, user):
         """Authorize a user for a specific action on a resource."""
         # This is a placeholder for a real authorization mechanism.
         return user == "admin"

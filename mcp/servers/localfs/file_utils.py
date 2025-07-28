@@ -3,7 +3,6 @@ File utilities for the LocalFiles server.
 """
 
 import difflib
-import os
 import re
 from pathlib import Path
 
@@ -32,12 +31,11 @@ class FileUtils:
     @staticmethod
     def check_file_size(file_path: str):
         """Check if file size is within limits."""
-        try:
-            size = os.path.getsize(file_path)
+        path_obj = Path(file_path)
+        if path_obj.exists():
+            size = path_obj.stat().st_size
             if size > FileUtils.max_file_size:
                 raise ValueError(f"File too large: {size} bytes (max: {FileUtils.max_file_size} bytes)")
-        except OSError:
-            pass  # File doesn't exist yet, which is fine for write operations
 
     @staticmethod
     def normalize_line_endings(content: str, target_format: str = "\n") -> str:
@@ -58,8 +56,8 @@ class FileUtils:
             diff = difflib.unified_diff(
                 before_lines,
                 after_lines,
-                fromfile=f"{os.path.basename(file_path)} (before)",
-                tofile=f"{os.path.basename(file_path)} (after)",
+                fromfile=f"{Path(file_path).name} (before)",
+                tofile=f"{Path(file_path).name} (after)",
                 lineterm="",
             )
 
@@ -83,64 +81,62 @@ class FileUtils:
     def read_file_content(file_path: str, root_dir: str, mode: str = "text", encoding: str = "utf-8"):
         """Read file content with proper error handling and normalization."""
         validated_path = FileUtils.validate_file_path(file_path, root_dir)
+        path_obj = Path(validated_path)
 
-        if not os.path.exists(validated_path):
+        if not path_obj.exists():
             raise FileNotFoundError(f"File not found: '{file_path}'. Please check the path and ensure the file exists.")
 
-        if not os.path.isfile(validated_path):
+        if not path_obj.is_file():
             raise ValueError(f"Path exists but is not a file: '{validated_path}'")
 
         FileUtils.check_file_size(validated_path)
 
         try:
             if mode == "binary":
-                with open(validated_path, "rb") as f:
-                    return f.read()
-            else:
-                with open(validated_path, "r", encoding=encoding) as f:
-                    content = f.read()
-                # Normalize line endings to \n for consistent processing
-                return FileUtils.normalize_line_endings(content, "\n")
+                return path_obj.read_bytes()
+            content = path_obj.read_text(encoding=encoding)
+            # Normalize line endings to \n for consistent processing
+            return FileUtils.normalize_line_endings(content, "\n")
 
         except UnicodeDecodeError as e:
             raise ValueError(
-                f"Cannot decode file '{validated_path}' with encoding '{encoding}'. " f"Error: {e}. Try using a different encoding or 'binary' mode."
+                f"Cannot decode file '{validated_path}' with encoding '{encoding}'. Error: {e}. Try using a different encoding or 'binary' mode."
             ) from e
         except PermissionError as e:
             raise PermissionError(f"Permission denied: cannot read file '{validated_path}'") from e
         except ValueError as e:
             raise e
         except Exception as e:  # pylint: disable=broad-exception-caught
-            raise IOError(f"Unexpected error reading file '{validated_path}': {e}") from e
+            raise OSError(f"Unexpected error reading file '{validated_path}': {e}") from e
 
     @staticmethod
     def write_file_content(file_path: str, content, root_dir: str, mode: str = "text", encoding: str = "utf-8"):
         """Write file content with proper error handling."""
         validated_path = FileUtils.validate_file_path(file_path, root_dir)
+        path_obj = Path(validated_path)
 
         # Create directory if it doesn't exist
-        parent_dir = os.path.dirname(validated_path)
-        if parent_dir and not os.path.exists(parent_dir):
+        parent_dir = path_obj.parent
+        if parent_dir and not parent_dir.exists():
             try:
-                os.makedirs(parent_dir, exist_ok=True)
+                parent_dir.mkdir(parents=True, exist_ok=True)
             except Exception as e:  # pylint: disable=broad-exception-caught
                 raise OSError(f"Failed to create parent directory '{parent_dir}': {e}") from e
 
         try:
             if mode == "binary":
-                with open(validated_path, "wb") as f:
-                    f.write(content)
+                path_obj.write_bytes(content)
             else:
-                with open(validated_path, "w", encoding=encoding) as f:
-                    f.write(content)
+                path_obj.write_text(content, encoding=encoding)
 
         except PermissionError as e:
             raise PermissionError(f"Permission denied: cannot write to file '{validated_path}'") from e
         except OSError as e:
-            if e.errno == 28:  # No space left on device
+            no_space_left_on_device = 28
+            if e.errno == no_space_left_on_device:  # No space left on device
                 raise OSError(f"No space left on device when writing to '{validated_path}': {e}") from e
             raise OSError(f"OS error writing to file '{validated_path}': {e}") from e
         except ValueError as e:
             raise e
         except Exception as e:  # pylint: disable=broad-exception-caught
-            raise IOError(f"Unexpected error writing to file '{validated_path}': {e}") from e
+            raise OSError(f"Unexpected error writing to file '{validated_path}': {e}") from e

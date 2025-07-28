@@ -2,8 +2,9 @@
 This module defines the Agent-Coordinator Protocol (ACP), which facilitates
 communication between the orchestrator and various agents.
 """
+
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 # region: Generic JSON-RPC Structures
 
@@ -15,7 +16,7 @@ class Request:
     jsonrpc: str
     id: int
     method: str
-    params: Optional[Dict[str, Any]] = None
+    params: dict[str, Any] | None = None
 
 
 @dataclass
@@ -24,8 +25,8 @@ class Response:
 
     jsonrpc: str
     id: int
-    result: Optional[Any] = None
-    error: Optional[Dict[str, Any]] = None
+    result: Any | None = None
+    error: dict[str, Any] | None = None
 
 
 @dataclass
@@ -34,7 +35,7 @@ class Error:
 
     code: int
     message: str
-    data: Optional[Any] = None
+    data: Any | None = None
 
 
 # endregion: Generic JSON-RPC Structures
@@ -53,7 +54,7 @@ class InitializeParams:
 class SendUserMessageParams:
     """Parameters for the 'sendUserMessage' method."""
 
-    chunks: List[Dict[str, Any]]
+    chunks: list[dict[str, Any]]
 
 
 # endregion: ACP Method Parameters
@@ -78,7 +79,7 @@ class InitializeResponse:
 class StreamAssistantMessageChunkParams:
     """Parameters for the 'streamAssistantMessageChunk' notification."""
 
-    chunk: Dict[str, Any]
+    chunk: dict[str, Any]
 
 
 @dataclass
@@ -86,17 +87,17 @@ class ToolCallLocation:
     """Represents a location for a tool call."""
 
     path: str
-    line: Optional[int] = None
+    line: int | None = None
 
 
 @dataclass
 class RequestToolCallConfirmationParams:
     """Parameters for the 'requestToolCallConfirmation' notification."""
 
-    confirmation: Dict[str, Any]
+    confirmation: dict[str, Any]
     label: str
-    content: Optional[Dict[str, Any]] = None
-    locations: Optional[List[ToolCallLocation]] = None
+    content: dict[str, Any] | None = None
+    locations: list["ToolCallLocation"] | None = None
 
 
 @dataclass
@@ -104,15 +105,15 @@ class PushToolCallParams:
     """Parameters for the 'pushToolCall' notification."""
 
     label: str
-    content: Optional[Dict[str, Any]] = None
-    locations: Optional[List[ToolCallLocation]] = None
+    content: dict[str, Any] | None = None
+    locations: list[ToolCallLocation] | None = None
 
 
 @dataclass
 class UpdateToolCallParams:
     """Parameters for the 'updateToolCall' notification."""
 
-    content: Optional[Dict[str, Any]]
+    content: dict[str, Any] | None
     status: str
     tool_call_id: int
 
@@ -147,7 +148,7 @@ class AIRequest:
     """Represents a request to an AI agent."""
 
     prompt: str
-    context: Optional[Dict[str, Any]] = None
+    context: dict[str, Any] | None = None
 
 
 # endregion: AI
@@ -161,7 +162,7 @@ class TaskRequest:
 
     task_id: str
     task_type: str
-    params: Optional[Dict[str, Any]] = None
+    params: dict[str, Any] | None = None
 
 
 @dataclass
@@ -170,7 +171,7 @@ class TaskResult:
 
     task_id: str
     result: Any
-    error: Optional[Error] = None
+    error: Error | None = None
 
 
 # endregion: Task Management

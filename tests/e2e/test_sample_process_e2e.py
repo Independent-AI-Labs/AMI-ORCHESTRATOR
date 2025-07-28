@@ -7,10 +7,11 @@ import subprocess
 import sys
 import time
 import unittest
+from pathlib import Path
 
 import requests
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 
 class TestSampleProcessE2E(unittest.TestCase):
@@ -19,10 +20,11 @@ class TestSampleProcessE2E(unittest.TestCase):
     def setUp(self):
         """Set up the test case."""
         env = os.environ.copy()
-        project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-        env["PYTHONPATH"] = project_root
-        self.orchestrator_process = subprocess.Popen(["python", "-m", "orchestrator.main"], env=env)
-        self.worker_process = subprocess.Popen(["python", "-m", "orchestrator.workers.sample_worker"], env=env)
+        project_root = Path(__file__).resolve().parents[2]
+        env["PYTHONPATH"] = str(project_root)
+        python_executable = sys.executable
+        self.orchestrator_process = subprocess.Popen([python_executable, "-m", "orchestrator.main"], env=env)  # noqa: S603, S607 # python_executable and module path are trusted.
+        self.worker_process = subprocess.Popen([python_executable, "-m", "orchestrator.workers.sample_worker"], env=env)  # noqa: S603, S607 # python_executable and module path are trusted.
         time.sleep(5)  # Wait for the services to start
 
     def tearDown(self):

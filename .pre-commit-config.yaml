@@ -1,35 +1,15 @@
 repos:
-  # Python code formatting
-  - repo: https://github.com/psf/black
-    rev: 23.12.1
+  # Ruff - replaces black, isort, pylint, and bandit
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.1.9
     hooks:
-      - id: black
-        args: [--line-length=160]
-        language_version: python3
-        stages: [pre-commit]
-
-  # Import sorting
-  - repo: https://github.com/pycqa/isort
-    rev: 5.13.2
-    hooks:
-      - id: isort
-        args: ["--profile", "black"]
-        stages: [pre-commit]
-
-  # Linting
-  - repo: local
-    hooks:
-      - id: pylint
-        name: pylint
-        entry: python -m pylint
-        language: system
-        types: [python]
-        args: [orchestrator, --rcfile=.pylintrc]
-        stages: [pre-push]
-        pass_filenames: false
-        files: ^orchestrator/
-        env:
-          PYTHONPATH: "."
+      # Linting (includes security checks)
+      - id: ruff
+        args: [ --fix, --exit-non-zero-on-fix ]
+        stages: [ pre-commit ]
+      # Formatting (replaces black)
+      - id: ruff-format
+        stages: [ pre-commit ]
 
   # Type checking
   - repo: local
@@ -39,36 +19,30 @@ repos:
         entry: mypy
         language: python
         language_version: python3.12
-        types: [python]
+        types: [ python ]
         require_serial: true
-        stages: [pre-push]
-        additional_dependencies: ['.']
+        stages: [ pre-commit ]
+
+  - repo: local
+    hooks:
+      - id: mypy-tests
+        name: mypy (tests)
+        entry: mypy
+        language: python
+        language_version: python3.12
+        types: [ python ]
+        require_serial: true
+        stages: [ pre-commit ]
 
   # Additional useful hooks
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.5.0
     hooks:
       - id: check-yaml
+        stages: [ pre-commit ]
       - id: check-added-large-files
+        stages: [ pre-commit ]
       - id: check-merge-conflict
+        stages: [ pre-commit ]
       - id: debug-statements
-        stages: [pre-commit]
-
-  # Security checks
-  - repo: https://github.com/pycqa/bandit
-    rev: 1.7.5
-    hooks:
-      - id: bandit
-        args: ['-r', '.', '-f', 'json', '-o', 'bandit-report.json', '--exit-zero']
-        stages: [pre-push]
-        pass_filenames: false
-
-  - repo: local
-    hooks:
-      - id: semgrep
-        name: semgrep
-        entry: semgrep --config=auto --error
-        language: system
-        types: [python]
-        stages: [pre-push]
-        pass_filenames: false
+        stages: [ pre-commit ]

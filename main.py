@@ -6,8 +6,9 @@ from llama_index.llms.openai import OpenAI
 
 from orchestrator.bpmn.models import Resource
 from orchestrator.core.config import Config
-from orchestrator.core.redis_client import RedisClient
 from orchestrator.core.worker_manager import WorkerManager
+
+worker_manager = WorkerManager()
 
 
 # 2. Define tool functions that wrap WorkerManager methods
@@ -31,7 +32,7 @@ def register_worker(worker_id: str, capabilities: str, resources: str = "GENERIC
             if r_str in Resource.__members__:
                 res_list_enum.append(Resource[r_str])
             else:
-                return f"Error: Invalid resource '{r_str}'. Valid options are: {", ".join(Resource.__members__)}"
+                return f"Error: Invalid resource '{r_str}'. Valid options are: {', '.join(Resource.__members__)}"
 
         worker_manager.register_worker(worker_id, cap_list, res_list_enum)
         return f"Successfully registered worker '{worker_id}' with capabilities {cap_list} and resources {res_list_str}."
@@ -68,11 +69,4 @@ agent = ReActAgent.from_tools(tools, llm=llm, verbose=True)
 # 5. Main execution loop
 if __name__ == "__main__":
     print("Orchestrator Agent is running. Type 'exit' to quit.")
-    # Example of how to run in a loop
-    # while True:
-    #     prompt = input("Enter a prompt: ")
-    #     if prompt.lower() == "exit":
-    #         break
-    #     response = agent.chat(prompt)
-    #     print(str(response))
     print("Agent initialized successfully with worker management tools.")

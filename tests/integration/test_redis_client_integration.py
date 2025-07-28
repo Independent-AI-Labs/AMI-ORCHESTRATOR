@@ -4,7 +4,6 @@ Integration tests for the RedisClient class against a live Redis instance.
 
 import unittest
 
-from orchestrator.core.config import Config
 from orchestrator.core.redis_client import RedisClient
 
 

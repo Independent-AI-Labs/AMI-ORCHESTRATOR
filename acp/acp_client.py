@@ -4,8 +4,10 @@ Client for the Agent-Coordinator Protocol (ACP).
 
 import json
 import subprocess
+from collections.abc import Callable
+from contextlib import suppress
 from threading import Event, Lock, Thread
-from typing import Any, Callable, Dict, Generic, Optional, TypeVar, cast
+from typing import Any, Generic, TypeVar, cast
 from unittest.mock import MagicMock
 
 from orchestrator.acp.protocol import (
@@ -14,14 +16,9 @@ from orchestrator.acp.protocol import (
     SendUserMessageParams,
 )
 
-# region: Data Classes
-
-
-# endregion: Data Classes
-
 
 class RequestError(Exception):
-    def __init__(self, code: int, message: str, data: Optional[Any] = None):
+    def __init__(self, code: int, message: str, data: Any | None = None):
         super().__init__(f"[{code}] {message}")
         self.code = code
         self.message = message
@@ -35,7 +32,7 @@ class Stream:
     def __init__(self, process: subprocess.Popen):
         self._process = process
 
-    def read(self) -> Optional[str]:
+    def read(self) -> str | None:
         if self._process.stdout:
             return self._process.stdout.readline()
         return None
@@ -45,27 +42,28 @@ class Stream:
             try:
                 self._process.stdin.write(message)
                 self._process.stdin.flush()
-            except IOError:
+            except OSError:
                 pass
 
     def close(self):
         if self._process.stdout:
-            try:
+            with suppress(OSError):
                 self._process.stdout.close()
-            except IOError:
-                pass
 
 
-class Connection(Generic[D]):
-    def __init__(self, delegate: D, stream: Stream, test_mode=False):
+D_co = TypeVar("D_co", covariant=True)
+
+
+class Connection(Generic[D_co]):  # noqa: UP046
+    def __init__(self, delegate: D_co, stream: Stream, test_mode=False):
         self._delegate = delegate
         self._stream = stream
         self._next_request_id = 0
-        self._pending_responses: Dict[int, Callable[[Any], None]] = {}
+        self._pending_responses: dict[int, Callable[[Any], None]] = {}
         self._lock = Lock()
         self._running = False
         self._test_mode = test_mode
-        self._listener_thread: Optional[Thread] = None
+        self._listener_thread: Thread | None = None
 
     def start(self):
         if not self._test_mode:
@@ -89,16 +87,16 @@ class Connection(Generic[D]):
                     break
                 message = json.loads(line)
                 self._process_message(message)
-            except (IOError, json.JSONDecodeError):
+            except (OSError, json.JSONDecodeError):
                 break
 
-    def _process_message(self, message: Dict[str, Any]):
+    def _process_message(self, message: dict[str, Any]):
         if "method" in message:
             self._handle_request(message)
         else:
             self._handle_response(message)
 
-    def _handle_request(self, request: Dict[str, Any]):
+    def _handle_request(self, request: dict[str, Any]):
         method_name = request["method"]
         params = request.get("params")
         request_id = request.get("id")
@@ -117,7 +115,7 @@ class Connection(Generic[D]):
             if request_id is not None:
                 self._send_error(request_id, -32603, str(e))
 
-    def _handle_response(self, response: Dict[str, Any]):
+    def _handle_response(self, response: dict[str, Any]):
         response_id = response["id"]
         with self._lock:
             callback = self._pending_responses.pop(response_id, None)
@@ -129,7 +127,7 @@ class Connection(Generic[D]):
                 error = response["error"]
                 callback(RequestError(error["code"], error["message"], error.get("data")))
 
-    def send_request(self, method: str, params: Optional[Dict[str, Any]] = None) -> Any:
+    def send_request(self, method: str, params: dict[str, Any] | None = None) -> Any:
         request_id = self._get_next_request_id()
         request = {"jsonrpc": "2.0", "id": request_id, "method": method, "params": params}
         self._send_message(json.dumps(request) + "\n")
@@ -148,7 +146,7 @@ class Connection(Generic[D]):
 
         # In normal mode, wait for the listener thread
         event = Event()
-        result: Optional[Any] = None
+        result: Any | None = None
 
         def callback(response):
             nonlocal result
@@ -172,7 +170,7 @@ class Connection(Generic[D]):
         response = {"jsonrpc": "2.0", "id": request_id, "result": result}
         self._send_message(json.dumps(response) + "\n")
 
-    def _send_error(self, request_id: int, code: int, message: str, data: Optional[Any] = None):
+    def _send_error(self, request_id: int, code: int, message: str, data: Any | None = None):
         error = {"code": code, "message": message}
         if data:
             error["data"] = data
@@ -193,8 +191,8 @@ class AcpClient:
 
     def __init__(self, gemini_cli_path: str, delegate: Any, test_mode=False):
         self.gemini_cli_path = gemini_cli_path
-        self.process: Optional[subprocess.Popen] = None
-        self.connection: Optional[Connection] = None
+        self.process: subprocess.Popen | None = None
+        self.connection: Connection | None = None
         self._delegate = delegate
         self._test_mode = test_mode
 
@@ -202,12 +200,13 @@ class AcpClient:
         if not self._test_mode:
             self.process = cast(
                 subprocess.Popen,
-                subprocess.Popen(
+                subprocess.Popen(  # noqa: S603, S607
                     ["node", self.gemini_cli_path, "--experimental-acp"],
                     stdin=subprocess.PIPE,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                     text=True,
+                    shell=False,  # Explicitly not using shell
                 ),
             )
             stream = Stream(self.process)
