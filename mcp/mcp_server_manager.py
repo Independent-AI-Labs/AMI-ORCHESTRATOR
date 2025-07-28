@@ -105,6 +105,13 @@ class MCPServerManager:
             preexec_fn = os.setsid if sys.platform != "win32" else None  # noqa: PLW1509
             # This is safe as it's only applied on Unix-like systems and does not interact with threads in an unsafe manner.
 
+            final_env = os.environ.copy()
+            project_root = Path(self.cwd).resolve()
+            if "PYTHONPATH" in final_env:
+                final_env["PYTHONPATH"] = f"{project_root}{os.pathsep}{final_env["PYTHONPATH"]}"
+            else:
+                final_env["PYTHONPATH"] = str(project_root)
+
             process = subprocess.Popen(
                 [sys.executable, self.server_script_path],  # noqa: S603, S607
                 cwd=self.cwd,
@@ -113,6 +120,7 @@ class MCPServerManager:
                 stdin=subprocess.DEVNULL if sys.platform == "win32" else None,
                 stdout=LOG_FILE.open("wb"),
                 stderr=subprocess.STDOUT,
+                env=final_env,
             )
             self._write_pid(process.pid)
             logger.info(

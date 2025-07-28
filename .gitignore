@@ -162,3 +162,5 @@ modelcache
 *commit_message*
 bandit-report.json
 *temp_*
+
+*.pid

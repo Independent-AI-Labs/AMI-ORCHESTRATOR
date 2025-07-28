@@ -50,8 +50,8 @@ class FileUtils:
     def generate_diff(before_content: str, after_content: str, file_path: str) -> str:
         """Generate a unified diff between before and after content."""
         try:
-            before_lines = before_content.splitlines(keepends=True)
-            after_lines = after_content.splitlines(keepends=True)
+            before_lines = before_content.splitlines(keepends=False)
+            after_lines = after_content.splitlines(keepends=False)
 
             diff = difflib.unified_diff(
                 before_lines,

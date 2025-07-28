@@ -9,6 +9,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import cast
 
+import yaml
+
 from orchestrator.mcp.servers.localfs.file_utils import FileUtils
 from orchestrator.mcp.servers.localfs.tool_definitions import get_tool_declarations
 
@@ -95,7 +97,10 @@ class LocalFiles:
                 len(content),
                 content.count(chr(10)),
             )
-            return content
+            # Prepend line numbers for text files
+            lines = content.splitlines(keepends=True)
+            numbered_lines = [f"{i + 1}: {line}" for i, line in enumerate(lines)]
+            return "".join(numbered_lines)
 
         except Exception as e:  # pylint: disable=broad-exception-caught
             logging.error("Failed to read file %s: %s", file_path, e)
@@ -340,7 +345,6 @@ class LocalFiles:
                 result_msg += f"\n\nDiff:\n{diff_output}"
 
             return {"status": "success", "message": result_msg}
-
         except Exception as e:  # pylint: disable=broad-exception-caught
             logging.error("Failed to replace string in file %s: %s", file_path, e)
             raise e
@@ -756,9 +760,13 @@ class LocalFiles:
                 logging.info("Executing tool: %s", tool_name)
                 filtered_args = self._filter_tool_arguments(tool_name, tool_args)
                 result = self.tools[tool_name](**filtered_args)
+                # Convert the result to a human-readable YAML string
+                if isinstance(result, dict):
+                    formatted_result = yaml.dump(result, indent=2, default_flow_style=False) if isinstance(result, dict) else str(result)
+
                 response = {
                     "jsonrpc": "2.0",
-                    "result": {"content": [{"type": "text", "text": str(result)}]},
+                    "result": {"content": [{"type": "text", "text": formatted_result}]},
                     "id": request_id,
                 }
                 self._send_response(response)
