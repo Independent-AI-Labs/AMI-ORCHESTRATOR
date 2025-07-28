@@ -23,7 +23,7 @@ This document outlines the best practices and development guidelines for working
 
 ## 3. Code Style and Linting
 
-All code should adhere to the PEP 8 style guide. Pylint should be used to enforce this and to check for other code quality issues.
+All code should adhere to the PEP 8 style guide. Ruff and MyPy should be used to enforce this and to check for other code quality issues.
 
 ## 4. Agent-Coordinator Protocol (ACP)
 
