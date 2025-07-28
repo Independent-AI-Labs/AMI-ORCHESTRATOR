@@ -42,12 +42,4 @@
 *   **Fault Tolerance for Worker Pools:** Enhance error handling and recovery mechanisms for tasks executed within thread and process pools.
 *   **Monitoring & Observability:** Integrate metrics and logging for worker pool utilization, task queue lengths, and task execution times.
 
-## Development Guidelines Reminder
 
-As outlined in `orchestrator/GEMINI.md`, all development should adhere to the following principles:
-
-1.  **Plan and Confirm:** Thoroughly plan the approach, identify affected files, understand existing patterns, and consider potential impacts. Confirm the plan with relevant stakeholders or by performing self-verification steps.
-2.  **Create/Update Tests:** Write tests that validate new functionality *before* writing new code.
-3.  **Implement Feature (Atomic Changes):** Focus on small, self-contained, atomic changes.
-4.  **Run All Tests (Frequent Validation):** Validate frequently after each atomic change, and run the entire test suite before submitting.
-5.  **Update Documentation:** Keep all relevant documentation up-to-date.

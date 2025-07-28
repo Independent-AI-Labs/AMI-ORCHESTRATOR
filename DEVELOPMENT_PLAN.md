@@ -63,10 +63,10 @@ This plan breaks down the development into logical phases, starting with a solid
     *   **Pydantic BPMN Models:** A comprehensive set of Pydantic models for BPMN 2.0 has been defined in `orchestrator/bpmn/models.py`.
     *   **Dgraph Schema Generator:** A script at `orchestrator/core/schema_generator.py` automatically generates the Dgraph schema from the Pydantic models.
     *   **Automated Schema Application:** The `apply_schema.py` script now integrates the schema generator, ensuring the Dgraph schema is always in sync with the models.
-    *   Dgraph Client: Basic client implemented.
+    *   Dgraph Client: Basic client implemented, but `create_process_instance` and `create_human_task` are placeholders.
     *   Redis Setup: Client implemented for messaging and dead-letter queue.
-    *   Security Kernel: `SecurityManager` exists, but authorization logic is not fully implemented.
-    *   Initial Orchestrator Service: FastAPI is set up.
+    *   Security Kernel: `SecurityManager` exists, but authentication and authorization logic is not fully implemented.
+    *   Initial Orchestrator Service: `main.py` now uses a `llama_index` ReActAgent for interaction, replacing the initial FastAPI setup.
 *   **Tasks to Complete:**
     1.  **Dgraph Persistence:** Fully implement `create_process_instance` and `create_human_task` in `DgraphClient` using the new Pydantic models to ensure proper process and human task persistence.
     2.  **Process Definition Storage:** Implement `store_process_definition` in `ProcessLoader` to persistently store BPMN definitions in Dgraph, using the Pydantic models as the data contract.
@@ -84,9 +84,9 @@ This plan breaks down the development into logical phases, starting with a solid
     *   Service Task Execution: Currently simulated; actual worker integration is pending.
     *   Expression Evaluation: Simplified evaluators are in place.
 *   **Tasks to Complete:**
-    1.  **Worker Integration:** Modify `_handle_service_task` to send `TaskRequest` messages to appropriate workers (e.g., `sample_worker`, `gemini_cli_adapter`) via Redis. Implement a mechanism to receive `TaskCompleted` or `TaskFailed` messages from workers and update the process state accordingly.
+    1.  **Worker Integration:** Modify `_handle_service_task` to send `TaskRequest` messages to appropriate workers (e.g., `gemini_cli_adapter`) via Redis. Implement a mechanism to receive `TaskCompleted` or `TaskFailed` messages from workers and update the process state accordingly.
     2.  **Robust Expression Language:** Replace the simplified `evaluate_condition` and `evaluate_expression` with a proper expression language.
-    3.  **Real-time Process Status:** Implement the actual logic for the `/api/processes/instances/<process_instance_id>` endpoint in `api.py` to fetch real-time process status from Dgraph.
+    
     4.  **Testing:** Write comprehensive unit and integration tests for the BPMN engine, process loader, and worker integration.
 
 ### Phase 3: The Agent-Coordinator Protocol (ACP) & First Worker (In Progress)
@@ -96,11 +96,11 @@ This plan breaks down the development into logical phases, starting with a solid
     *   ACP definition (`acp/protocol.py`) is complete.
     *   `acp_client.py` is implemented and unit tested.
     *   `sample_worker.py` exists.
-    *   Generic Agent Interface: The `Icon` class and `Agent` base class are defined in `acp/agent.py`.
+    
     *   **Llama Index ReAct Agent:** A conversational agent has been implemented in `main.py` to provide a natural language interface to the orchestrator. The agent is equipped with tools to manage workers.
 *   **Tasks to Complete:**
     1.  **Worker Manager Enhancements:** Enhance the `WorkerManager` to handle agent registration, health checks, and capability discovery via ACP. This includes integrating the `GeminiCliAdapter` with the `WorkerManager`.
-    2.  **First Generic Adapter:** Implement a simple adapter for a basic Python function worker to demonstrate the end-to-end flow from a `serviceTask` in BPMN to a worker and back, utilizing the enhanced `WorkerManager`.
+    
     3.  **Testing:** Write comprehensive unit and integration tests for the `WorkerManager` enhancements and the first generic adapter.
 
 ### Phase 4: Advanced Business Logic & Human-in-the-Loop (Planned)
