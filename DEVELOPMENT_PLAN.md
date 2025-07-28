@@ -111,7 +111,18 @@ This plan breaks down the development into logical phases, starting with a solid
     *   Service Task Execution: Currently simulated; actual worker integration is pending.
     *   Expression Evaluation: Simplified evaluators are in place.
 *   **Tasks to Complete:**
-    1.  **Worker Integration:** Modify `_handle_service_task` to send `TaskRequest` messages to appropriate workers (e.g., `gemini_cli_adapter`) via Redis. Implement a mechanism to receive `TaskCompleted` or `TaskFailed` messages from workers and update the process state accordingly.
+    1.  **Robust Worker Integration with Monitor Process:**
+        *   **Orchestrator-to-Worker Communication:** Modify `_handle_service_task` to send `TaskRequest` messages to appropriate workers (e.g., `gemini_cli_adapter`) via Redis. These messages will include all necessary context for the worker to perform its task.
+        *   **Introducing the Monitor Process:** For each worker agent process, implement an accompanying, dedicated **Monitor Process**. This monitor will:
+            *   **Intercept and Validate ACP Output:** Act as a critic and moderator of the worker agent's ACP output, ensuring compliance with expected formats, safety protocols, and operational guidelines.
+            *   **BPMN Graph Updates:** Translate relevant worker outputs and state changes into updates for the BPMN graph (via the Dgraph client), ensuring the process state accurately reflects the worker's progress and outcomes.
+            *   **Orchestrator Notifications:** Notify the main Orchestrator process of significant events, including:
+                *   `TaskCompleted`: Successful completion of a task, along with any relevant output data.
+                *   `TaskFailed`: Failure of a task, including error details and potential recovery options.
+                *   `Notifications`: General updates or informational messages from the worker.
+                *   `User Input Required`: When a worker requires human intervention or input to proceed.
+            *   **Robustness and Error Handling:** Implement comprehensive error handling, retry mechanisms, and logging within the monitor process to ensure resilience and provide clear diagnostics in case of worker failures or unexpected behavior. The monitor should be able to manage the worker's lifecycle (start, stop, restart) and report its health.
+            *   **Contextual Awareness:** The monitor should maintain contextual awareness of the specific task and process instance it is overseeing, enabling intelligent interpretation of worker output and targeted updates to the BPMN graph.
     2.  **Robust Expression Language:** Replace the simplified `evaluate_condition` and `evaluate_expression` with a proper expression language.
     
     4.  **Testing:** Write comprehensive unit and integration tests for the BPMN engine, process loader, and worker integration.
