@@ -4,7 +4,6 @@ import json
 import logging
 import shutil
 import sys
-import time
 from datetime import datetime
 from pathlib import Path
 from typing import cast
@@ -147,9 +146,9 @@ class LocalFiles:
         )
         return f"Successfully wrote binary content to '{file_path}' ({content_size} bytes)."
 
-    def _get_write_success_message_text(self, file_path: str, content: str, original_content: str | None) -> str:
-        """Generates the success message for text file writes."""
-        diff_output = ""
+    def _get_write_success_message_text(self, file_path: str, content: str, original_content: str | None) -> tuple[str, str | None]:
+        """Generates the success message and diff for text file writes."""
+        diff_output: str | None = None
         if original_content is not None:
             diff_output = FileUtils.generate_diff(original_content, content, file_path)
 
@@ -157,20 +156,20 @@ class LocalFiles:
         char_count = len(content)
 
         message = f"Successfully wrote text content to '{file_path}' ({char_count} characters, {line_count} lines)."
-        if diff_output:
-            message += f"\n\nDiff:\n{diff_output}"
-        return message
+        return message, diff_output
 
-    def _get_write_success_message(self, file_path: str, content: str | bytes, mode: str, original_content: str | bytes | None) -> str:
+    def _get_write_success_message(self, file_path: str, content: str | bytes, mode: str, original_content: str | bytes | None) -> dict:
         """Generates the success message for write_file, dispatching to specific handlers."""
         if mode == "binary":
             # MyPy knows content is bytes here due to the mode check
-            return self._get_write_success_message_binary(file_path, cast(bytes, content))
+            message = self._get_write_success_message_binary(file_path, cast(bytes, content))
+            return {"message": message, "diff": None}
         # MyPy knows content is str here due to the mode check
         # MyPy knows original_content is str | None here
-        return self._get_write_success_message_text(file_path, cast(str, content), cast(str | None, original_content))
+        message, diff_output = self._get_write_success_message_text(file_path, cast(str, content), cast(str | None, original_content))
+        return {"message": message, "diff": diff_output}
 
-    def write_file(self, file_path: str, content: str | bytes, mode: str = "text", encoding: str = "utf-8") -> str:
+    def write_file(self, file_path: str, content: str | bytes, mode: str = "text", encoding: str = "utf-8") -> dict:
         """Write content to a file."""
         try:
             logging.info("Writing file: %s (mode: %s, encoding: %s)", file_path, mode, encoding)
@@ -200,7 +199,11 @@ class LocalFiles:
                     logging.warning("Could not read existing file for diff: %s", e)
 
             FileUtils.write_file_content(file_path, processed_content, self.root_dir, mode, encoding)
-            return self._get_write_success_message(file_path, processed_content, mode, original_content)
+            result_dict = self._get_write_success_message(file_path, processed_content, mode, original_content)
+            response_data = {"status": "success", "message": result_dict["message"]}
+            if result_dict["diff"]:
+                response_data["diff"] = result_dict["diff"]
+            return response_data
 
         except Exception as e:  # pylint: disable=broad-exception-caught
             logging.error("Failed to write file %s: %s", file_path, e)
@@ -268,11 +271,7 @@ class LocalFiles:
         return {"status": "success", "message": f"No changes made to '{file_path}': replacement resulted in identical content."}
 
     def _read_file_content(self, file_path: str, mode: str, encoding: str) -> str | bytes:
-        try:
-            return FileUtils.read_file_content(file_path, self.root_dir, mode, encoding)
-        except Exception as e:
-            logging.warning("Could not read existing file for diff: %s", e)
-            return b"" if mode == "binary" else ""
+        return FileUtils.read_file_content(file_path, self.root_dir, mode, encoding)
 
     def _perform_replacement(
         self, file_path: str, original_content: str | bytes, old_string: str | bytes, new_string: str | bytes, mode: str, count: int
@@ -309,7 +308,6 @@ class LocalFiles:
                 mode,
                 count,
             )
-
             original_content = self._read_file_content(file_path, mode, encoding)
             new_content: str | bytes
             actual_replacements: int
@@ -344,7 +342,13 @@ class LocalFiles:
             if diff_output:
                 result_msg += f"\n\nDiff:\n{diff_output}"
 
-            return {"status": "success", "message": result_msg}
+            response_data = {"status": "success", "message": result_msg}
+            if diff_output:
+                response_data["diff"] = diff_output
+            return response_data
+        except (ValueError, PermissionError) as e:  # pylint: disable=broad-exception-caught
+            logging.error("Failed to replace string in file %s: %s", file_path, e)
+            raise e
         except Exception as e:  # pylint: disable=broad-exception-caught
             logging.error("Failed to replace string in file %s: %s", file_path, e)
             raise e
@@ -356,7 +360,7 @@ class LocalFiles:
         end_line: int,
         new_string: str,
         encoding: str = "utf-8",
-    ) -> str:
+    ) -> dict:
         """Replace content within a specified range of lines."""
         try:
             logging.info("Replacing lines %s-%s in file: %s", start_line, end_line, file_path)
@@ -409,13 +413,16 @@ class LocalFiles:
             if diff_output:
                 result_msg += f"\n\nDiff:\n{diff_output}"
 
-            return result_msg
+            response_data = {"status": "success", "message": result_msg}
+            if diff_output:
+                response_data["diff"] = diff_output
+            return response_data
 
         except Exception as e:  # pylint: disable=broad-exception-caught
             logging.error("Failed to replace lines in file %s: %s", file_path, e)
             raise e
 
-    def edit_file_delete_lines(self, file_path: str, start_line: int, end_line: int, encoding: str = "utf-8") -> str:
+    def edit_file_delete_lines(self, file_path: str, start_line: int, end_line: int, encoding: str = "utf-8") -> dict:
         """Delete lines within a specified range."""
         try:
             logging.info("Deleting lines %s-%s in file: %s", start_line, end_line, file_path)
@@ -459,13 +466,16 @@ class LocalFiles:
             if diff_output:
                 result_msg += f"\n\nDiff:\n{diff_output}"
 
-            return result_msg
+            response_data = {"status": "success", "message": result_msg}
+            if diff_output:
+                response_data["diff"] = diff_output
+            return response_data
 
         except Exception as e:  # pylint: disable=broad-exception-caught
             logging.error("Failed to delete lines from file %s: %s", file_path, e)
             raise e
 
-    def edit_file_insert_lines(self, file_path: str, line_number: int, content: str, encoding: str = "utf-8") -> str:
+    def edit_file_insert_lines(self, file_path: str, line_number: int, content: str, encoding: str = "utf-8") -> dict:
         """Insert content at a specified line number."""
         try:
             logging.info("Inserting content at line %s in file: %s", line_number, file_path)
@@ -514,13 +524,16 @@ class LocalFiles:
             if diff_output:
                 result_msg += f"\n\nDiff:\n{diff_output}"
 
-            return result_msg
+            response_data = {"status": "success", "message": result_msg}
+            if diff_output:
+                response_data["diff"] = diff_output
+            return response_data
 
         except Exception as e:  # pylint: disable=broad-exception-caught
             logging.error("Failed to insert lines in file %s: %s", file_path, e)
             raise e
 
-    def delete_files(self, file_paths: list) -> str:
+    def delete_files(self, file_paths: list) -> dict:
         """Delete multiple files."""
         if not isinstance(file_paths, list):
             raise ValueError("file_paths must be a list")
@@ -565,7 +578,7 @@ class LocalFiles:
 
         logging.info("Successfully deleted all %s file(s)", len(deleted_files))
 
-        return f"Successfully deleted {len(deleted_files)} file(s): {', '.join(deleted_files)}"
+        return {"status": "success", "message": f"Successfully deleted {len(deleted_files)} file(s): {', '.join(deleted_files)}"}
 
     def _validate_move_paths(self, source_paths: list, destination_paths: list):
         if not isinstance(source_paths, list) or not isinstance(destination_paths, list):
@@ -617,7 +630,7 @@ class LocalFiles:
             result = False, f"Error moving file '{source_path}' -> '{dest_path}': {e}"
         return result
 
-    def move_files(self, source_paths: list, destination_paths: list, create_dirs: bool = True) -> str:
+    def move_files(self, source_paths: list, destination_paths: list, create_dirs: bool = True) -> dict:
         """Move/rename files from source paths to destination paths."""
         self._validate_move_paths(source_paths, destination_paths)
 
@@ -645,9 +658,9 @@ class LocalFiles:
 
         logging.info("Successfully moved all %s file(s)", len(moved_files))
         moved_list = [f"{src} -> {dst}" for src, dst in moved_files]
-        return f"Successfully moved {len(moved_files)} file(s): {', '.join(moved_list)}"
+        return {"status": "success", "message": f"Successfully moved {len(moved_files)} file(s): {', '.join(moved_list)}"}
 
-    def create_directory(self, directory_path: str) -> str:
+    def create_directory(self, directory_path: str) -> dict:
         """Create a directory and any necessary parent directories."""
         try:
             validated_path = FileUtils.validate_file_path(directory_path, self.root_dir)
@@ -656,12 +669,12 @@ class LocalFiles:
             if path_obj.exists():
                 if path_obj.is_dir():
                     logging.info("Directory already exists: %s", directory_path)
-                    return f"Directory already exists: '{directory_path}'"
+                    return {"status": "success", "message": f"Directory already exists: '{directory_path}'"}
                 raise ValueError(f"Path exists but is not a directory: '{directory_path}'")
 
             path_obj.mkdir(parents=True, exist_ok=True)
             logging.info("Successfully created directory: %s", directory_path)
-            return f"Successfully created directory: '{directory_path}'"
+            return {"status": "success", "message": f"Successfully created directory: '{directory_path}'"}
 
         except PermissionError as e:
             error_msg = f"Permission denied creating directory: '{directory_path}': {e}"
@@ -674,7 +687,7 @@ class LocalFiles:
             logging.error(error_msg)
             raise Exception(error_msg) from e
 
-    def delete_directory(self, directory_path: str) -> str:
+    def delete_directory(self, directory_path: str) -> dict:
         """Delete a directory and all its contents."""
         try:
             validated_path = FileUtils.validate_file_path(directory_path, self.root_dir)
@@ -691,7 +704,7 @@ class LocalFiles:
 
             shutil.rmtree(validated_path)
             logging.info("Successfully deleted directory: %s", directory_path)
-            return f"Successfully deleted directory '{directory_path}' and all its contents ({item_count} items)"
+            return {"status": "success", "message": f"Successfully deleted directory '{directory_path}' and all its contents ({item_count} items)"}
 
         except PermissionError as e:
             error_msg = f"Permission denied deleting directory: '{directory_path}': {e}"
@@ -761,8 +774,7 @@ class LocalFiles:
                 filtered_args = self._filter_tool_arguments(tool_name, tool_args)
                 result = self.tools[tool_name](**filtered_args)
                 # Convert the result to a human-readable YAML string
-                if isinstance(result, dict):
-                    formatted_result = yaml.dump(result, indent=2, default_flow_style=False) if isinstance(result, dict) else str(result)
+                formatted_result = yaml.dump(result, indent=2, default_flow_style=False) if isinstance(result, dict) else str(result)
 
                 response = {
                     "jsonrpc": "2.0",
@@ -772,7 +784,11 @@ class LocalFiles:
                 self._send_response(response)
             except Exception as e:  # pylint: disable=broad-exception-caught
                 logging.error("Tool execution failed for %s: %s", tool_name, e, exc_info=True)
-                self._send_error(f"Tool '{tool_name}' execution failed: {e}", request_id)
+                # Check if the exception is a ValueError or PermissionError from FileUtils
+                if isinstance(e, ValueError | PermissionError):
+                    self._send_error(f"Tool '{tool_name}' execution failed: {e}", request_id)
+                else:
+                    self._send_error(f"Internal server error during tool '{tool_name}' execution: {e}", request_id)
             return
 
         self._send_error(
@@ -790,12 +806,8 @@ class LocalFiles:
             try:
                 line = sys.stdin.buffer.readline()
                 if not line:
-                    # If no line is received, it means no input is available.
-                    # In a detached process, stdin might not be actively written to.
-                    # We should not break, but rather continue to wait for input.
-                    # Add a small sleep to prevent busy-waiting.
-                    time.sleep(0.1)
-                    continue
+                    logging.info("stdin closed, shutting down server.")
+                    break
 
                 line_str = line.decode("utf-8").strip()
                 if not line_str:

@@ -108,7 +108,7 @@ class MCPServerManager:
             final_env = os.environ.copy()
             project_root = Path(self.cwd).resolve()
             if "PYTHONPATH" in final_env:
-                final_env["PYTHONPATH"] = f"{project_root}{os.pathsep}{final_env["PYTHONPATH"]}"
+                final_env["PYTHONPATH"] = f"{project_root}{os.pathsep}{final_env['PYTHONPATH']}"
             else:
                 final_env["PYTHONPATH"] = str(project_root)
 
@@ -132,7 +132,7 @@ class MCPServerManager:
             logger.error("Error starting MCP server: %s", e)
             raise
 
-    def start_server_for_testing(self, cwd: str, env: dict | None = None):
+    def start_server_for_testing(self, cwd: str, env: dict | None = None, capture_stderr: bool = False):
         """
         Starts the MCP server for testing (not detached).
         Returns the Popen object for direct communication.
@@ -155,11 +155,13 @@ class MCPServerManager:
             # This is necessary for the server script to find its modules
             final_env["PYTHONPATH"] = str(Path(self.server_script_path).parents[4])
 
+            stderr_dest = subprocess.PIPE if capture_stderr else subprocess.DEVNULL
+
             return subprocess.Popen(
                 [sys.executable, "-m", "orchestrator.mcp.servers.localfs.local_file_server"],  # noqa: S603, S607
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
+                stderr=stderr_dest,
                 cwd=self.cwd,
                 creationflags=creation_flags,
                 start_new_session=start_new_session,

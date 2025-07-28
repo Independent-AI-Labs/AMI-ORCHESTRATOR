@@ -14,19 +14,26 @@ class FileUtils:
 
     @staticmethod
     def validate_file_path(file_path: str, root_dir: str) -> str:
-        """Validate and normalize file path for security, confining it to root_dir."""
         try:
-            # Convert to Path object and resolve to absolute path
-            path_obj = Path(file_path).resolve()
-            root_path_obj = Path(root_dir).resolve()
+            # Resolve the root directory to an absolute path
+            root_path = Path(root_dir).resolve()
 
-            # Ensure the resolved path is a child of the root directory
-            if not path_obj.is_relative_to(root_path_obj):
+            # Resolve the provided file path
+            # If the path is absolute, resolve it directly.
+            # If it's relative, resolve it relative to the root_dir.
+            resolved_path = Path(file_path).resolve() if Path(file_path).is_absolute() else (root_path / file_path).resolve()
+
+            # Check if the resolved path is within the root directory
+            if not resolved_path.is_relative_to(root_path):
                 raise ValueError(f"Path '{file_path}' is outside the allowed root directory '{root_dir}'")
 
-            return str(path_obj)
-        except Exception as e:  # pylint: disable=broad-exception-caught
+            return str(resolved_path)
+        except (ValueError, TypeError) as e:
+            # Catch specific, expected errors for better diagnostics
             raise ValueError(f"Invalid file path '{file_path}': {e}") from e
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            # Catch any other unexpected errors during path resolution
+            raise ValueError(f"An unexpected error occurred while resolving path '{file_path}': {e}") from e
 
     @staticmethod
     def check_file_size(file_path: str):
