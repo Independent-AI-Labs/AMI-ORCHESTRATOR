@@ -105,12 +105,29 @@ The Orchestrator project is actively under development, with significant progres
 
 For a detailed breakdown of completed tasks, current progress, and the next steps, please refer to the `DEVELOPMENT_PLAN.md` and `NEXT_STEPS.md` files.
 
-## 9. Linting and Code Quality
+## 9. Code Quality and Pre-Commit Hooks
 
-This project uses `pylint` for code quality and style checking. To ensure consistent results for all developers, the configuration is managed in the `.pylintrc` file at the root of the `orchestrator` directory.
+This project enforces code quality and consistency through a robust pre-commit setup, utilizing `ruff` for linting and formatting, and `mypy` for type checking. This ensures that all code adheres to established standards before it is committed.
 
-### Pylint Configuration
+### Pre-Commit Configuration
 
-The `.pylintrc` file is configured to automatically handle Python path issues that can arise from the project's structure. It uses an `init-hook` to add the `orchestrator` directory to `sys.path` when `pylint` is run.
+The `.pre-commit-config.yaml` file at the root of the `orchestrator` directory defines the hooks that are run automatically before each commit and push. These include:
 
-This ensures that commands like `pylint .` executed from the `orchestrator` directory will correctly resolve all module imports without requiring manual changes to the `PYTHONPATH` environment variable.
+-   **Ruff:** Used for both linting (including security checks) and code formatting, replacing tools like `black`, `isort`, `pylint`, and `bandit`.
+-   **Ruff-format:** Used for code formatting.
+-   **MyPy:** Ensures static type checking for Python code, catching potential type-related errors early in the development cycle.
+-   **MyPy (tests):** Ensures static type checking for Python test code.
+-   **Pytest:** Runs unit and integration tests as a `pre-push` hook to prevent regressions.
+-   **check-yaml:** Checks YAML file syntax.
+-   **check-added-large-files:** Prevents committing large files.
+-   **check-merge-conflict:** Checks for merge conflict strings.
+-   **debug-statements:** Prevents committing files with debug statements.
+
+To ensure all checks are run, install the pre-commit hooks by navigating to the `orchestrator` directory and running:
+
+```bash
+pre-commit install
+pre-commit install --hook-type pre-push
+```
+
+This setup guarantees that code quality is maintained throughout the development process, providing immediate feedback on potential issues.
