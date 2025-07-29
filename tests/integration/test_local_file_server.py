@@ -11,7 +11,6 @@ from pathlib import Path
 from subprocess import Popen
 
 import pytest
-import yaml
 
 from orchestrator.mcp.mcp_server_manager import MCPServerManager
 
@@ -92,26 +91,7 @@ class MCPClient:
 
     def call_tool(self, tool_name: str, **tool_args):
         response = self._send_and_read("tools/call", {"name": tool_name, "arguments": tool_args})
-        raw_result = response["result"]["content"][0]["text"]
-        # For tools that are expected to return structured YAML output, attempt to parse it.
-        # If parsing fails, it indicates an unexpected format, which should be treated as an error.
-        if tool_name in [
-            "write_file",
-            "edit_file_replace_string",
-            "edit_file_replace_lines",
-            "edit_file_delete_lines",
-            "edit_file_insert_lines",
-            "delete_files",
-            "move_files",
-            "create_directory",
-            "delete_directory",
-        ]:
-            try:
-                return yaml.safe_load(raw_result)
-            except yaml.YAMLError as e:
-                raise ValueError(f"Failed to parse YAML output for tool {tool_name}: {raw_result}") from e
-        # For other tools, return the raw string result.
-        return raw_result
+        return response["result"]
 
 
 @pytest.fixture(scope="module")
@@ -206,7 +186,7 @@ def test_mcp_list_tools(client: MCPClient):
 def test_mcp_read_file_text(client: MCPClient, temp_file: str):
     """Tests reading a text file using MCP."""
     result = client.call_tool("read_file", file_path=temp_file, mode="text")
-    assert result == "1: Line 1\n2: Line 2\n3: Line 3\n"  # nosec B101
+    assert result == "Line 1\nLine 2\nLine 3\n"  # nosec B101
 
 
 def test_mcp_read_file_binary(client: MCPClient, temp_binary_file: str):
@@ -220,7 +200,7 @@ def test_mcp_write_file_text(client: MCPClient):
     """Tests writing a text file using MCP."""
     file_path = Path(client.root_dir) / "write_test.txt"
     result = client.call_tool("write_file", file_path=str(file_path), content="New text content.", mode="text")
-    assert "Successfully wrote text content" in result["message"]  # nosec B101
+    assert "Successfully wrote text content" in result  # nosec B101
     assert file_path.read_text() == "New text content."  # nosec B101
 
 
@@ -229,7 +209,7 @@ def test_mcp_write_file_binary(client: MCPClient):
     file_path = Path(client.root_dir) / "write_binary_test.bin"
     content_b64 = base64.b64encode(b"\x0a\x0b\x0c").decode("utf-8")
     result = client.call_tool("write_file", file_path=str(file_path), content=content_b64, mode="binary")
-    assert "Successfully wrote binary content" in result["message"]  # nosec B101
+    assert "Successfully wrote binary content" in result  # nosec B101
     assert file_path.read_bytes() == b"\x0a\x0b\x0c"  # nosec B101
 
 
@@ -244,7 +224,7 @@ def test_mcp_replace_content_text(client: MCPClient, temp_file: str):
         new_string=new_c,
         mode="text",
     )
-    assert "Successfully replaced 1 occurrence(s)" in result["message"]  # nosec B101
+    assert "Successfully replaced 1 occurrence(s)" in result  # nosec B101
 
 
 def test_mcp_read_file_outside_root_error(client: MCPClient, tmp_path: Path):
@@ -331,7 +311,7 @@ def test_mcp_replace_content_binary(client: MCPClient, temp_binary_file: str):
         new_string=base64.b64encode(new_c).decode(),
         mode="binary",
     )
-    assert "Successfully replaced 1 occurrence(s)" in result["message"]  # nosec B101
+    assert "Successfully replaced 1 occurrence(s)" in result  # nosec B101
     with Path(temp_binary_file).open("rb") as f:
         assert f.read() == b"\x00\xff\xfe\x03\x04\x05\x06\x07\x08\x09"  # nosec B101
 
@@ -346,7 +326,7 @@ def test_mcp_replace_lines(client: MCPClient, temp_file: str):
         end_line=3,
         new_string=new_content,
     )
-    assert "Successfully replaced lines 2-3" in result["message"]  # nosec B101
+    assert "Successfully replaced lines 2-3" in result  # nosec B101
     with Path(temp_file).open(encoding="utf-8") as f:
         assert f.read() == "Line 1\nNew line 2\nNew line 3\n"  # nosec B101
 
@@ -360,7 +340,7 @@ def test_mcp_insert_lines(client: MCPClient, temp_file: str):
         line_number=2,
         content=new_content,
     )
-    assert "Successfully inserted content at line" in result["message"]
+    assert "Successfully inserted content at line" in result
     with Path(temp_file).open(encoding="utf-8") as f:
         assert f.read() == "Line 1\nInserted Line\nLine 2\nLine 3\n"
 
@@ -373,7 +353,7 @@ def test_mcp_delete_lines(client: MCPClient, temp_file: str):
         start_line=2,
         end_line=2,
     )
-    assert "Successfully deleted lines 2-2 (1 lines)" in result["message"]
+    assert "Successfully deleted lines 2-2 (1 lines)" in result
     with Path(temp_file).open(encoding="utf-8") as f:
         assert f.read() == "Line 1\nLine 3\n"
 
@@ -391,7 +371,7 @@ def test_mcp_insert_lines_append(client: MCPClient, temp_file: str):
         line_number=num_lines + 1,
         content=new_content,
     )
-    assert "Successfully inserted content at line" in result["message"]
+    assert "Successfully inserted content at line" in result
     with path.open(encoding="utf-8") as f:
         assert f.read() == "Line 1\nLine 2\nLine 3\nAppended Line\n"
 
@@ -401,7 +381,7 @@ def test_mcp_read_file_raw_response_format(client: MCPClient, temp_file: str):
     # The bug fix was to ensure that string results are not dumped as YAML.
     # A direct string result should be returned as is.
     result = client.call_tool("read_file", file_path=temp_file, mode="text")
-    assert result == "1: Line 1\n2: Line 2\n3: Line 3\n"
+    assert result == "Line 1\nLine 2\nLine 3\n"
     # If it were YAML, it might have quotes or document separators.
     assert not result.startswith("'")
     assert not result.endswith("'\n")
@@ -416,7 +396,7 @@ def test_mcp_delete_files(client: MCPClient):
     file2.write_text("content2")
 
     result = client.call_tool("delete_files", file_paths=[str(file1), str(file2)])
-    assert "Successfully deleted 2 file(s)" in result["message"]  # nosec B101
+    assert "Successfully deleted 2 file(s)" in result  # nosec B101
     assert not file1.exists()  # nosec B101
     assert not file2.exists()  # nosec B101
 
@@ -432,7 +412,7 @@ def test_mcp_move_files(client: MCPClient):
         source_paths=[str(source_file)],
         destination_paths=[str(destination_file)],
     )
-    assert "Successfully moved 1 file(s)" in result["message"]  # nosec B101
+    assert "Successfully moved 1 file(s)" in result  # nosec B101
     assert not source_file.exists()  # nosec B101
     assert destination_file.exists()  # nosec B101
     assert destination_file.read_text() == "content"  # nosec B101
@@ -442,7 +422,7 @@ def test_mcp_create_directory(client: MCPClient):
     """Tests creating a directory using MCP."""
     new_dir = Path(client.root_dir) / "new_directory"
     result = client.call_tool("create_directory", directory_path=str(new_dir))
-    assert "Successfully created directory" in result["message"]  # nosec B101
+    assert "Successfully created directory" in result  # nosec B101
     assert new_dir.is_dir()  # nosec B101
 
 
@@ -453,7 +433,7 @@ def test_mcp_delete_directory(client: MCPClient):
     (dir_to_delete / "file.txt").write_text("content")
 
     result = client.call_tool("delete_directory", directory_path=str(dir_to_delete))
-    assert "Successfully deleted directory" in result["message"]  # nosec B101
+    assert "Successfully deleted directory" in result  # nosec B101
     assert not dir_to_delete.exists()  # nosec B101
 
 

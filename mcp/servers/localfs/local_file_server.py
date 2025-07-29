@@ -7,8 +7,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import cast
 
-import yaml
-
 from orchestrator.mcp.servers.localfs.file_utils import FileUtils
 from orchestrator.mcp.servers.localfs.tool_definitions import get_tool_declarations
 
@@ -95,10 +93,7 @@ class LocalFiles:
                 len(content),
                 content.count(chr(10)),
             )
-            # Prepend line numbers for text files
-            lines = content.splitlines(keepends=True)
-            numbered_lines = [f"{i + 1}: {line}" for i, line in enumerate(lines)]
-            return "".join(numbered_lines)
+            return content
 
         except Exception as e:  # pylint: disable=broad-exception-caught
             logging.error("Failed to read file %s: %s", file_path, e)
@@ -115,7 +110,7 @@ class LocalFiles:
         message, diff_output = FileUtils.get_write_success_message_text(file_path, cast(str, content), cast(str | None, original_content))
         return {"message": message, "diff": diff_output}
 
-    def write_file(self, file_path: str, content: str | bytes, mode: str = "text", encoding: str = "utf-8") -> dict:
+    def write_file(self, file_path: str, content: str | bytes, mode: str = "text", encoding: str = "utf-8") -> str:
         """Write content to a file."""
         try:
             logging.info("Writing file: %s (mode: %s, encoding: %s)", file_path, mode, encoding)
@@ -146,10 +141,7 @@ class LocalFiles:
 
             FileUtils.write_file_content(file_path, processed_content, self.root_dir, mode, encoding)
             result_dict = self._get_write_success_message(file_path, processed_content, mode, original_content)
-            response_data = {"status": "success", "message": result_dict["message"]}
-            if result_dict["diff"]:
-                response_data["diff"] = result_dict["diff"]
-            return response_data
+            return result_dict["message"]
 
         except Exception as e:  # pylint: disable=broad-exception-caught
             logging.error("Failed to write file %s: %s", file_path, e)
@@ -163,7 +155,7 @@ class LocalFiles:
         mode: str = "text",
         encoding: str = "utf-8",
         count: int = 0,
-    ) -> dict:
+    ) -> str:
         """Replace occurrences of old_string with new_string in a file."""
         try:
             logging.info(
@@ -206,10 +198,7 @@ class LocalFiles:
             if diff_output:
                 result_msg += f"\n\nDiff:\n{diff_output}"
 
-            response_data = {"status": "success", "message": result_msg}
-            if diff_output:
-                response_data["diff"] = diff_output
-            return response_data
+            return result_msg
         except (ValueError, PermissionError) as e:  # pylint: disable=broad-exception-caught
             logging.error("Failed to replace string in file %s: %s", file_path, e)
             raise e
@@ -224,7 +213,7 @@ class LocalFiles:
         end_line: int,
         new_string: str,
         encoding: str = "utf-8",
-    ) -> dict:
+    ) -> str:
         """Replace content within a specified range of lines."""
         try:
             logging.info("Replacing lines %s-%s in file: %s", start_line, end_line, file_path)
@@ -267,16 +256,13 @@ class LocalFiles:
             if diff_output:
                 result_msg += f"\n\nDiff:\n{diff_output}"
 
-            response_data = {"status": "success", "message": result_msg}
-            if diff_output:
-                response_data["diff"] = diff_output
-            return response_data
+            return result_msg
 
         except Exception as e:  # pylint: disable=broad-exception-caught
             logging.error("Failed to replace lines in file %s: %s", file_path, e)
             raise e
 
-    def edit_file_delete_lines(self, file_path: str, start_line: int, end_line: int, encoding: str = "utf-8") -> dict:
+    def edit_file_delete_lines(self, file_path: str, start_line: int, end_line: int, encoding: str = "utf-8") -> str:
         """Delete lines within a specified range."""
         try:
             logging.info("Deleting lines %s-%s in file: %s", start_line, end_line, file_path)
@@ -314,16 +300,13 @@ class LocalFiles:
             if diff_output:
                 result_msg += f"\n\nDiff:\n{diff_output}"
 
-            response_data = {"status": "success", "message": result_msg}
-            if diff_output:
-                response_data["diff"] = diff_output
-            return response_data
+            return result_msg
 
         except Exception as e:  # pylint: disable=broad-exception-caught
             logging.error("Failed to delete lines from file %s: %s", file_path, e)
             raise e
 
-    def edit_file_insert_lines(self, file_path: str, line_number: int, content: str, encoding: str = "utf-8") -> dict:
+    def edit_file_insert_lines(self, file_path: str, line_number: int, content: str, encoding: str = "utf-8") -> str:
         """Insert content at a specified line number."""
         try:
             logging.info("Inserting content at line %s in file: %s", line_number, file_path)
@@ -359,10 +342,7 @@ class LocalFiles:
             if diff_output:
                 result_msg += f"\n\nDiff:\n{diff_output}"
 
-            response_data = {"status": "success", "message": result_msg}
-            if diff_output:
-                response_data["diff"] = diff_output
-            return response_data
+            return result_msg
 
         except Exception as e:  # pylint: disable=broad-exception-caught
             logging.error("Failed to insert lines in file %s: %s", file_path, e)
@@ -374,7 +354,7 @@ class LocalFiles:
             logging.info("Deleting files: %s", file_paths)
             result = FileUtils.delete_files(file_paths, self.root_dir)
             logging.info("Successfully deleted files: %s", file_paths)
-            return result
+            return result["message"]
         except Exception as e:  # pylint: disable=broad-exception-caught
             logging.error("Failed to delete files %s: %s", file_paths, e)
             raise e
@@ -385,7 +365,7 @@ class LocalFiles:
             logging.info("Moving files: %s to %s", source_paths, destination_paths)
             result = FileUtils.move_files(source_paths, destination_paths, create_dirs, self.root_dir)
             logging.info("Successfully moved files: %s to %s", source_paths, destination_paths)
-            return result
+            return result["message"]
         except Exception as e:  # pylint: disable=broad-exception-caught
             logging.error("Failed to move files %s to %s: %s", source_paths, destination_paths, e)
             raise e
@@ -396,7 +376,7 @@ class LocalFiles:
             logging.info("Creating directory: %s", directory_path)
             result = FileUtils.create_directory(directory_path, self.root_dir)
             logging.info("Successfully created directory: %s", directory_path)
-            return result
+            return result["message"]
         except Exception as e:  # pylint: disable=broad-exception-caught
             logging.error("Failed to create directory %s: %s", directory_path, e)
             raise e
@@ -407,19 +387,9 @@ class LocalFiles:
             logging.info("Deleting directory: %s", directory_path)
             result = FileUtils.delete_directory(directory_path, self.root_dir)
             logging.info("Successfully deleted directory: %s", directory_path)
-            return result
+            return result["message"]
         except Exception as e:  # pylint: disable=broad-exception-caught
             logging.error("Failed to delete directory %s: %s", directory_path, e)
-            raise e
-
-        try:
-            logging.info("Creating directory: %s", directory_path)
-            result = FileUtils.create_directory(directory_path, self.root_dir)
-            logging.info("Successfully created directory: %s", directory_path)
-            return result
-        except Exception as e:  # pylint: disable=broad-exception-caught
-            logging.error("Failed to create directory %s: %s", directory_path, e)
-            raise e
             raise e
 
     def _handle_request(self, line_str):
@@ -478,11 +448,9 @@ class LocalFiles:
                 filtered_args = self._filter_tool_arguments(tool_name, tool_args)
                 result = self.tools[tool_name](**filtered_args)
                 # Convert the result to a human-readable YAML string
-                formatted_result = yaml.dump(result, indent=2, default_flow_style=False) if isinstance(result, dict) else str(result)
-
                 response = {
                     "jsonrpc": "2.0",
-                    "result": {"content": [{"type": "text", "text": formatted_result}]},
+                    "result": {"content": [{"type": "text", "text": str(result)}]},
                     "id": request_id,
                 }
                 self._send_response(response)
