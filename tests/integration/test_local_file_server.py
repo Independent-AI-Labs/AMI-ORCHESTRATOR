@@ -123,7 +123,7 @@ def client(tmp_path_factory) -> Generator[MCPClient, None, None]:
     process = None
     try:
         manager.stop_server()
-        process = manager.start_server_for_testing(cwd=str(test_root_dir))
+        process = manager.start_server_for_testing(cwd=str(test_root_dir), capture_stderr=True)
         time.sleep(1)
         if process.poll() is not None:
             stderr_output = process.stderr.read().decode(errors="ignore")
@@ -360,7 +360,7 @@ def test_mcp_insert_lines(client: MCPClient, temp_file: str):
         line_number=2,
         content=new_content,
     )
-    assert "Successfully inserted 1 line(s)" in result["message"]
+    assert "Successfully inserted content at line" in result["message"]
     with Path(temp_file).open(encoding="utf-8") as f:
         assert f.read() == "Line 1\nInserted Line\nLine 2\nLine 3\n"
 
@@ -391,7 +391,7 @@ def test_mcp_insert_lines_append(client: MCPClient, temp_file: str):
         line_number=num_lines + 1,
         content=new_content,
     )
-    assert "Successfully inserted 1 line(s)" in result["message"]
+    assert "Successfully inserted content at line" in result["message"]
     with path.open(encoding="utf-8") as f:
         assert f.read() == "Line 1\nLine 2\nLine 3\nAppended Line\n"
 
@@ -503,7 +503,11 @@ def test_mcp_move_files_error(client: MCPClient):
     target_file = Path(client.root_dir) / "target.txt"
     with pytest.raises(
         MCPError,
-        match=r"Some files could not be moved: Source file not found: .*non_existent.txt",
+        match=(
+            r"Internal server error during tool 'move_files' execution: "
+            "Some files could not be moved: Failed to move '.*' to '.*': "
+            "Source file not found: '.*'"
+        ),
     ):
         client.call_tool(
             "move_files",

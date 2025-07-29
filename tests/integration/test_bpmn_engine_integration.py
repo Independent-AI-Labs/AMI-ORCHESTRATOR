@@ -5,7 +5,7 @@ Integration tests for the BpmnEngine class.
 import unittest
 from pathlib import Path
 
-from tests.base_test import BaseTestCase
+from ..base_test import BaseTestCase
 
 
 class TestBpmnEngineIntegration(BaseTestCase):

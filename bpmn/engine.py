@@ -65,7 +65,7 @@ class BpmnEngine:
         self.process_loader.store_process_definition(process_definition)
 
         # Create a new process instance in Dgraph
-        process_instance_uid = self.dgraph_client.create_process_instance(process_definition)
+        process_instance_uid = self.dgraph_client.create_process_instance()
 
         # This is a placeholder for the actual process execution logic.
         print(f"Starting process: {process_definition['name']}")

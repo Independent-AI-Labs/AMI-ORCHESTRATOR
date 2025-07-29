@@ -6,9 +6,10 @@ from llama_index.llms.openai import OpenAI
 
 from orchestrator.bpmn.models import Resource
 from orchestrator.core.config import Config
+from orchestrator.core.redis_client import RedisClient
 from orchestrator.core.worker_manager import WorkerManager
 
-worker_manager = WorkerManager()
+worker_manager = WorkerManager(RedisClient())
 
 
 # 2. Define tool functions that wrap WorkerManager methods

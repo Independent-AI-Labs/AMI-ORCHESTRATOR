@@ -2,7 +2,6 @@ import argparse
 import base64
 import json
 import logging
-import shutil
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -105,68 +104,15 @@ class LocalFiles:
             logging.error("Failed to read file %s: %s", file_path, e)
             raise e
 
-    def _validate_and_decode_content(self, content: str | bytes, mode: str) -> str | bytes:
-        """Validates and decodes content based on mode."""
-        if content is None:
-            raise ValueError("content cannot be None")
-
-        if mode == "binary":
-            if isinstance(content, str):
-                try:
-                    decoded_content = base64.b64decode(content.encode("utf-8"))
-                    logging.info("Decoded base64 content: %s bytes", len(decoded_content))
-                    return decoded_content
-                except (TypeError, ValueError) as e:
-                    raise ValueError(f"Invalid base64 content for binary mode: {e}") from e
-            elif isinstance(content, bytes):
-                return content
-            else:
-                raise ValueError("Binary mode requires base64-encoded string or bytes content")
-        elif mode == "text":
-            if isinstance(content, bytes):
-                try:
-                    return content.decode("utf-8")
-                except UnicodeDecodeError as e:
-                    raise ValueError(f"Cannot decode bytes to string in text mode: {e}") from e
-            elif isinstance(content, str):
-                return content
-            else:
-                raise ValueError("Text mode requires string or bytes content")
-        else:
-            raise ValueError("Mode must be 'text' or 'binary'")
-
-    def _get_write_success_message_binary(self, file_path: str, content: bytes) -> str:
-        """Generates the success message for binary file writes."""
-        content_bytes: bytes = content
-        content_size = len(content_bytes)
-        logging.info(
-            "Successfully wrote binary file: %s (%s bytes)",
-            file_path,
-            content_size,
-        )
-        return f"Successfully wrote binary content to '{file_path}' ({content_size} bytes)."
-
-    def _get_write_success_message_text(self, file_path: str, content: str, original_content: str | None) -> tuple[str, str | None]:
-        """Generates the success message and diff for text file writes."""
-        diff_output: str | None = None
-        if original_content is not None:
-            diff_output = FileUtils.generate_diff(original_content, content, file_path)
-
-        line_count = content.count("\n") + 1
-        char_count = len(content)
-
-        message = f"Successfully wrote text content to '{file_path}' ({char_count} characters, {line_count} lines)."
-        return message, diff_output
-
     def _get_write_success_message(self, file_path: str, content: str | bytes, mode: str, original_content: str | bytes | None) -> dict:
         """Generates the success message for write_file, dispatching to specific handlers."""
         if mode == "binary":
             # MyPy knows content is bytes here due to the mode check
-            message = self._get_write_success_message_binary(file_path, cast(bytes, content))
+            message = FileUtils.get_write_success_message_binary(file_path, cast(bytes, content))
             return {"message": message, "diff": None}
         # MyPy knows content is str here due to the mode check
         # MyPy knows original_content is str | None here
-        message, diff_output = self._get_write_success_message_text(file_path, cast(str, content), cast(str | None, original_content))
+        message, diff_output = FileUtils.get_write_success_message_text(file_path, cast(str, content), cast(str | None, original_content))
         return {"message": message, "diff": diff_output}
 
     def write_file(self, file_path: str, content: str | bytes, mode: str = "text", encoding: str = "utf-8") -> dict:
@@ -177,7 +123,7 @@ class LocalFiles:
             if not file_path:
                 raise ValueError("file_path cannot be empty")
 
-            processed_content_raw = self._validate_and_decode_content(content, mode)
+            processed_content_raw = FileUtils.validate_and_decode_content(content, mode)
             processed_content: str | bytes
 
             if mode == "binary":
@@ -209,88 +155,6 @@ class LocalFiles:
             logging.error("Failed to write file %s: %s", file_path, e)
             raise e
 
-    def _process_text_replacement(self, file_path: str, current_content: str, old_string: str, new_string: str, count: int) -> tuple[str, int]:
-        """Handles text mode string replacement logic."""
-        if not isinstance(old_string, str) or not isinstance(new_string, str):
-            raise ValueError("old_string and new_string must be strings in text mode")
-
-        if not old_string:
-            raise ValueError("old_string cannot be empty - this would insert new_string between every character")
-
-        old_string_normalized = FileUtils.normalize_line_endings(old_string, "\n")
-        new_string_normalized = FileUtils.normalize_line_endings(new_string, "\n")
-
-        occurrence_count = current_content.count(old_string_normalized)
-        if occurrence_count == 0:
-            logging.info("No occurrences found of search string in %s", file_path)
-            return "No changes made to '{file_path}': search string not found.", 0
-
-        if count == 0:
-            new_content = current_content.replace(old_string_normalized, new_string_normalized)
-            actual_replacements = current_content.count(old_string_normalized)
-        else:
-            new_content = current_content.replace(old_string_normalized, new_string_normalized, count)
-            actual_replacements = count
-
-        return new_content, actual_replacements
-
-    def _process_binary_replacement(self, file_path: str, current_content: bytes, old_string: bytes, new_string: bytes, count: int) -> tuple[bytes, int]:
-        """Handles binary mode string replacement logic."""
-        if not isinstance(old_string, bytes) or not isinstance(new_string, bytes):
-            raise ValueError("old_string and new_string must be bytes in binary mode")
-
-        if not old_string:
-            raise ValueError("old_string cannot be empty - this would insert new_string between every byte")
-
-        occurrence_count = current_content.count(old_string)
-        if occurrence_count == 0:
-            logging.info("No occurrences found of search bytes in %s", file_path)
-            return b"No changes made to '{file_path}': search bytes not found.", 0
-
-        if count == 0:
-            new_content = current_content.replace(old_string, new_string)
-            actual_replacements = current_content.count(old_string)
-        else:
-            new_content = current_content.replace(old_string, new_string, count)
-            actual_replacements = count
-
-        return new_content, actual_replacements
-
-    def _handle_no_replacements(self, file_path: str) -> dict:
-        logging.info(
-            "No changes made to %s - search string not found or no replacements occurred",
-            file_path,
-        )
-        return {"status": "success", "message": f"No changes made to '{file_path}': search string not found or no replacements occurred."}
-
-    def _handle_identical_content(self, file_path: str) -> dict:
-        logging.info(
-            "No changes made to %s - content identical after replacement",
-            file_path,
-        )
-        return {"status": "success", "message": f"No changes made to '{file_path}': replacement resulted in identical content."}
-
-    def _read_file_content(self, file_path: str, mode: str, encoding: str) -> str | bytes:
-        return FileUtils.read_file_content(file_path, self.root_dir, mode, encoding)
-
-    def _perform_replacement(
-        self, file_path: str, original_content: str | bytes, old_string: str | bytes, new_string: str | bytes, mode: str, count: int
-    ) -> tuple[str | bytes, int]:
-        if mode == "binary":
-            if not isinstance(original_content, bytes):
-                raise TypeError("Original content must be bytes in binary mode")
-            try:
-                old_bytes = base64.b64decode(cast(str, old_string).encode("utf-8"))
-                new_bytes = base64.b64decode(cast(str, new_string).encode("utf-8"))
-            except (TypeError, ValueError) as e:
-                raise ValueError(f"Invalid base64 content for binary mode: {e}") from e
-            return self._process_binary_replacement(file_path, original_content, old_bytes, new_bytes, count)
-        if mode == "text":
-            if not isinstance(original_content, str):
-                raise TypeError("Original content must be string in text mode")
-            return self._process_text_replacement(file_path, original_content, cast(str, old_string), cast(str, new_string), count)
-        raise ValueError("Mode must be 'text' or 'binary'")
-
     def edit_file_replace_string(
         self,
         file_path: str,
@@ -308,21 +172,21 @@ class LocalFiles:
                 mode,
                 count,
             )
-            original_content = self._read_file_content(file_path, mode, encoding)
+            original_content = FileUtils.read_file_content(file_path, self.root_dir, mode, encoding)
             new_content: str | bytes
             actual_replacements: int
 
-            new_content, actual_replacements = self._perform_replacement(file_path, original_content, old_string, new_string, mode, count)
+            new_content, actual_replacements = FileUtils.perform_replacement(original_content, old_string, new_string, mode, count)
 
             if actual_replacements == 0:
                 logging.info(
                     "No changes made to %s - search string not found or no replacements occurred",
                     file_path,
                 )
-                return self._handle_no_replacements(file_path)
+                return FileUtils.handle_no_replacements(file_path)
 
             if new_content == original_content:
-                return self._handle_identical_content(file_path)
+                return FileUtils.handle_identical_content(file_path)
 
             FileUtils.write_file_content(file_path, new_content, self.root_dir, mode, encoding)
 
@@ -382,17 +246,7 @@ class LocalFiles:
             if end_line > total_lines + 1:  # Allow replacing at end of file
                 raise ValueError(f"End line {end_line} exceeds file length ({total_lines} lines)")
 
-            # Convert to 0-based indexing
-            start_idx = start_line - 1
-            end_idx = end_line
-
-            # Normalize the new string's line endings and split
-            new_string_normalized = FileUtils.normalize_line_endings(new_string, "\n")
-            new_lines = new_string_normalized.splitlines(keepends=True)
-
-            # Perform replacement
-            modified_lines = lines[:start_idx] + new_lines + lines[end_idx:]
-            new_content = "".join(modified_lines)
+            new_content = FileUtils.replace_lines(original_content, start_line, end_line, new_string)
 
             FileUtils.write_file_content(file_path, new_content, self.root_dir, "text", encoding)
 
@@ -400,7 +254,7 @@ class LocalFiles:
             diff_output = FileUtils.generate_diff(original_content, new_content, file_path)
 
             replaced_lines = end_line - start_line + 1
-            new_line_count = len(new_lines)
+            new_line_count = len(new_content.splitlines(keepends=True))
 
             logging.info(
                 "Successfully replaced %s lines with %s lines in %s",
@@ -444,13 +298,7 @@ class LocalFiles:
             if end_line > total_lines + 1:  # Allow deleting from end of file
                 raise ValueError(f"End line {end_line} exceeds file length ({total_lines} lines)")
 
-            # Convert to 0-based indexing
-            start_idx = start_line - 1
-            end_idx = end_line
-
-            # Delete the specified lines by keeping everything before and after
-            modified_lines = lines[:start_idx] + lines[end_idx:]
-            new_content = "".join(modified_lines)
+            new_content = FileUtils.delete_lines(original_content, start_line, end_line)
 
             FileUtils.write_file_content(file_path, new_content, self.root_dir, "text", encoding)
 
@@ -458,7 +306,7 @@ class LocalFiles:
             diff_output = FileUtils.generate_diff(original_content, new_content, file_path)
 
             deleted_lines = end_line - start_line + 1
-            remaining_lines = len(modified_lines)
+            remaining_lines = len(new_content.splitlines(keepends=True))
 
             logging.info("Successfully deleted %s lines from %s", deleted_lines, file_path)
 
@@ -491,27 +339,14 @@ class LocalFiles:
             if line_number > total_lines + 1:  # Allow inserting at line_number = total_lines + 1 (append to end)
                 raise ValueError(f"Line number {line_number} exceeds file length + 1 ({total_lines + 1})")
 
-            # Normalize the content's line endings and split
-            content_normalized = FileUtils.normalize_line_endings(content, "\n")
-            insert_lines = content_normalized.splitlines(keepends=False)
-
-            # Re-add newlines for joining
-            insert_lines_with_ends = [line + "\n" for line in insert_lines]
-
-            # Convert to 0-based indexing for insertion
-            insert_idx = line_number - 1
-
-            # Insert the new lines
-            modified_lines = lines[:insert_idx] + insert_lines_with_ends + lines[insert_idx:]
-            new_content = "".join(modified_lines)
+            new_content = FileUtils.insert_lines(original_content, line_number, content)
 
             FileUtils.write_file_content(file_path, new_content, self.root_dir, "text", encoding)
 
             # Generate diff
             diff_output = FileUtils.generate_diff(original_content, new_content, file_path)
 
-            inserted_line_count = len(insert_lines)
-            new_total_lines = len(modified_lines)
+            inserted_line_count = len(new_content.splitlines(keepends=True)) - len(original_content.splitlines(keepends=True)) + (line_number - 1)
 
             logging.info(
                 "Successfully inserted %s lines at line %s in %s",
@@ -520,7 +355,7 @@ class LocalFiles:
                 file_path,
             )
 
-            result_msg = f"Successfully inserted {inserted_line_count} line(s) at line {line_number} in '{file_path}'. File now has {new_total_lines} lines."
+            result_msg = f"Successfully inserted content at line {line_number} in '{file_path}'."
             if diff_output:
                 result_msg += f"\n\nDiff:\n{diff_output}"
 
@@ -535,187 +370,57 @@ class LocalFiles:
 
     def delete_files(self, file_paths: list) -> dict:
         """Delete multiple files."""
-        if not isinstance(file_paths, list):
-            raise ValueError("file_paths must be a list")
-
-        if not file_paths:
-            raise ValueError("file_paths list cannot be empty")
-
-        deleted_files = []
-        errors = []
-
-        logging.info("Attempting to delete %s file(s)", len(file_paths))
-
-        for file_path in file_paths:
-            try:
-                validated_path = FileUtils.validate_file_path(file_path, self.root_dir)
-                path_obj = Path(validated_path)
-
-                if not path_obj.exists():
-                    errors.append(f"File not found: '{file_path}'")
-                    continue
-
-                if not path_obj.is_file():
-                    errors.append(f"Path is not a file: '{file_path}'")
-                    continue
-
-                path_obj.unlink()
-                deleted_files.append(file_path)
-                logging.info("Successfully deleted file: %s", file_path)
-
-            except PermissionError as e:
-                errors.append(f"Permission denied deleting file: '{file_path}': {e}")
-            except Exception as e:  # pylint: disable=broad-exception-caught
-                errors.append(f"Error deleting file '{file_path}': {e}")
-
-        if errors:
-            error_msg = f"Some files could not be deleted: {'; '.join(errors)}"
-            if deleted_files:
-                error_msg += f". Successfully deleted: {', '.join(deleted_files)}"
-
-            logging.error(error_msg)
-            raise Exception(error_msg) from None  # pylint: disable=raise-missing-from
-
-        logging.info("Successfully deleted all %s file(s)", len(deleted_files))
-
-        return {"status": "success", "message": f"Successfully deleted {len(deleted_files)} file(s): {', '.join(deleted_files)}"}
-
-    def _validate_move_paths(self, source_paths: list, destination_paths: list):
-        if not isinstance(source_paths, list) or not isinstance(destination_paths, list):
-            raise ValueError("source_paths and destination_paths must be lists")
-        if not source_paths or not destination_paths:
-            raise ValueError("source_paths and destination_paths lists cannot be empty")
-        if len(source_paths) != len(destination_paths):
-            raise ValueError(f"Number of source paths ({len(source_paths)}) must match destination paths ({len(destination_paths)})")
-
-    def _handle_destination_directory(self, dest_path_obj: Path, create_dirs: bool, source_path: str) -> str | None:
-        dest_dir = dest_path_obj.parent
-        if dest_dir and not dest_dir.exists():
-            if create_dirs:
-                try:
-                    dest_dir.mkdir(parents=True, exist_ok=True)
-                    logging.info("Created destination directory: %s", dest_dir)
-                except Exception as e:  # pylint: disable=broad-exception-caught
-                    return f"Failed to create destination directory '{dest_dir}' for '{source_path}': {e}"
-            else:
-                return f"Destination directory does not exist: '{dest_dir}' for '{source_path}'"
-        return None
-
-    def _perform_single_file_move(self, source_path: str, dest_path: str, create_dirs: bool) -> tuple[bool, str | None]:
-        result: tuple[bool, str | None] = (False, None)
         try:
-            validated_source = FileUtils.validate_file_path(source_path, self.root_dir)
-            validated_dest = FileUtils.validate_file_path(dest_path, self.root_dir)
-
-            source_path_obj = Path(validated_source)
-            if not source_path_obj.exists():
-                result = False, f"Source file not found: '{source_path}'"
-            elif not source_path_obj.is_file():
-                result = False, f"Source path is not a file: '{source_path}'"
-            else:
-                dest_path_obj = Path(validated_dest)
-                dir_error = self._handle_destination_directory(dest_path_obj, create_dirs, source_path)
-                if dir_error:
-                    result = False, dir_error
-                elif dest_path_obj.exists():
-                    result = False, f"Destination already exists: '{dest_path}' for source '{source_path}'"
-                else:
-                    file_size = source_path_obj.stat().st_size if source_path_obj.exists() else 0
-                    shutil.move(validated_source, validated_dest)
-                    logging.info("Successfully moved file: %s -> %s (%s bytes)", source_path, dest_path, file_size)
-                    result = True, None
-        except PermissionError as e:
-            result = False, f"Permission denied moving file: '{source_path}' -> '{dest_path}': {e}"
+            logging.info("Deleting files: %s", file_paths)
+            result = FileUtils.delete_files(file_paths, self.root_dir)
+            logging.info("Successfully deleted files: %s", file_paths)
+            return result
         except Exception as e:  # pylint: disable=broad-exception-caught
-            result = False, f"Error moving file '{source_path}' -> '{dest_path}': {e}"
-        return result
+            logging.error("Failed to delete files %s: %s", file_paths, e)
+            raise e
 
     def move_files(self, source_paths: list, destination_paths: list, create_dirs: bool = True) -> dict:
         """Move/rename files from source paths to destination paths."""
-        self._validate_move_paths(source_paths, destination_paths)
-
-        moved_files = []
-        errors = []
-
-        logging.info("Attempting to move %s file(s)", len(source_paths))
-
-        for source_path, dest_path in zip(source_paths, destination_paths, strict=False):
-            success, error_msg = self._perform_single_file_move(source_path, dest_path, create_dirs)
-            if success:
-                moved_files.append((source_path, dest_path))
-            else:
-                errors.append(error_msg)
-
-        if errors:
-            # Filter out None values before joining
-            filtered_errors = [err for err in errors if err is not None]
-            error_msg = f"Some files could not be moved: {'; '.join(filtered_errors)}"
-            if moved_files:
-                moved_list = [f"{src} -> {dst}" for src, dst in moved_files]
-                error_msg += f". Successfully moved: {', '.join(moved_list)}"
-            logging.error(error_msg)
-            raise Exception(error_msg) from None
-
-        logging.info("Successfully moved all %s file(s)", len(moved_files))
-        moved_list = [f"{src} -> {dst}" for src, dst in moved_files]
-        return {"status": "success", "message": f"Successfully moved {len(moved_files)} file(s): {', '.join(moved_list)}"}
+        try:
+            logging.info("Moving files: %s to %s", source_paths, destination_paths)
+            result = FileUtils.move_files(source_paths, destination_paths, create_dirs, self.root_dir)
+            logging.info("Successfully moved files: %s to %s", source_paths, destination_paths)
+            return result
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            logging.error("Failed to move files %s to %s: %s", source_paths, destination_paths, e)
+            raise e
 
     def create_directory(self, directory_path: str) -> dict:
         """Create a directory and any necessary parent directories."""
         try:
-            validated_path = FileUtils.validate_file_path(directory_path, self.root_dir)
-            path_obj = Path(validated_path)
-
-            if path_obj.exists():
-                if path_obj.is_dir():
-                    logging.info("Directory already exists: %s", directory_path)
-                    return {"status": "success", "message": f"Directory already exists: '{directory_path}'"}
-                raise ValueError(f"Path exists but is not a directory: '{directory_path}'")
-
-            path_obj.mkdir(parents=True, exist_ok=True)
+            logging.info("Creating directory: %s", directory_path)
+            result = FileUtils.create_directory(directory_path, self.root_dir)
             logging.info("Successfully created directory: %s", directory_path)
-            return {"status": "success", "message": f"Successfully created directory: '{directory_path}'"}
-
-        except PermissionError as e:
-            error_msg = f"Permission denied creating directory: '{directory_path}': {e}"
-            logging.error(error_msg)
-            raise PermissionError(error_msg) from e
-        except ValueError as e:
-            raise e
+            return result
         except Exception as e:  # pylint: disable=broad-exception-caught
-            error_msg = f"Failed to create directory '{directory_path}': {e}"
-            logging.error(error_msg)
-            raise Exception(error_msg) from e
+            logging.error("Failed to create directory %s: %s", directory_path, e)
+            raise e
 
     def delete_directory(self, directory_path: str) -> dict:
         """Delete a directory and all its contents."""
         try:
-            validated_path = FileUtils.validate_file_path(directory_path, self.root_dir)
-            path_obj = Path(validated_path)
-
-            if not path_obj.exists():
-                raise FileNotFoundError(f"Directory not found: '{directory_path}'")
-
-            if not path_obj.is_dir():
-                raise ValueError(f"Path is not a directory: '{directory_path}'")
-
-            # Count items before deletion for informative message
-            item_count = sum(1 for _ in path_obj.rglob("*")) + 1  # +1 for the directory itself
-
-            shutil.rmtree(validated_path)
+            logging.info("Deleting directory: %s", directory_path)
+            result = FileUtils.delete_directory(directory_path, self.root_dir)
             logging.info("Successfully deleted directory: %s", directory_path)
-            return {"status": "success", "message": f"Successfully deleted directory '{directory_path}' and all its contents ({item_count} items)"}
-
-        except PermissionError as e:
-            error_msg = f"Permission denied deleting directory: '{directory_path}': {e}"
-            logging.error(error_msg)
-            raise PermissionError(error_msg) from e
-        except ValueError as e:
-            raise e
+            return result
         except Exception as e:  # pylint: disable=broad-exception-caught
-            error_msg = f"Failed to delete directory '{directory_path}': {e}"
-            logging.error(error_msg)
-            raise Exception(error_msg) from e
+            logging.error("Failed to delete directory %s: %s", directory_path, e)
+            raise e
+
+        try:
+            logging.info("Creating directory: %s", directory_path)
+            result = FileUtils.create_directory(directory_path, self.root_dir)
+            logging.info("Successfully created directory: %s", directory_path)
+            return result
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            logging.error("Failed to create directory %s: %s", directory_path, e)
+            raise e
+            raise e
 
     def _handle_request(self, line_str):
         """Handle a single JSON-RPC request."""
@@ -741,7 +446,6 @@ class LocalFiles:
             }
             self._send_response(response)
             return
-
         if method == "notifications/initialized":
             logging.info("Client initialization complete")
             print("INITIALIZED_NOTIFICATION_SENT_DEBUG_MESSAGE")
