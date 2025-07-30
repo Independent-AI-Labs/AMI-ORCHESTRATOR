@@ -175,24 +175,27 @@ def test_mcp_list_tools(client: MCPClient):
     tools = client.list_tools()
     assert isinstance(tools, list)
     assert len(tools) > 0
-    assert any(tool["name"] == "read_file" for tool in tools)
+    assert any(tool["name"] == "read_from_file" for tool in tools)
 
+    # Create the test directory structure and files
+    test_dir = client.root_dir / "test_dir"
+    test_dir.mkdir(parents=True, exist_ok=True)
 
-def test_mcp_list_dir(client: MCPClient):
-    """Tests the list_dir MCP command."""
-    (client.root_dir / "test_dir").mkdir()
-    (client.root_dir / "test_dir" / "file1.txt").touch()
-    (client.root_dir / "test_dir" / "file2.txt").touch()
-    (client.root_dir / "test_dir" / "subdir").mkdir()
+    # Create the subdirectory
+    (test_dir / "subdir").mkdir(parents=True, exist_ok=True)
 
-    result = client.call_tool("list_dir", path=str(client.root_dir / "test_dir"))
+    # Create the expected files
+    (test_dir / "file1.txt").touch()
+    (test_dir / "file2.txt").touch()
+
+    result = client.call_tool("list_dir", path=str(test_dir))
     # The output is now a formatted string representing a tree
     expected_output = "\n".join(["├───subdir", "├───file1.txt", "└───file2.txt"])
     assert result["content"][0]["text"] == expected_output
 
     # Testing recursive listing
-    (client.root_dir / "test_dir" / "subdir" / "subfile.txt").touch()
-    result = client.call_tool("list_dir", path=str(client.root_dir / "test_dir"), recursive=True)
+    (test_dir / "subdir" / "subfile.txt").touch()
+    result = client.call_tool("list_dir", path=str(test_dir), recursive=True)
     expected_recursive_output = "\n".join(
         [
             "├───subdir",
@@ -232,32 +235,32 @@ def test_mcp_find_paths(client: MCPClient):
     assert {Path(p).name for p in file_list} == {"file_a.txt", "file_c.txt"}
 
 
-def test_mcp_read_file_text(client: MCPClient, temp_file: str):
+def test_mcp_read_from_file_text(client: MCPClient, temp_file: str):
     """Tests reading a text file using MCP."""
-    result = client.call_tool("read_file", path=temp_file)
+    result = client.call_tool("read_from_file", path=temp_file)
     assert result["content"][0]["text"] == "   1 | Line 1\n   2 | Line 2\n   3 | Line 3"
 
 
-def test_mcp_read_file_binary(client: MCPClient, temp_binary_file: str):
+def test_mcp_read_from_file_binary(client: MCPClient, temp_binary_file: str):
     """Tests reading a binary file using MCP."""
-    result = client.call_tool("read_file", path=temp_binary_file)
+    result = client.call_tool("read_from_file", path=temp_binary_file)
     expected_content_b64 = base64.b64encode(b"\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09").decode("utf-8")
     assert result["content"][0]["text"] == expected_content_b64
 
 
-def test_mcp_write_file_text(client: MCPClient):
+def test_mcp_write_to_file_text(client: MCPClient):
     """Tests writing a text file using MCP."""
     file_path = Path(client.root_dir) / "write_test.txt"
-    result = client.call_tool("write_file", path=str(file_path), new_content="New text content.", mode="text")
+    result = client.call_tool("write_to_file", path=str(file_path), new_content="New text content.", mode="text")
     assert "Successfully wrote text content" in result["content"][0]["text"]
     assert file_path.read_text() == "New text content."
 
 
-def test_mcp_write_file_binary(client: MCPClient):
+def test_mcp_write_to_file_binary(client: MCPClient):
     """Tests writing a binary file using MCP."""
     file_path = Path(client.root_dir) / "write_binary_test.bin"
     content_b64 = base64.b64encode(b"\x0a\x0b\x0c").decode("utf-8")
-    result = client.call_tool("write_file", path=str(file_path), new_content=content_b64, mode="binary")
+    result = client.call_tool("write_to_file", path=str(file_path), new_content=content_b64, mode="binary")
     assert "Successfully wrote binary content" in result["content"][0]["text"]
     assert file_path.read_bytes() == b"\x0a\x0b\x0c"
 
@@ -310,18 +313,18 @@ def test_mcp_modify_file_binary(client: MCPClient, temp_binary_file: str):
 # --- Error handling tests ---
 
 
-def test_mcp_read_file_not_found_error(client: MCPClient):
-    """Tests read_file error for non-existent file."""
+def test_mcp_read_from_file_not_found_error(client: MCPClient):
+    """Tests read_from_file error for non-existent file."""
     non_existent_file = Path(client.root_dir) / "non_existent.txt"
     with pytest.raises(MCPError, match=r"File not found: .*non_existent.txt"):
-        client.call_tool("read_file", path=str(non_existent_file))
+        client.call_tool("read_from_file", path=str(non_existent_file))
 
 
-def test_mcp_write_file_permission_error(client: MCPClient, read_only_dir: Path):
-    """Tests write_file error for permission denied."""
+def test_mcp_write_to_file_permission_error(client: MCPClient, read_only_dir: Path):
+    """Tests write_to_file error for permission denied."""
     read_only_path = read_only_dir / "test.txt"
     with pytest.raises(MCPError, match=r"Permission denied"):
-        client.call_tool("write_file", path=str(read_only_path), new_content="some content")
+        client.call_tool("write_to_file", path=str(read_only_path), new_content="some content")
 
 
 def test_mcp_delete_paths_error(client: MCPClient):

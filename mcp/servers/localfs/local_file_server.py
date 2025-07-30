@@ -72,7 +72,7 @@ class LocalFiles:
 
         return filtered_args
 
-    def read_file(self, path: str, start_offset_inclusive: int = 0, end_offset_inclusive: int = -1, offset_type: str = "BYTE") -> str:
+    def read_from_file(self, path: str, start_offset_inclusive: int = 0, end_offset_inclusive: int = -1, offset_type: str = "BYTE") -> str:
         """Read content from a file with offset support."""
         try:
             offset_type_enum = OffsetType[offset_type.upper()]
@@ -102,7 +102,7 @@ class LocalFiles:
         message, diff_output = FileUtils.get_write_success_message_text(file_path, cast(str, content), cast(str | None, original_content))
         return {"message": message, "diff": diff_output}
 
-    def write_file(self, path: str, new_content: str | bytes, mode: str = "text", encoding: str = "utf-8") -> str:
+    def write_to_file(self, path: str, new_content: str | bytes, mode: str = "text", encoding: str = "utf-8") -> str:
         """Write content to a file."""
         try:
             logging.info("Writing file: %s (mode: %s, encoding: %s)", path, mode, encoding)

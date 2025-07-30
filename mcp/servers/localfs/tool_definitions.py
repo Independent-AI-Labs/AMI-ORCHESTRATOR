@@ -66,7 +66,7 @@ def get_tool_declarations():
             },
         },
         {
-            "name": "read_file",
+            "name": "read_from_file",
             "description": "Reads file content with support for offsets, various file types (text, binary, image), and line numbering for text files.",
             "inputSchema": {
                 "type": "object",
@@ -96,7 +96,7 @@ def get_tool_declarations():
             },
         },
         {
-            "name": "write_file",
+            "name": "write_to_file",
             "description": "Writes content to a file, creating parent directories if needed. Supports text/binary modes; generates diffs for text.",
             "inputSchema": {
                 "type": "object",
