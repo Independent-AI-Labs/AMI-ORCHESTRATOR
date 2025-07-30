@@ -73,13 +73,13 @@ This plan breaks down the development into logical phases, starting with a solid
     *   **Pydantic BPMN Models:** A comprehensive set of Pydantic models for BPMN 2.0 has been defined in `orchestrator/bpmn/models.py`.
     *   **Dgraph Schema Generator:** A script at `orchestrator/core/schema_generator.py` automatically generates the Dgraph schema from the Pydantic models.
     *   **Automated Schema Application:** The `apply_schema.py` script now integrates the schema generator, ensuring the Dgraph schema is always in sync with the models.
-    *   Dgraph Client: Basic client implemented, but `create_process_instance` and `create_human_task` are placeholders.
-    *   Redis Setup: Client implemented for messaging and dead-letter queue.
-    *   Security Kernel: `SecurityManager` exists, but authentication and authorization logic is not fully implemented.
-    *   Initial Orchestrator Service: `main.py` now uses a `llama_index` ReActAgent for interaction, replacing the initial FastAPI setup.
+    *   **Dgraph Client:** Basic client implemented, but `create_process_instance` and `create_human_task` are placeholders.
+    *   **Redis Setup:** Client implemented for messaging and dead-letter queue.
+    *   **Security Kernel:** `SecurityManager` exists, but authentication and authorization logic is not fully implemented.
+    *   **Initial Orchestrator Service:** `main.py` now uses a `llama_index` ReActAgent for interaction, replacing the initial FastAPI setup.
 *   **Tasks to Complete:**
-    1.  **Dgraph Persistence:** Fully implement `create_process_instance` and `create_human_task` in `DgraphClient` using the new Pydantic models to ensure proper process and human task persistence.
-    2.  **Process Definition Storage:** Implement `store_process_definition` in `ProcessLoader` to persistently store BPMN definitions in Dgraph, using the Pydantic models as the data contract.
+    1.  **Dgraph Persistence:** Fully implement `create_process_instance` and `create_human_task` in `orchestrator/core/dgraph_client.py` using the new Pydantic models to ensure proper process and human task persistence.
+    2.  **Process Definition Storage:** Implement `store_process_definition` in `orchestrator/bpmn/process_loader.py` to persistently store BPMN definitions in Dgraph, using the Pydantic models as the data contract.
     3.  **Security Implementation:** Complete the `SecurityManager` implementation, including robust authorization logic.
     4.  **Testing:** Write comprehensive unit and integration tests for all components in this phase.
 
@@ -88,11 +88,11 @@ This plan breaks down the development into logical phases, starting with a solid
 *   **Goal:** Implement the fundamental BPMN execution logic, fully integrating the new Pydantic models.
 *   **Current Status:**
     *   **BPMN Engine Refactoring:** The `BpmnEngine` has been refactored to use the Pydantic models from `orchestrator.bpmn.models`.
-    *   BPMN Process Loader: Loads definitions from JSON files.
-    *   BPMN Engine Core: Handlers for `startEvent`, `exclusiveGateway`, `serviceTask`, `humanTask`, `intermediateCatchEvent` (timer and message events), and `endEvent` are present.
-    *   State Persistence: Placeholder calls to Dgraph client exist.
-    *   Service Task Execution: Currently simulated; actual worker integration is pending.
-    *   Expression Evaluation: Simplified evaluators are in place.
+    *   **BPMN Process Loader:** Loads definitions from JSON files.
+    *   **BPMN Engine Core:** Handlers for `startEvent`, `exclusiveGateway`, `serviceTask`, `humanTask`, `intermediateCatchEvent` (timer and message events), and `endEvent` are present.
+    *   **State Persistence:** Placeholder calls to Dgraph client exist.
+    *   **Service Task Execution:** Currently simulated; actual worker integration is pending.
+    *   **Expression Evaluation:** Simplified evaluators are in place.
 *   **Tasks to Complete:**
     1.  **Robust Worker Integration with Monitor Process:**
         *   **Orchestrator-to-Worker Communication:** Modify `_handle_service_task` to send `TaskRequest` messages to appropriate workers (e.g., `gemini_cli_adapter`) via Redis. These messages will include all necessary context for the worker to perform its task.
@@ -107,23 +107,22 @@ This plan breaks down the development into logical phases, starting with a solid
             *   **Robustness and Error Handling:** Implement comprehensive error handling, retry mechanisms, and logging within the monitor process to ensure resilience and provide clear diagnostics in case of worker failures or unexpected behavior. The monitor should be able to manage the worker's lifecycle (start, stop, restart) and report its health.
             *   **Contextual Awareness:** The monitor should maintain contextual awareness of the specific task and process instance it is overseeing, enabling intelligent interpretation of worker output and targeted updates to the BPMN graph.
     2.  **Robust Expression Language:** Replace the simplified `evaluate_condition` and `evaluate_expression` with a proper expression language.
-    
-    4.  **Testing:** Write comprehensive unit and integration tests for the BPMN engine, process loader, and worker integration.
+    3.  **Testing:** Write comprehensive unit and integration tests for the BPMN engine, process loader, and worker integration.
 
 ### Phase 4: The Agent-Coordinator Protocol (ACP) & Agent Operational Guidelines (In Progress)
 
 *   **Goal:** Define the agent communication standard, integrate the first simple worker, and establish robust operational guidelines for agent execution.
 *   **Current Status:**
-    *   ACP definition (`acp/protocol.py`) is complete.
+    *   **ACP definition** (`acp/protocol.py`) is complete.
     *   `acp_client.py` is implemented and unit tested.
     *   **Llama Index ReAct Agent:** A conversational agent has been implemented in `main.py` to provide a natural language interface to the orchestrator. This agent interacts with the `WorkerManager` to manage tasks.
-*   **Agent Operational Guidelines:**
-    1.  **Restricted Operating Environment:** Agents can only operate inside a pre-defined, secure directory on the host system.
-    2.  **Temporary Work Directories:** Spawning a worker agent creates a new, temporary work directory inside the pre-defined space on the host for each task.
-    3.  **.gemini/settings.json Configuration:** A `.gemini/settings.json` file is created for each individual task, defining the available MCP servers for the agent. The `local_file_server` is included by default, and its root directory is configured to match the agent's temporary work directory to enforce file access restrictions.
-    4.  **Host Directory Cloning:** As a separate argument to the worker spawn process, a directory on the host device can be specified. This directory is "cloned" or copied in full inside the temporary work directory for the agent task.
-    5.  **Temporary Directory Lifecycle:** When a task is voided or completed, a flag determines whether the entire temporary working directory is deleted (default is YES).
-    6.  **Session Management:** The orchestrator should be able to manually kill and restart agent sessions within the context of the same task. ACP sessions have a separate lifecycle from an agent task, which may involve multiple sessions within the same temporary work environment and configuration.
+    *   **Agent Operational Guidelines:**
+        1.  **Restricted Operating Environment:** Agents can only operate inside a pre-defined, secure directory on the host system.
+        2.  **Temporary Work Directories:** Spawning a worker agent creates a new, temporary work directory inside the pre-defined space on the host for each task.
+        3.  **.gemini/settings.json Configuration:** A `.gemini/settings.json` file is created for each individual task, defining the available MCP servers for the agent. The `local_file_server` is included by default, and its root directory is configured to match the agent's temporary work directory to enforce file access restrictions.
+        4.  **Host Directory Cloning:** As a separate argument to the worker spawn process, a directory on the host device can be specified. This directory is "cloned" or copied in full inside the temporary work directory for the agent task.
+        5.  **Temporary Directory Lifecycle:** When a task is voided or completed, a flag determines whether the entire temporary working directory is deleted (default is YES).
+        6.  **Session Management:** The orchestrator should be able to manually kill and restart agent sessions within the context of the same task. ACP sessions have a separate lifecycle from an agent task, which may involve multiple sessions within the same temporary work environment and configuration.
 *   **Tasks to Complete:**
     1.  **Worker Manager Enhancements:** Enhance the `WorkerManager` to handle agent registration, health checks, and capability discovery via ACP. This includes integrating with generic ACP-compliant agents.
     2.  **Implement Agent Operational Guidelines:** Implement the mechanisms for creating and managing temporary work directories, configuring `local_file_server` roots, cloning host directories, handling the deletion flag, and managing agent session lifecycles.

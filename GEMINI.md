@@ -24,15 +24,3 @@ This document outlines the best practices and development guidelines for working
 ## 3. Code Style and Linting
 
 All code should adhere to the PEP 8 style guide. Ruff and MyPy should be used to enforce this and to check for other code quality issues.
-
-## 4. Agent-Coordinator Protocol (ACP)
-
-The Agent-Coordinator Protocol (ACP) is a JSON-RPC based protocol that allows the orchestrator to communicate with various agents, including the Gemini CLI.
-
-The `orchestrator/acp` directory contains the implementation of the ACP, including the protocol definition and the Gemini CLI adapter.
-
-### Gemini CLI Integration
-
-The Gemini CLI integration allows the orchestrator to use the Gemini CLI as an agent. The `GeminiCliAdapter` class in `orchestrator/acp/gemini_cli_adapter.py` implements the client side of the ACP and communicates with the Gemini CLI over stdin/stdout.
-
-To use the Gemini CLI integration, you need to have the Gemini CLI installed and configured. You also need to provide the path to the Gemini CLI bundle in the `sample_adapter.py` file.
