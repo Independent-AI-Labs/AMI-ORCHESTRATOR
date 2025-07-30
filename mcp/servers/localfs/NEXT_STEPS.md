@@ -21,8 +21,6 @@
 
 - **Improve Configuration:** Introduce a configuration file for the server to allow for more flexible and secure management of settings, such as the maximum file size and logging configurations.
 
-- **Expand Toolset:** Add new tools to the server, such as a tool for listing directory contents or a tool for getting file metadata (e.g., size, modification time).
-
 ## Low-Priority Tasks
 
 - **Add User-Specific Permissions:** Implement a user-based permission system to control access to specific tools or directories.
@@ -31,13 +29,6 @@
 
 - **Add Support for More Encodings:** Expand the list of supported text encodings to provide greater flexibility when working with files from different sources.
 
-## Ideas
+## Future Enhancements
 
-1.  **Expand MCP Tools**: Based on future requirements, expand the set of tools exposed by the `local_file_server.py` to include other necessary file system operations.
-    *   **Examples**:
-        *   `copy_files`
-        *   `list_directory`
-        *   `search_file_content`
-
-2.  **Performance Optimization**: Investigate and implement performance optimizations for the MCP server and client, especially for large file operations.
-3.  **Configuration Management**: Implement a more flexible configuration management system for the MCP server.
+For a detailed plan on expanding the toolset and other enhancements, please refer to `DEVELOPMENT_PLAN.md`.

@@ -170,7 +170,7 @@ def test_mcp_replace_string_outside_root_error(client: MCPClient):
     try:
         outside_file.write_text("original content")
         with pytest.raises(MCPError) as excinfo:
-            client.call_tool("edit_file_replace_string", file_path=str(outside_file), old_string="original", new_string="new")
+            client.call_tool("replace_content_in_file", path=str(outside_file), old_content="original content", new_content="new content")
         assert "is outside the allowed root directory" in str(excinfo.value)
         assert str(outside_file) in str(excinfo.value)
     finally:

@@ -61,6 +61,7 @@ graph TD
 - **Redis Streams (Event Bus):** Serves as the high-performance, persistent message broker for all inter-component communication, enabling an event-driven architecture.
 - **Worker & Agent Manager:** Responsible for managing the lifecycle of connected workers and AI agents, including registration, health checks, and task distribution via the Agent-Coordinator Protocol (ACP). Now supports resource-based worker pools (e.g., for Dgraph, Postgres, GPU, NPU) and parallelization using thread and process pools.
 - **Agent Ecosystem (via ACP):** A flexible and extensible framework for integrating diverse specialized agents and workers (e.g., AI agents like Gemini running with `--experimental-acp` mode, file system workers, internal API workers, human task managers) that perform specific tasks within a BPMN process. This ecosystem is the backbone for extending the Orchestrator's automation capabilities.
+- **LocalFS MCP Server:** A dedicated MCP server that provides a comprehensive and secure toolset for local file system operations. The server exposes a range of tools, including `list_dir`, `create_dirs`, `find_paths`, `read_file`, `write_file`, `delete_paths`, `modify_file`, and `replace_content_in_file`, enabling robust and granular file manipulation capabilities.
 
 ## 4. Getting Started
 

@@ -17,16 +17,14 @@ The Local Files MCP server is a standalone Python script that provides a set of 
 
 The server exposes the following tools:
 
+- `list_dir`: Lists the names of files and subdirectories directly within a specified directory path.
+- `create_dirs`: Creates a directory and any necessary parent directories.
+- `find_paths`: Searches for files based on keywords in path/name or content.
 - `read_file`: Reads the content of a file.
 - `write_file`: Writes content to a file.
-- `edit_file_replace_string`: Replaces occurrences of a string in a file.
-- `edit_file_replace_lines`: Replaces a range of lines in a file.
-- `edit_file_delete_lines`: Deletes a range of lines from a file.
-- `edit_file_insert_lines`: Inserts content at a specific line number.
-- `delete_files`: Deletes one or more files.
-- `move_files`: Moves or renames one or more files.
-- `create_directory`: Creates a new directory.
-- `delete_directory`: Deletes a directory and its contents.
+- `delete_paths`: Deletes multiple files or directories.
+- `modify_file`: Modifies a file by replacing a range of content with new content.
+- `replace_content_in_file`: Replaces all occurrences of old_content with new_content within a file.
 
 ## Usage
 

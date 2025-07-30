@@ -7,49 +7,113 @@ def get_tool_declarations():
     """Return tool declarations for the MCP protocol."""
     return [
         {
-            "name": "read_file",
-            "description": "Read content from a file. Supports text/binary modes, auto line ending normalization.",
+            "name": "list_dir",
+            "description": "Lists the names of files and subdirectories directly within a specified directory path.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "file_path": {
+                    "path": {"type": "string", "description": "The absolute path to the directory to list."},
+                    "limit": {"type": "integer", "default": 100, "description": "The maximum number of items (files + directories) to return."},
+                    "recursive": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": "If True, the listing will include contents of subdirectories recursively.",
+                    },
+                },
+                "required": ["path"],
+            },
+        },
+        {
+            "name": "create_dirs",
+            "description": "Creates a directory and any necessary parent directories.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "path": {
+                        "type": "string",
+                        "description": "The path of the directory to create.",
+                    }
+                },
+                "required": ["path"],
+            },
+        },
+        {
+            "name": "find_paths",
+            "description": "Searches for files based on keywords in path/name or content.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string", "description": "The absolute path to the directory to start the search."},
+                    "keywords_path_name": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "default": [],
+                        "description": "A list of strings to search for within the file's path or name.",
+                    },
+                    "kewords_file_content": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "default": [],
+                        "description": "A list of strings to search for within the file's content.",
+                    },
+                    "regex_keywords": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": "If True, keywords_path_name and kewords_file_content will be treated as regular expressions.",
+                    },
+                },
+                "required": ["path"],
+            },
+        },
+        {
+            "name": "read_file",
+            "description": "Reads file content with support for offsets, various file types (text, binary, image), and line numbering for text files.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "path": {
                         "type": "string",
                         "description": "The path to the file to read.",
                     },
-                    "mode": {
-                        "type": "string",
-                        "enum": ["text", "binary"],
-                        "default": "text",
-                        "description": "Read mode: 'text' for text files, 'binary' for binary (returns base64).",
+                    "start_offset_inclusive": {
+                        "type": "integer",
+                        "default": 0,
+                        "description": "The starting offset (byte, char, or line number, 0-indexed).",
                     },
-                    "encoding": {
+                    "end_offset_inclusive": {
+                        "type": "integer",
+                        "default": -1,
+                        "description": "The ending offset (byte, char, or line number, -1 for end of file).",
+                    },
+                    "offset_type": {
                         "type": "string",
-                        "default": "utf-8",
-                        "description": "Text encoding to use (ignored in binary mode).",
+                        "enum": ["BYTE", "CHAR", "LINE"],
+                        "default": "BYTE",
+                        "description": "Specifies how offsets are interpreted (Byte, Char, or Line).",
                     },
                 },
-                "required": ["file_path"],
+                "required": ["path"],
             },
         },
         {
             "name": "write_file",
-            "description": "Write content to a file. Creates parent dirs. Supports text/binary modes, diffs for text.",
+            "description": "Writes content to a file, creating parent directories if needed. Supports text/binary modes; generates diffs for text.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "file_path": {
+                    "path": {
                         "type": "string",
                         "description": "The path to the file to write.",
                     },
-                    "content": {
+                    "new_content": {
                         "type": "string",
-                        "description": "Content to write. Base64 for binary mode.",
+                        "description": "The content to write. For binary mode, provide base64-encoded data.",
                     },
                     "mode": {
                         "type": "string",
                         "enum": ["text", "binary"],
                         "default": "text",
-                        "description": "Write mode: 'text' for text, 'binary' for binary (expects base64).",
+                        "description": "Write mode: 'text' for text files with encoding, 'binary' for binary files (expects base64).",
                     },
                     "encoding": {
                         "type": "string",
@@ -57,201 +121,50 @@ def get_tool_declarations():
                         "description": "Text encoding to use (ignored in binary mode).",
                     },
                 },
-                "required": ["file_path", "content"],
+                "required": ["path", "new_content"],
             },
         },
         {
-            "name": "edit_file_replace_string",
-            "description": "Replaces old_string with new_string. Shows diff. Handles line endings. Binary mode uses base64.",
+            "name": "delete_paths",
+            "description": "Deletes multiple files or directories.",
             "inputSchema": {
                 "type": "object",
-                "properties": {
-                    "file_path": {
-                        "type": "string",
-                        "description": "The path to the file to modify.",
-                    },
-                    "old_string": {
-                        "type": "string",
-                        "description": "Content to find. Base64 for binary mode.",
-                    },
-                    "new_string": {
-                        "type": "string",
-                        "description": "Content to replace with. Base64 for binary mode.",
-                    },
-                    "mode": {
-                        "type": "string",
-                        "enum": ["text", "binary"],
-                        "default": "text",
-                        "description": "Operation mode: 'text' (auto line ending) or 'binary' (exact bytes).",
-                    },
-                    "encoding": {
-                        "type": "string",
-                        "default": "utf-8",
-                        "description": "Text encoding to use (ignored in binary mode).",
-                    },
-                    "count": {
-                        "type": "integer",
-                        "default": 0,
-                        "description": "Max replacements (0 for all).",
-                    },
-                },
-                "required": ["file_path", "old_string", "new_string"],
+                "properties": {"paths": {"type": "array", "items": {"type": "string"}, "description": "A list of absolute file or directory paths to delete."}},
+                "required": ["paths"],
             },
         },
         {
-            "name": "edit_file_replace_lines",
-            "description": "Replaces lines in a range (1-indexed). Shows diff. Handles line endings.",
+            "name": "modify_file",
+            "description": "Modifies a file by replacing a range of content with new content.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "file_path": {
+                    "path": {"type": "string", "description": "The absolute path to the file."},
+                    "start_offset_inclusive": {"type": "integer", "default": 0, "description": "The 0-indexed starting offset (inclusive)."},
+                    "end_offset_inclusive": {"type": "integer", "default": -1, "description": "The 0-indexed ending offset (inclusive, -1 for end of file)."},
+                    "offset_type": {
                         "type": "string",
-                        "description": "The path to the file to modify.",
+                        "enum": ["BYTE", "CHAR", "LINE"],
+                        "default": "BYTE",
+                        "description": "Specifies how offsets are interpreted (Byte, Char, or Line).",
                     },
-                    "start_line": {
-                        "type": "integer",
-                        "description": "Starting line number (1-based, inclusive).",
-                    },
-                    "end_line": {
-                        "type": "integer",
-                        "description": "Ending line number (1-based, inclusive).",
-                    },
-                    "new_string": {
-                        "type": "string",
-                        "description": "New content to replace lines with.",
-                    },
-                    "encoding": {
-                        "type": "string",
-                        "default": "utf-8",
-                        "description": "Text encoding to use.",
-                    },
+                    "new_content": {"type": "string", "description": "The new content to replace the specified range (string for text, base64 for binary)."},
                 },
-                "required": ["file_path", "start_line", "end_line", "new_string"],
+                "required": ["path", "new_content"],
             },
         },
         {
-            "name": "edit_file_delete_lines",
-            "description": "Deletes lines in a range (1-indexed). Shows diff. Handles line endings.",
+            "name": "replace_content_in_file",
+            "description": "Replaces all occurrences of old_content with new_content within a file.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "file_path": {
-                        "type": "string",
-                        "description": "The path to the file to modify.",
-                    },
-                    "start_line": {
-                        "type": "integer",
-                        "description": "Starting line number to delete (1-based, inclusive).",
-                    },
-                    "end_line": {
-                        "type": "integer",
-                        "description": "Ending line number to delete (1-based, inclusive).",
-                    },
-                    "encoding": {
-                        "type": "string",
-                        "default": "utf-8",
-                        "description": "Text encoding to use.",
-                    },
+                    "path": {"type": "string", "description": "The absolute path to the file."},
+                    "old_content": {"type": "string", "description": "The content to find (string for text, base64 for binary)."},
+                    "new_content": {"type": "string", "description": "The content to replace with (string for text, base64 for binary)."},
+                    "number_of_occurrences": {"type": "integer", "default": -1, "description": "The number of occurrences to replace (-1 for all)."},
                 },
-                "required": ["file_path", "start_line", "end_line"],
-            },
-        },
-        {
-            "name": "edit_file_insert_lines",
-            "description": "Inserts content at a line number (1-indexed). Shows diff. Handles line endings.",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "file_path": {
-                        "type": "string",
-                        "description": "The path to the file to modify.",
-                    },
-                    "line_number": {
-                        "type": "integer",
-                        "description": "Line number for insertion (1-based). Use file_length + 1 to append.",
-                    },
-                    "content": {
-                        "type": "string",
-                        "description": "Content to insert.",
-                    },
-                    "encoding": {
-                        "type": "string",
-                        "default": "utf-8",
-                        "description": "Text encoding to use.",
-                    },
-                },
-                "required": ["file_path", "line_number", "content"],
-            },
-        },
-        {
-            "name": "delete_files",
-            "description": "Deletes multiple files. Provides feedback on success/failure.",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "file_paths": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": "List of file paths to delete.",
-                        "minItems": 1,
-                    }
-                },
-                "required": ["file_paths"],
-            },
-        },
-        {
-            "name": "move_files",
-            "description": "Move/rename files. Can create destination directories.",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "source_paths": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": "List of source file paths to move.",
-                        "minItems": 1,
-                    },
-                    "destination_paths": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": "List of destination file paths. Must match source count.",
-                        "minItems": 1,
-                    },
-                    "create_dirs": {
-                        "type": "boolean",
-                        "default": True,
-                        "description": "Create destination directories if they don't exist.",
-                    },
-                },
-                "required": ["source_paths", "destination_paths"],
-            },
-        },
-        {
-            "name": "create_directory",
-            "description": "Creates a directory and parents. Reports if already exists.",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "directory_path": {
-                        "type": "string",
-                        "description": "Path of the directory to create.",
-                    }
-                },
-                "required": ["directory_path"],
-            },
-        },
-        {
-            "name": "delete_directory",
-            "description": "Deletes a directory and its contents recursively. Reports deleted item count.",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "directory_path": {
-                        "type": "string",
-                        "description": "Path of the directory to delete.",
-                    }
-                },
-                "required": ["directory_path"],
+                "required": ["path", "old_content", "new_content"],
             },
         },
     ]
