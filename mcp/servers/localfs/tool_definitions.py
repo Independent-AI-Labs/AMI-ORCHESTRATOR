@@ -153,18 +153,5 @@ def get_tool_declarations():
                 "required": ["path", "new_content"],
             },
         },
-        {
-            "name": "replace_content_in_file",
-            "description": "Replaces all occurrences of old_content with new_content within a file.",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "path": {"type": "string", "description": "The absolute path to the file."},
-                    "old_content": {"type": "string", "description": "The content to find (string for text, base64 for binary)."},
-                    "new_content": {"type": "string", "description": "The content to replace with (string for text, base64 for binary)."},
-                    "number_of_occurrences": {"type": "integer", "default": -1, "description": "The number of occurrences to replace (-1 for all)."},
-                },
-                "required": ["path", "old_content", "new_content"],
-            },
-        },
+
     ]

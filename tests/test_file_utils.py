@@ -24,8 +24,8 @@ class TestFileUtils(unittest.TestCase):
         (self.root_dir / "subdir2").mkdir()
 
         contents = FileUtils.list_directory_contents(str(self.root_dir), str(self.root_dir))
-        expected = ["file1.txt", "file2.txt", "subdir1", "subdir2"]
-        self.assertCountEqual(contents, expected)
+        expected = "file1.txt\nfile2.txt\nsubdir1\nsubdir2"
+        self.assertCountEqual(contents.splitlines(), expected.splitlines())
 
     def test_list_directory_contents_recursive(self):
         (self.root_dir / "file1.txt").touch()
@@ -37,9 +37,23 @@ class TestFileUtils(unittest.TestCase):
         (self.root_dir / "subdir2" / "subsubdir1" / "file5.txt").touch()
 
         contents = FileUtils.list_directory_contents(str(self.root_dir), str(self.root_dir), recursive=True)
-        expected = ["file1.txt", "subdir1", "subdir1/file3.txt", "subdir2", "subdir2/file4.txt", "subdir2/subsubdir1", "subdir2/subsubdir1/file5.txt"]
-        normalized_contents = [p.replace("\\", "/") for p in contents]
-        self.assertCountEqual(normalized_contents, expected)
+        # The expected output needs to be carefully crafted to match the ASCII tree structure
+        # The root directory name will be part of the output
+        root_name = self.root_dir.name
+        expected_lines = [
+            f"{root_name}/",
+            "├───subdir1",
+            "│   └───file3.txt",
+            "├───subdir2",
+            "│   ├───subsubdir1",
+            "│   │   └───file5.txt",
+            "│   └───file4.txt",
+            "└───file1.txt",
+        ]
+        # Normalize line endings and split to compare
+        actual_lines = contents.replace("\\", "/").splitlines()
+        # The order of files and directories is now deterministic, so we can compare directly
+        self.assertEqual(actual_lines, expected_lines)
 
     def test_create_dirs(self):
         new_dir = self.root_dir / "new_dir" / "subdir"
@@ -74,6 +88,12 @@ class TestFileUtils(unittest.TestCase):
         file_path.write_text("Line 1\nLine 2\nLine 3")
         content = FileUtils.read_file_content(str(file_path), str(self.root_dir), offset_type=OffsetType.BYTE)
         self.assertEqual(content, "   1 | Line 1\n   2 | Line 2\n   3 | Line 3")
+
+    def test_read_file_content_text_line_offset(self):
+        file_path = self.root_dir / "test_text_line_offset.txt"
+        file_path.write_text("Line 1\nLine 2\nLine 3\nLine 4\nLine 5")
+        content = FileUtils.read_file_content(str(file_path), str(self.root_dir), start_offset_inclusive=2, end_offset_inclusive=4, offset_type=OffsetType.LINE)
+        self.assertEqual(content, "   2 | Line 2\n   3 | Line 3\n   4 | Line 4")
 
     def test_delete_paths(self):
         file1 = self.root_dir / "file_to_delete1.txt"

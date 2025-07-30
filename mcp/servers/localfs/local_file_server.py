@@ -88,10 +88,6 @@ class LocalFiles:
                     len(content),
                 )
                 return encoded_content
-            if offset_type_enum == OffsetType.LINE:
-                lines = content.splitlines(keepends=False)
-                numbered_lines = [f"{start_offset_inclusive + i}: {line}" for i, line in enumerate(lines)]
-                return "\n".join(numbered_lines)
             return content
 
         except Exception as e:  # pylint: disable=broad-exception-caught
@@ -145,7 +141,7 @@ class LocalFiles:
             logging.error("Failed to write file %s: %s", path, e)
             raise e
 
-    def list_dir(self, path: str, limit: int = 100, recursive: bool = False) -> list[str]:
+    def list_dir(self, path: str, limit: int = 100, recursive: bool = False) -> str:
         """Lists the names of files and subdirectories within a specified directory path."""
         try:
             logging.info("Listing directory: %s (limit: %s, recursive: %s)", path, limit, recursive)

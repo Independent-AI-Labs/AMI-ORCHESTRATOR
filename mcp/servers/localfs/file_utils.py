@@ -54,7 +54,7 @@ class FileUtils:
                 raise ValueError(f"File too large: {size} bytes (max: {FileUtils.max_file_size} bytes)")
 
     @staticmethod
-    def list_directory_contents(directory_path: str, root_dir: str, limit: int = 100, recursive: bool = False) -> list[str]:
+    def list_directory_contents(directory_path: str, root_dir: str, limit: int = 100, recursive: bool = False) -> str:
         """Lists the names of files and subdirectories directly within a specified directory path."""
         validated_path = FileUtils.validate_file_path(directory_path, root_dir)
         path_obj = Path(validated_path)
@@ -62,18 +62,51 @@ class FileUtils:
         if not path_obj.is_dir():
             raise ValueError(f"Path is not a directory: '{directory_path}'")
 
-        contents = []
         if recursive:
-            for item in path_obj.rglob("*"):
-                contents.append(str(item.relative_to(path_obj)))
-                if len(contents) >= limit:
-                    break
-        else:
-            for item in path_obj.iterdir():
-                contents.append(item.name)
-                if len(contents) >= limit:
-                    break
-        return contents
+            return FileUtils._list_directory_recursive(path_obj, limit)
+        return FileUtils._list_directory_non_recursive(path_obj, limit)
+
+    @staticmethod
+    def _list_directory_non_recursive(path_obj: Path, limit: int) -> str:
+        """Helper for non-recursive listing."""
+        contents = []
+        for item in path_obj.iterdir():
+            contents.append(item.name)
+            if len(contents) >= limit:
+                break
+        return "\n".join(contents)
+
+    @staticmethod
+    def _list_directory_recursive(path_obj: Path, limit: int) -> str:
+        """Helper for recursive listing with ASCII tree."""
+        lines: list[str] = []
+
+        def get_tree_lines(directory: Path, prefix: str = ""):
+            if len(lines) >= limit:
+                return
+
+            items = sorted(directory.iterdir(), key=lambda x: (x.is_file(), x.name.lower()))
+            for i, item in enumerate(items):
+                if len(lines) >= limit:
+                    return
+
+                is_last = i == (len(items) - 1)
+                connector = "└───" if is_last else "├───"
+
+                lines.append(f"{prefix}{connector}{item.name}")
+
+                if item.is_dir():
+                    new_prefix = prefix + ("    " if is_last else "│   ")
+                    get_tree_lines(item, new_prefix)
+
+        lines.append(f"{path_obj.name}/")
+        get_tree_lines(path_obj)
+
+        if len(lines) > limit:
+            lines = lines[:limit]
+            lines.append("... (list truncated)")
+
+        return "\n".join(lines)
 
     @staticmethod
     def create_dirs(directory_path: str, root_dir: str) -> dict:
@@ -190,9 +223,12 @@ class FileUtils:
 
         if offset_type == OffsetType.LINE:
             all_lines = normalized_full_content.splitlines(keepends=True)
-            end_line = len(all_lines) if end_offset_inclusive == -1 else end_offset_inclusive + 1
-            processed_content_lines = all_lines[start_offset_inclusive:end_line]
-            start_line_for_display = start_offset_inclusive + 1  # Line numbers are 1-indexed
+            # Adjust for 1-based indexing from user
+            start_line_index = start_offset_inclusive - 1 if start_offset_inclusive > 0 else 0
+            end_line_index = len(all_lines) if end_offset_inclusive == -1 else end_offset_inclusive
+
+            processed_content_lines = all_lines[start_line_index:end_line_index]
+            start_line_for_display = start_line_index + 1  # Line numbers are 1-indexed
 
         if offset_type == OffsetType.CHAR:
             end_char = len(normalized_full_content) if end_offset_inclusive == -1 else end_offset_inclusive + 1
