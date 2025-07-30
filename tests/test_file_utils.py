@@ -24,8 +24,13 @@ class TestFileUtils(unittest.TestCase):
         (self.root_dir / "subdir2").mkdir()
 
         contents = FileUtils.list_directory_contents(str(self.root_dir), str(self.root_dir))
-        expected = "file1.txt\nfile2.txt\nsubdir1\nsubdir2"
-        self.assertCountEqual(contents.splitlines(), expected.splitlines())
+        expected_lines = [
+            "├───subdir1",
+            "├───subdir2",
+            "├───file1.txt",
+            "└───file2.txt",
+        ]
+        self.assertEqual(contents.splitlines(), expected_lines)
 
     def test_list_directory_contents_recursive(self):
         (self.root_dir / "file1.txt").touch()
@@ -38,10 +43,7 @@ class TestFileUtils(unittest.TestCase):
 
         contents = FileUtils.list_directory_contents(str(self.root_dir), str(self.root_dir), recursive=True)
         # The expected output needs to be carefully crafted to match the ASCII tree structure
-        # The root directory name will be part of the output
-        root_name = self.root_dir.name
         expected_lines = [
-            f"{root_name}/",
             "├───subdir1",
             "│   └───file3.txt",
             "├───subdir2",
@@ -51,7 +53,7 @@ class TestFileUtils(unittest.TestCase):
             "└───file1.txt",
         ]
         # Normalize line endings and split to compare
-        actual_lines = contents.replace("\\", "/").splitlines()
+        actual_lines = contents.splitlines()
         # The order of files and directories is now deterministic, so we can compare directly
         self.assertEqual(actual_lines, expected_lines)
 

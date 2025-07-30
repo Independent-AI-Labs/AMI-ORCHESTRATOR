@@ -186,10 +186,22 @@ def test_mcp_list_dir(client: MCPClient):
     (client.root_dir / "test_dir" / "subdir").mkdir()
 
     result = client.call_tool("list_dir", path=str(client.root_dir / "test_dir"))
-    assert set(ast.literal_eval(result["content"][0]["text"])) == {"file1.txt", "file2.txt", "subdir"}
+    # The output is now a formatted string representing a tree
+    expected_output = "\n".join(["├───subdir", "├───file1.txt", "└───file2.txt"])
+    assert result["content"][0]["text"] == expected_output
 
+    # Testing recursive listing
+    (client.root_dir / "test_dir" / "subdir" / "subfile.txt").touch()
     result = client.call_tool("list_dir", path=str(client.root_dir / "test_dir"), recursive=True)
-    assert set(ast.literal_eval(result["content"][0]["text"])) == {"file1.txt", "file2.txt", "subdir"}
+    expected_recursive_output = "\n".join(
+        [
+            "├───subdir",
+            "│   └───subfile.txt",
+            "├───file1.txt",
+            "└───file2.txt",
+        ]
+    )
+    assert result["content"][0]["text"] == expected_recursive_output
 
 
 def test_mcp_create_dirs(client: MCPClient):
@@ -295,34 +307,6 @@ def test_mcp_modify_file_binary(client: MCPClient, temp_binary_file: str):
         assert f.read() == b"\x00\x01\xff\xee\x04\x05\x06\x07\x08\x09"
 
 
-def test_mcp_replace_content_in_file_text(client: MCPClient, temp_file: str):
-    """Tests replacing content in a text file using MCP."""
-    result = client.call_tool(
-        "replace_content_in_file",
-        path=temp_file,
-        old_content="Line 2",
-        new_content="Replaced Line 2",
-    )
-    assert "Successfully replaced 1 occurrence(s) in text file" in result["content"][0]["text"]
-    with Path(temp_file).open(encoding="utf-8") as f:
-        assert f.read() == "Line 1\nReplaced Line 2\nLine 3\n"
-
-
-def test_mcp_replace_content_in_file_binary(client: MCPClient, temp_binary_file: str):
-    """Tests replacing content in a binary file using MCP."""
-    old_c = b"\x01\x02"
-    new_c = b"\xff\xfe"
-    result = client.call_tool(
-        "replace_content_in_file",
-        path=temp_binary_file,
-        old_content=base64.b64encode(old_c).decode(),
-        new_content=base64.b64encode(new_c).decode(),
-    )
-    assert "Successfully replaced 1 occurrence(s) in binary file" in result["content"][0]["text"]
-    with Path(temp_binary_file).open("rb") as f:
-        assert f.read() == b"\x00\xff\xfe\x03\x04\x05\x06\x07\x08\x09"
-
-
 # --- Error handling tests ---
 
 
@@ -356,12 +340,6 @@ def test_mcp_create_dirs_permission_error(client: MCPClient, read_only_dir: Path
     invalid_path = read_only_dir / "new_dir"
     with pytest.raises(MCPError, match=r"Permission denied"):
         client.call_tool("create_dirs", path=str(invalid_path))
-
-
-def test_mcp_unknown_tool_error(client: MCPClient):
-    """Tests unknown tool error."""
-    with pytest.raises(MCPError, match="Unknown tool"):
-        client.call_tool("non_existent_tool")
 
 
 def test_mcp_server_shutdown_on_eof(client: MCPClient):

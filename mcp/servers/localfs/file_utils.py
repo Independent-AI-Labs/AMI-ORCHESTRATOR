@@ -68,13 +68,16 @@ class FileUtils:
 
     @staticmethod
     def _list_directory_non_recursive(path_obj: Path, limit: int) -> str:
-        """Helper for non-recursive listing."""
-        contents = []
-        for item in path_obj.iterdir():
-            contents.append(item.name)
-            if len(contents) >= limit:
+        """Helper for non-recursive listing with ASCII tree."""
+        lines: list[str] = []
+        items = sorted(path_obj.iterdir(), key=lambda x: (not x.is_dir(), x.name.lower()))
+        for i, item in enumerate(items):
+            if len(lines) >= limit:
                 break
-        return "\n".join(contents)
+            is_last = i == (len(items) - 1)
+            connector = "└───" if is_last else "├───"
+            lines.append(f"{connector}{item.name}")
+        return "\n".join(lines)
 
     @staticmethod
     def _list_directory_recursive(path_obj: Path, limit: int) -> str:
@@ -85,7 +88,7 @@ class FileUtils:
             if len(lines) >= limit:
                 return
 
-            items = sorted(directory.iterdir(), key=lambda x: (x.is_file(), x.name.lower()))
+            items = sorted(directory.iterdir(), key=lambda x: (not x.is_dir(), x.name.lower()))
             for i, item in enumerate(items):
                 if len(lines) >= limit:
                     return
@@ -99,7 +102,6 @@ class FileUtils:
                     new_prefix = prefix + ("    " if is_last else "│   ")
                     get_tree_lines(item, new_prefix)
 
-        lines.append(f"{path_obj.name}/")
         get_tree_lines(path_obj)
 
         if len(lines) > limit:

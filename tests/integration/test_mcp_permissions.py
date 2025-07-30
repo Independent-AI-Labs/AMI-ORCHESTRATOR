@@ -164,13 +164,20 @@ def read_only_dir(client: MCPClient) -> Generator[Path, None, None]:
         (dir_path / "test.txt").chmod(stat.S_IWRITE | stat.S_IREAD | stat.S_IEXEC)
 
 
-def test_mcp_replace_string_outside_root_error(client: MCPClient):
-    """Tests edit_file_replace_string error for a file outside the allowed root directory."""
-    outside_file = client.root_dir.parent / "outside_replace.txt"
+def test_mcp_modify_file_outside_root_error(client: MCPClient):
+    """Tests modify_file error for a file outside the allowed root directory."""
+    outside_file = client.root_dir.parent / "outside_modify.txt"
     try:
         outside_file.write_text("original content")
         with pytest.raises(MCPError) as excinfo:
-            client.call_tool("replace_content_in_file", path=str(outside_file), old_content="original content", new_content="new content")
+            client.call_tool(
+                "modify_file",
+                path=str(outside_file),
+                start_offset_inclusive=0,
+                end_offset_inclusive=8,
+                offset_type="CHAR",
+                new_content="new",
+            )
         assert "is outside the allowed root directory" in str(excinfo.value)
         assert str(outside_file) in str(excinfo.value)
     finally:
