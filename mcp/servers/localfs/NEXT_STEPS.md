@@ -27,7 +27,7 @@
 
 - **Improve Performance:** Optimize the file I/O operations to improve performance when working with large files or a high volume of requests.
 
-- **Add Support for More Encodings:** Expand the list of supported text encodings to provide greater flexibility when working with files from different sources.
+
 
 ## Future Enhancements
 

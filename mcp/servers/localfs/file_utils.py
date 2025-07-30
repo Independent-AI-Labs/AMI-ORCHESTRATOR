@@ -8,6 +8,7 @@ import re
 import shutil
 from enum import Enum
 from pathlib import Path
+from quopri import decodestring, encodestring
 
 
 class OffsetType(Enum):
@@ -16,10 +17,44 @@ class OffsetType(Enum):
     LINE = "line"
 
 
+class InputFormat(Enum):
+    QUOTED_PRINTABLE = "quoted-printable"
+    BASE64 = "base64"
+    RAW_UTF8 = "raw-utf8"
+
+
+class OutputFormat(Enum):
+    QUOTED_PRINTABLE = "quoted-printable"
+    BASE64 = "base64"
+    RAW_UTF8 = "raw-utf8"
+
+
 class FileUtils:
     """Provides file manipulation utilities."""
 
     max_file_size = 100 * 1024 * 1024  # 100MB limit
+
+    @staticmethod
+    def _encode_content(data: bytes, output_format: OutputFormat) -> str | bytes:
+        """Encodes bytes to the specified output format."""
+        if output_format == OutputFormat.QUOTED_PRINTABLE:
+            return encodestring(data).decode("ascii")
+        if output_format == OutputFormat.BASE64:
+            return base64.b64encode(data).decode("ascii")
+        if output_format == OutputFormat.RAW_UTF8:
+            return data.decode("utf-8")
+        raise ValueError(f"Unsupported output format: {output_format}")
+
+    @staticmethod
+    def _decode_content(data: str, input_format: InputFormat) -> bytes:
+        """Decodes a string from the specified input format to bytes."""
+        if input_format == InputFormat.QUOTED_PRINTABLE:
+            return decodestring(data.encode("ascii"))
+        if input_format == InputFormat.BASE64:
+            return base64.b64decode(data.encode("ascii"))
+        if input_format == InputFormat.RAW_UTF8:
+            return data.encode("utf-8")
+        raise ValueError(f"Unsupported input format: {input_format}")
 
     @staticmethod
     def validate_file_path(file_path: str, root_dir: str) -> str:
@@ -214,46 +249,44 @@ class FileUtils:
             return f"Failed to generate diff: {e}"
 
     @staticmethod
-    def _read_text_content(path_obj: Path, start_offset_inclusive: int, end_offset_inclusive: int, offset_type: OffsetType, encoding: str) -> str:
-        full_content = path_obj.read_text(encoding=encoding)
+    def _read_text_content(
+        path_obj: Path, start_offset_inclusive: int, end_offset_inclusive: int, offset_type: OffsetType, file_encoding: str, output_format: OutputFormat
+    ) -> str | bytes:
+        full_content = path_obj.read_text(encoding=file_encoding)
         normalized_full_content = FileUtils.normalize_line_endings(full_content, "\n")
         if full_content.endswith(("\r\n", "\n", "\r")) and not normalized_full_content.endswith("\n"):
             normalized_full_content += "\n"
 
         processed_content_lines = []
-        start_line_for_display = 0  # This will be the actual line number in the file for the first line of processed_content
+        start_line_for_display = 0
 
         if offset_type == OffsetType.LINE:
             all_lines = normalized_full_content.splitlines(keepends=True)
-            # Adjust for 1-based indexing from user
-            start_line_index = start_offset_inclusive - 1 if start_offset_inclusive > 0 else 0
-            end_line_index = len(all_lines) if end_offset_inclusive == -1 else end_offset_inclusive
+            start_line_index = start_offset_inclusive
+            end_line_index = len(all_lines) if end_offset_inclusive == -1 else end_offset_inclusive + 1
 
             processed_content_lines = all_lines[start_line_index:end_line_index]
-            start_line_for_display = start_line_index + 1  # Line numbers are 1-indexed
+            start_line_for_display = start_line_index + 1
 
         if offset_type == OffsetType.CHAR:
             end_char = len(normalized_full_content) if end_offset_inclusive == -1 else end_offset_inclusive + 1
             processed_content_segment = normalized_full_content[start_offset_inclusive:end_char]
             processed_content_lines = processed_content_segment.splitlines(keepends=True)
 
-            # Calculate the starting line number for CHAR offset
             start_line_for_display = normalized_full_content[:start_offset_inclusive].count("\n") + 1
 
         if offset_type == OffsetType.BYTE:
             full_content_bytes = path_obj.read_bytes()
             end_byte = len(full_content_bytes) if end_offset_inclusive == -1 else end_offset_inclusive + 1
             processed_content_bytes_segment = full_content_bytes[start_offset_inclusive:end_byte]
-            processed_content_segment = processed_content_bytes_segment.decode(encoding, errors="ignore")
+            processed_content_segment = processed_content_bytes_segment.decode(file_encoding, errors="ignore")
             processed_content_lines = FileUtils.normalize_line_endings(processed_content_segment, "\n").splitlines(keepends=True)
 
-            # Calculate the starting line number for BYTE offset
-            char_offset_at_start_byte = len(full_content_bytes[:start_offset_inclusive].decode(encoding, errors="ignore"))
+            char_offset_at_start_byte = len(full_content_bytes[:start_offset_inclusive].decode(file_encoding, errors="ignore"))
             start_line_for_display = normalized_full_content[:char_offset_at_start_byte].count("\n") + 1
 
-        # Now, unify the numbering logic
         numbered_lines = [f"{i + start_line_for_display: >4} | {line.rstrip('\n')}" for i, line in enumerate(processed_content_lines)]
-        return "\n".join(numbered_lines)
+        return FileUtils._encode_content("\n".join(numbered_lines).encode("utf-8"), output_format)
 
     @staticmethod
     def _read_binary_content(path_obj: Path, start_offset_inclusive: int, end_offset_inclusive: int, offset_type: OffsetType) -> bytes:
@@ -270,7 +303,8 @@ class FileUtils:
         start_offset_inclusive: int = 0,
         end_offset_inclusive: int = -1,
         offset_type: OffsetType = OffsetType.BYTE,
-        encoding: str = "utf-8",
+        file_encoding: str = "utf-8",
+        output_format: OutputFormat = OutputFormat.QUOTED_PRINTABLE,
     ):
         """Read file content with proper error handling and normalization, with offset support."""
         validated_path = FileUtils.validate_file_path(file_path, root_dir)
@@ -290,24 +324,26 @@ class FileUtils:
 
         try:
             if is_image:
-                return path_obj.read_bytes()
+                return FileUtils._encode_content(path_obj.read_bytes(), output_format)
             if not is_text:
-                return FileUtils._read_binary_content(path_obj, start_offset_inclusive, end_offset_inclusive, offset_type)
-            return FileUtils._read_text_content(path_obj, start_offset_inclusive, end_offset_inclusive, offset_type, encoding)
+                return FileUtils._encode_content(
+                    FileUtils._read_binary_content(path_obj, start_offset_inclusive, end_offset_inclusive, offset_type), output_format
+                )
+            return FileUtils._read_text_content(path_obj, start_offset_inclusive, end_offset_inclusive, offset_type, file_encoding, output_format)
 
         except UnicodeDecodeError as e:
             raise ValueError(
-                f"Cannot decode file '{validated_path}' with encoding '{encoding}'. Error: {e}. Try using a different encoding or 'binary' mode."
+                f"Cannot decode file '{validated_path}' with encoding '{file_encoding}'. Error: {e}. Try using a different encoding or 'binary' mode."
             ) from e
         except PermissionError as e:
             raise PermissionError(f"Permission denied: cannot read file '{validated_path}'") from e
         except ValueError as e:
             raise e
-        except Exception as e:  # pylint: disable=broad-exception-caught
+        except Exception as e:
             raise OSError(f"Unexpected error reading file '{validated_path}': {e}") from e
 
     @staticmethod
-    def is_text_file(file_path: Path, encoding: str = "utf-8") -> bool:
+    def is_text_file(file_path: Path, file_encoding: str = "utf-8") -> bool:
         """Heuristically determines if a file is a text file."""
         text_extensions = {
             ".txt",
@@ -339,87 +375,94 @@ class FileUtils:
         if file_path.suffix.lower() in text_extensions:
             return True
 
-        # Read a small chunk to check for non-text characters
         try:
             with file_path.open("rb") as f:
-                chunk = f.read(1024)  # Read first 1KB
-            # Check for common binary indicators (null bytes, non-printable ASCII)
+                chunk = f.read(1024)
             if b"\0" in chunk:
                 return False
             try:
-                chunk.decode(encoding)
+                chunk.decode(file_encoding)
                 return True
             except UnicodeDecodeError:
                 return False
         except Exception:
-            return False  # Assume not text if we can't read it
+            return False
 
     @staticmethod
-    def write_file_content(file_path: str, new_content, root_dir: str, mode: str = "text", encoding: str = "utf-8"):
+    def _write_text_content_and_get_message(path_obj: Path, file_path: str, new_content: str, file_encoding: str) -> tuple[str, str | None]:
+        original_content = None
+        if path_obj.exists():
+            original_content = path_obj.read_text(encoding=file_encoding)
+        path_obj.write_text(new_content, encoding=file_encoding)
+        message, diff = FileUtils.get_write_success_message_text(file_path, new_content, original_content)
+        return message, diff
+
+    @staticmethod
+    def _write_binary_content_and_get_message(path_obj: Path, file_path: str, new_content: bytes) -> str:
+        path_obj.write_bytes(new_content)
+        return FileUtils.get_write_success_message_binary(file_path, new_content)
+
+    @staticmethod
+    def write_file_content(file_path: str, new_content, root_dir: str, mode: str = "text", file_encoding: str = "utf-8") -> dict:
         """Write file content with proper error handling."""
         validated_path = FileUtils.validate_file_path(file_path, root_dir)
         path_obj = Path(validated_path)
 
-        # Create directory if it doesn't exist
         parent_dir = path_obj.parent
         if parent_dir and not parent_dir.exists():
             try:
                 parent_dir.mkdir(parents=True, exist_ok=True)
-            except Exception as e:  # pylint: disable=broad-exception-caught
+            except Exception as e:
                 raise OSError(f"Failed to create parent directory '{parent_dir}': {e}") from e
 
         try:
             if mode == "binary":
-                path_obj.write_bytes(new_content)
+                message = FileUtils._write_binary_content_and_get_message(path_obj, file_path, new_content)
             else:
-                path_obj.write_text(new_content, encoding=encoding)
+                message, diff = FileUtils._write_text_content_and_get_message(path_obj, file_path, new_content, file_encoding)
+                if diff:
+                    message += f"\n\nDiff:\n{diff}"
+
+            return {"status": "success", "message": message}
 
         except PermissionError as e:
             raise PermissionError(f"Permission denied: cannot write to file '{validated_path}'") from e
         except OSError as e:
             no_space_left_on_device = 28
-            if e.errno == no_space_left_on_device:  # No space left on device
+            if e.errno == no_space_left_on_device:
                 raise OSError(f"No space left on device when writing to '{validated_path}': {e}") from e
             raise OSError(f"OS error writing to file '{validated_path}': {e}") from e
         except ValueError as e:
             raise e
-        except Exception as e:  # pylint: disable=broad-exception-caught
+        except Exception as e:
             raise OSError(f"Unexpected error writing to file '{validated_path}': {e}") from e
 
     @staticmethod
-    def validate_and_decode_content(content: str | bytes, mode: str) -> str | bytes:
-        """Validates and decodes content based on mode."""
+    def validate_and_decode_content(content: str | bytes, mode: str, input_format: InputFormat) -> str | bytes:
+        """Validates and decodes content based on mode and input format."""
         if content is None:
             raise ValueError("content cannot be None")
 
         if mode == "binary":
             if isinstance(content, str):
-                try:
-                    return base64.b64decode(content.encode("utf-8"))
-                except (TypeError, ValueError) as e:
-                    raise ValueError(f"Invalid base64 content for binary mode: {e}") from e
-            elif isinstance(content, bytes):
-                return content
-            else:
-                raise ValueError("Binary mode requires base64-encoded string or bytes content")
-        elif mode == "text":
+                return FileUtils._decode_content(content, input_format)
             if isinstance(content, bytes):
-                try:
-                    return content.decode("utf-8")
-                except UnicodeDecodeError as e:
-                    raise ValueError(f"Cannot decode bytes to string in text mode: {e}") from e
-            elif isinstance(content, str):
                 return content
-            else:
-                raise ValueError("Text mode requires string or bytes content")
-        else:
-            raise ValueError("Mode must be 'text' or 'binary'")
+            raise ValueError("Binary mode requires string or bytes content")
+        if mode == "text":
+            if isinstance(content, str):
+                decoded_bytes = FileUtils._decode_content(content, input_format)
+                return decoded_bytes.decode("utf-8")
+            if isinstance(content, bytes):
+                return content.decode("utf-8")
+            raise ValueError("Text mode requires string or bytes content")
+        raise ValueError("Mode must be 'text' or 'binary'")
 
     @staticmethod
     def get_write_success_message_binary(file_path: str, content: bytes) -> str:
         """Generates the success message for binary file writes."""
-        content_bytes: bytes = content
-        content_size = len(content_bytes)
+        # The content here is already decoded bytes, so we can get its length directly
+        content_size = len(content)
         return f"Successfully wrote binary content to '{file_path}' ({content_size} bytes)."
 
     @staticmethod
@@ -437,7 +480,14 @@ class FileUtils:
 
     @staticmethod
     def modify_file(
-        file_path: str, root_dir: str, start_offset_inclusive: int, end_offset_inclusive: int, offset_type: OffsetType, new_content: str | bytes
+        file_path: str,
+        root_dir: str,
+        start_offset_inclusive: int,
+        end_offset_inclusive: int,
+        offset_type: OffsetType,
+        new_content: str | bytes,
+        input_format: InputFormat,
+        file_encoding: str,
     ) -> str:
         """Modifies a file by replacing a range of content with new content."""
         validated_path = FileUtils.validate_file_path(file_path, root_dir)
@@ -449,50 +499,63 @@ class FileUtils:
         if not path_obj.is_file():
             raise ValueError(f"Path exists but is not a file: '{validated_path}'")
 
-        is_text = FileUtils.is_text_file(path_obj)
+        is_text = FileUtils.is_text_file(path_obj, file_encoding)
 
         if is_text:
-            original_content = path_obj.read_text(encoding="utf-8")
-            if not isinstance(new_content, str):
-                raise ValueError("new_content must be a string for text files.")
+            original_content = path_obj.read_text(encoding=file_encoding)
+            processed_new_content = FileUtils.validate_and_decode_content(new_content, "text", input_format)
+            if not isinstance(processed_new_content, str):
+                raise ValueError("new_content must be a string for text files after decoding.")
 
             if offset_type == OffsetType.LINE:
                 lines = original_content.splitlines(keepends=True)
                 end_line = len(lines) if end_offset_inclusive == -1 else end_offset_inclusive + 1
-                modified_lines = lines[:start_offset_inclusive] + new_content.splitlines(keepends=True) + lines[end_line:]
+                modified_lines = lines[:start_offset_inclusive] + processed_new_content.splitlines(keepends=True) + lines[end_line:]
                 modified_content = "".join(modified_lines)
             elif offset_type == OffsetType.CHAR:
                 end_char = len(original_content) if end_offset_inclusive == -1 else end_offset_inclusive + 1
-                modified_content = original_content[:start_offset_inclusive] + new_content + original_content[end_char:]
-            else:  # BYTE for text file
-                content_bytes = original_content.encode("utf-8")
+                modified_content = original_content[:start_offset_inclusive] + processed_new_content + original_content[end_char:]
+            else:
+                content_bytes = original_content.encode(file_encoding)
                 end_byte = len(content_bytes) if end_offset_inclusive == -1 else end_offset_inclusive + 1
-                modified_bytes = content_bytes[:start_offset_inclusive] + new_content.encode("utf-8") + content_bytes[end_byte:]
-                modified_content = modified_bytes.decode("utf-8")
+                modified_bytes = content_bytes[:start_offset_inclusive] + processed_new_content.encode(file_encoding) + content_bytes[end_byte:]
+                modified_content = modified_bytes.decode(file_encoding)
 
-            path_obj.write_text(modified_content, encoding="utf-8")
+            path_obj.write_text(modified_content, encoding=file_encoding)
             diff_output = FileUtils.generate_diff(original_content, modified_content, file_path)
             return f"Successfully modified text file '{file_path}'.\n\nDiff:\n{diff_output}"
-        # Binary file
         original_content_bytes = path_obj.read_bytes()
-        if isinstance(new_content, str):
-            new_content_bytes = base64.b64decode(new_content.encode("utf-8"))
-        elif isinstance(new_content, bytes):
-            new_content_bytes = new_content
-        else:
-            raise ValueError("new_content must be bytes or base64-encoded string for binary files.")
+        processed_new_content_bytes = FileUtils.validate_and_decode_content(new_content, "binary", input_format)
+        if not isinstance(processed_new_content_bytes, bytes):
+            raise ValueError("new_content must be bytes for binary files after decoding.")
 
         if offset_type == OffsetType.BYTE:
             end_byte = len(original_content_bytes) if end_offset_inclusive == -1 else end_offset_inclusive
-            modified_content_bytes = original_content_bytes[:start_offset_inclusive] + new_content_bytes + original_content_bytes[end_byte:]
+            modified_content_bytes = original_content_bytes[:start_offset_inclusive] + processed_new_content_bytes + original_content_bytes[end_byte:]
             path_obj.write_bytes(modified_content_bytes)
             return f"Successfully modified binary file '{file_path}'. Replaced bytes from {start_offset_inclusive} to {end_offset_inclusive}."
         raise ValueError(f"Offset type {offset_type.name} not supported for binary files.")
 
     @staticmethod
-    def _replace_content_in_binary_file(path_obj: Path, old_content: bytes, new_content: bytes, number_of_occurrences: int) -> tuple[bytes, int]:
+    def _replace_content_in_binary_file(
+        path_obj: Path, old_content: bytes, new_content: bytes, number_of_occurrences: int, is_regex: bool
+    ) -> tuple[bytes, int]:
         original_content_bytes = path_obj.read_bytes()
-        if number_of_occurrences == -1:
+        replacements_made = 0
+        modified_content_bytes = original_content_bytes
+
+        if is_regex:
+            # For binary regex, we need to work with bytes directly
+            # re.subn returns (new_string, number_of_substitutions_made)
+            try:
+                # Ensure the regex pattern is a bytes pattern
+                old_content_pattern = re.compile(old_content)
+                modified_content_bytes, replacements_made = old_content_pattern.subn(
+                    new_content, original_content_bytes, count=(0 if number_of_occurrences == -1 else number_of_occurrences)
+                )
+            except re.error as e:
+                raise ValueError(f"Invalid regex pattern for binary content: {e}") from e
+        elif number_of_occurrences == -1:
             modified_content_bytes = original_content_bytes.replace(old_content, new_content)
             replacements_made = original_content_bytes.count(old_content)
         else:
@@ -502,8 +565,18 @@ class FileUtils:
         return modified_content_bytes, replacements_made
 
     @staticmethod
-    def replace_content_in_file(file_path: str, root_dir: str, old_content: str | bytes, new_content: str | bytes, number_of_occurrences: int = -1) -> str:
-        """Replaces occurrences of old_content with new_content within a file."""
+    def replace_content_in_file(
+        file_path: str,
+        root_dir: str,
+        old_content: str | bytes,
+        new_content: str | bytes,
+        number_of_occurrences: int = -1,
+        is_regex: bool = False,
+        mode: str = "text",
+        input_format: InputFormat = InputFormat.QUOTED_PRINTABLE,
+        file_encoding: str = "utf-8",
+    ) -> str:
+        """Replaces occurrences of old_content with new_content within a file, with regex support."""
         validated_path = FileUtils.validate_file_path(file_path, root_dir)
         path_obj = Path(validated_path)
 
@@ -513,47 +586,51 @@ class FileUtils:
         if not path_obj.is_file():
             raise ValueError(f"Path exists but is not a file: '{validated_path}'")
 
-        is_text = FileUtils.is_text_file(path_obj)
+        is_text_mode = mode == "text"
 
-        if is_text:
-            original_content_text = path_obj.read_text(encoding="utf-8")
-            if not isinstance(old_content, str) or not isinstance(new_content, str):
-                raise ValueError("old_content and new_content must be strings for text files.")
+        if is_text_mode:
+            original_content_text = path_obj.read_text(encoding=file_encoding)
+            processed_old_content = FileUtils.validate_and_decode_content(old_content, "text", input_format)
+            processed_new_content = FileUtils.validate_and_decode_content(new_content, "text", input_format)
+
+            if not isinstance(processed_old_content, str) or not isinstance(processed_new_content, str):
+                raise ValueError("old_content and new_content must be strings for text files after decoding.")
 
             original_content_normalized = FileUtils.normalize_line_endings(original_content_text, "\n")
-            old_content_normalized = FileUtils.normalize_line_endings(old_content, "\n")
-            new_content_normalized = FileUtils.normalize_line_endings(new_content, "\n")
+            old_content_normalized = FileUtils.normalize_line_endings(processed_old_content, "\n")
+            new_content_normalized = FileUtils.normalize_line_endings(processed_new_content, "\n")
 
-            if number_of_occurrences == -1:
+            if is_regex:
+                try:
+                    modified_content, replacements_made = re.subn(
+                        old_content_normalized,
+                        new_content_normalized,
+                        original_content_normalized,
+                        count=(0 if number_of_occurrences == -1 else number_of_occurrences),
+                    )
+                except re.error as e:
+                    raise ValueError(f"Invalid regex pattern for text content: {e}") from e
+            elif number_of_occurrences == -1:
                 modified_content = original_content_normalized.replace(old_content_normalized, new_content_normalized)
                 replacements_made = original_content_normalized.count(old_content_normalized)
             else:
                 modified_content = original_content_normalized.replace(old_content_normalized, new_content_normalized, number_of_occurrences)
-                replacements_made = len(re.findall(re.escape(old_content_normalized), original_content_normalized))
+                replacements_made = original_content_normalized.count(old_content_normalized)
                 replacements_made = min(replacements_made, number_of_occurrences)
 
-            path_obj.write_text(modified_content, encoding="utf-8")
+            path_obj.write_text(modified_content, encoding=file_encoding)
 
             diff_output = FileUtils.generate_diff(original_content_text, modified_content, file_path)
             return f"Successfully replaced {replacements_made} occurrence(s) in text file '{file_path}'.\n\nDiff:\n{diff_output}"
 
-        # Binary file handling
-        if isinstance(old_content, str):
-            old_content_bytes = base64.b64decode(old_content.encode("utf-8"))
-        elif isinstance(old_content, bytes):
-            old_content_bytes = old_content
-        else:
-            raise ValueError("old_content must be bytes or base64-encoded string for binary files.")
+        processed_old_content_bytes = FileUtils.validate_and_decode_content(old_content, "binary", input_format)
+        processed_new_content_bytes = FileUtils.validate_and_decode_content(new_content, "binary", input_format)
 
-        if isinstance(new_content, str):
-            new_content_bytes = base64.b64decode(new_content.encode("utf-8"))
-        elif isinstance(new_content, bytes):
-            new_content_bytes = new_content
-        else:
-            raise ValueError("new_content must be bytes or base64-encoded string for binary files.")
+        if not isinstance(processed_old_content_bytes, bytes) or not isinstance(processed_new_content_bytes, bytes):
+            raise ValueError("old_content and new_content must be bytes for binary files after decoding.")
 
         modified_content_bytes, replacements_made = FileUtils._replace_content_in_binary_file(
-            path_obj, old_content_bytes, new_content_bytes, number_of_occurrences
+            path_obj, processed_old_content_bytes, processed_new_content_bytes, number_of_occurrences, is_regex
         )
         path_obj.write_bytes(modified_content_bytes)
         return f"Successfully replaced {replacements_made} occurrence(s) in binary file '{file_path}'."

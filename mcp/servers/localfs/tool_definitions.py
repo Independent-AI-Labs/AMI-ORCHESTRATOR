@@ -67,7 +67,10 @@ def get_tool_declarations():
         },
         {
             "name": "read_from_file",
-            "description": "Reads file content with support for offsets, various file types (text, binary, image), and line numbering for text files.",
+            "description": (
+                "Reads file content with support for offsets, various file types (text, binary, image), "
+                "and line numbering for text files. Returns content in the specified output format."
+            ),
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -91,6 +94,17 @@ def get_tool_declarations():
                         "default": "BYTE",
                         "description": "Specifies how offsets are interpreted (Byte, Char, or Line).",
                     },
+                    "output_format": {
+                        "type": "string",
+                        "enum": ["quoted-printable", "base64", "raw-utf8"],
+                        "default": "quoted-printable",
+                        "description": "The format in which to return the content (Quoted-Printable, Base64, or raw UTF-8 string).",
+                    },
+                    "file_encoding": {
+                        "type": "string",
+                        "default": "utf-8",
+                        "description": "Text encoding to use when reading text files.",
+                    },
                 },
                 "required": ["path"],
             },
@@ -107,18 +121,24 @@ def get_tool_declarations():
                     },
                     "new_content": {
                         "type": "string",
-                        "description": "The content to write. For binary mode, provide base64-encoded data.",
+                        "description": "The content to write. Format depends on `input_format`.",
                     },
                     "mode": {
                         "type": "string",
                         "enum": ["text", "binary"],
                         "default": "text",
-                        "description": "Write mode: 'text' for text files with encoding, 'binary' for binary files (expects base64).",
+                        "description": "Write mode: 'text' for text files, 'binary' for binary files.",
                     },
-                    "encoding": {
+                    "input_format": {
+                        "type": "string",
+                        "enum": ["quoted-printable", "base64", "raw-utf8"],
+                        "default": "quoted-printable",
+                        "description": "The format of the `new_content` (Quoted-Printable, Base64, or raw UTF-8 string).",
+                    },
+                    "file_encoding": {
                         "type": "string",
                         "default": "utf-8",
-                        "description": "Text encoding to use (ignored in binary mode).",
+                        "description": "Text encoding to use when writing text files (ignored in binary mode).",
                     },
                 },
                 "required": ["path", "new_content"],
@@ -148,9 +168,69 @@ def get_tool_declarations():
                         "default": "BYTE",
                         "description": "Specifies how offsets are interpreted (Byte, Char, or Line).",
                     },
-                    "new_content": {"type": "string", "description": "The new content to replace the specified range (string for text, base64 for binary)."},
+                    "new_content": {
+                        "type": "string",
+                        "description": "The new content to replace the specified range. Format depends on `input_format`.",
+                    },
+                    "input_format": {
+                        "type": "string",
+                        "enum": ["quoted-printable", "base64", "raw-utf8"],
+                        "default": "quoted-printable",
+                        "description": "The format of the `new_content` (Quoted-Printable, Base64, or raw UTF-8 string).",
+                    },
+                    "file_encoding": {
+                        "type": "string",
+                        "default": "utf-8",
+                        "description": "Text encoding to use when modifying text files (ignored in binary mode).",
+                    },
                 },
                 "required": ["path", "new_content"],
+            },
+        },
+        {
+            "name": "replace_content_in_file",
+            "description": "Replaces occurrences of old_content with new_content within a file, with regex support.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string", "description": "The absolute path to the file."},
+                    "old_content": {
+                        "type": "string",
+                        "description": "The content to find. Format depends on `input_format`.",
+                    },
+                    "new_content": {
+                        "type": "string",
+                        "description": "The content to replace with. Format depends on `input_format`.",
+                    },
+                    "number_of_occurrences": {
+                        "type": "integer",
+                        "default": -1,
+                        "description": "The number of occurrences to replace (-1 for all).",
+                    },
+                    "is_regex": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": "If True, old_content will be treated as a regular expression.",
+                    },
+                    "mode": {
+                        "type": "string",
+                        "enum": ["text", "binary"],
+                        "default": "text",
+                        "description": "File mode: 'text' for text files, 'binary' for binary files.",
+                    },
+                    "input_format": {
+                        "type": "string",
+                        "enum": ["quoted-printable", "base64", "raw-utf8"],
+                        "default": "quoted-printable",
+                        "description": "The format of the `old_content` and `new_content` (Quoted-Printable, Base64, or raw UTF-8 string).",
+                    },
+                    "file_encoding": {
+                        "type": "string",
+                        "default": "utf-8",
+                        "description": "Text encoding to use when replacing content in text files (ignored in binary mode).",
+                    },
+                },
+                "required": ["path", "old_content", "new_content"],
             },
         },
     ]

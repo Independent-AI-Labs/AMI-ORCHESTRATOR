@@ -20,11 +20,11 @@ The server exposes the following tools:
 - `list_dir`: Lists the names of files and subdirectories directly within a specified directory path.
 - `create_dirs`: Creates a directory and any necessary parent directories.
 - `find_paths`: Searches for files based on keywords in path/name or content.
-- `read_file`: Reads the content of a file.
-- `write_file`: Writes content to a file.
+- `read_file`: Reads the content of a file, with support for specifying `file_encoding` and `output_format`.
+- `write_file`: Writes content to a file, with support for specifying `file_encoding` and `input_format`.
 - `delete_paths`: Deletes multiple files or directories.
-- `modify_file`: Modifies a file by replacing a range of content with new content.
-- `replace_content_in_file`: Replaces all occurrences of old_content with new_content within a file.
+- `modify_file`: Modifies a file by replacing a range of content with new content, with support for specifying `file_encoding` and `input_format`.
+- `replace_content_in_file`: Replaces all occurrences of old_content with new_content within a file, with support for specifying `file_encoding` and `input_format`.
 
 ## Usage
 

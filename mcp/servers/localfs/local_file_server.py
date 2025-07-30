@@ -1,5 +1,4 @@
 import argparse
-import base64
 import json
 import logging
 import sys
@@ -7,7 +6,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import cast
 
-from orchestrator.mcp.servers.localfs.file_utils import FileUtils, OffsetType
+from orchestrator.mcp.servers.localfs.file_utils import FileUtils, InputFormat, OffsetType, OutputFormat
 from orchestrator.mcp.servers.localfs.tool_definitions import get_tool_declarations
 
 
@@ -72,22 +71,35 @@ class LocalFiles:
 
         return filtered_args
 
-    def read_from_file(self, path: str, start_offset_inclusive: int = 0, end_offset_inclusive: int = -1, offset_type: str = "BYTE") -> str:
+    def read_from_file(
+        self,
+        path: str,
+        start_offset_inclusive: int = 0,
+        end_offset_inclusive: int = -1,
+        offset_type: str = "BYTE",
+        file_encoding: str = "utf-8",
+        output_format: str = "quoted-printable",
+    ) -> str:
         """Read content from a file with offset support."""
         try:
             offset_type_enum = OffsetType[offset_type.upper()]
-            logging.info("Reading file: %s (offset_type: %s, start: %s, end: %s)", path, offset_type_enum.name, start_offset_inclusive, end_offset_inclusive)
+            output_format_enum = OutputFormat[output_format.replace("-", "_").upper()]
+            logging.info(
+                "Reading file: %s (offset_type: %s, start: %s, end: %s, file_encoding: %s, output_format: %s)",
+                path,
+                offset_type_enum.name,
+                start_offset_inclusive,
+                end_offset_inclusive,
+                file_encoding,
+                output_format_enum.name,
+            )
 
-            content = FileUtils.read_file_content(path, self.root_dir, start_offset_inclusive, end_offset_inclusive, offset_type_enum)
+            content = FileUtils.read_file_content(
+                path, self.root_dir, start_offset_inclusive, end_offset_inclusive, offset_type_enum, file_encoding, output_format_enum
+            )
 
             if isinstance(content, bytes):
-                encoded_content = base64.b64encode(content).decode("utf-8")
-                logging.info(
-                    "Successfully read binary file: %s (%s bytes)",
-                    path,
-                    len(content),
-                )
-                return encoded_content
+                return content.decode("ascii")  # Should be ascii for QP or Base64
             return content
 
         except Exception as e:  # pylint: disable=broad-exception-caught
@@ -102,15 +114,18 @@ class LocalFiles:
         message, diff_output = FileUtils.get_write_success_message_text(file_path, cast(str, content), cast(str | None, original_content))
         return {"message": message, "diff": diff_output}
 
-    def write_to_file(self, path: str, new_content: str | bytes, mode: str = "text", encoding: str = "utf-8") -> str:
+    def write_to_file(
+        self, path: str, new_content: str | bytes, mode: str = "text", input_format: str = "quoted-printable", file_encoding: str = "utf-8"
+    ) -> str:
         """Write content to a file."""
         try:
-            logging.info("Writing file: %s (mode: %s, encoding: %s)", path, mode, encoding)
+            input_format_enum = InputFormat[input_format.replace("-", "_").upper()]
+            logging.info("Writing file: %s (mode: %s, input_format: %s, file_encoding: %s)", path, mode, input_format_enum.name, file_encoding)
 
             if not path:
                 raise ValueError("path cannot be empty")
 
-            processed_content_raw = FileUtils.validate_and_decode_content(new_content, mode)
+            processed_content_raw = FileUtils.validate_and_decode_content(new_content, mode, input_format_enum)
             processed_content: str | bytes
 
             if mode == "binary":
@@ -127,13 +142,17 @@ class LocalFiles:
             if file_exists:
                 try:
                     read_content = FileUtils.read_file_content(
-                        path, self.root_dir, offset_type=OffsetType.BYTE if mode == "binary" else OffsetType.CHAR, encoding=encoding
+                        path,
+                        self.root_dir,
+                        offset_type=OffsetType.BYTE if mode == "binary" else OffsetType.CHAR,
+                        file_encoding=file_encoding,
+                        output_format=OutputFormat.RAW_UTF8,  # Read raw for diffing
                     )
                     original_content = cast(bytes, read_content) if mode == "binary" else cast(str, read_content)
                 except Exception as e:  # pylint: disable=broad-exception-caught
                     logging.warning("Could not read existing file for diff: %s", e)
 
-            FileUtils.write_file_content(path, processed_content, self.root_dir, mode, encoding)
+            FileUtils.write_file_content(path, processed_content, self.root_dir, mode, file_encoding)
             result_dict = self._get_write_success_message(path, processed_content, mode, original_content)
             return result_dict["message"]
 
@@ -187,21 +206,54 @@ class LocalFiles:
             logging.error("Failed to delete paths %s: %s", paths, e)
             raise e
 
-    def modify_file(self, path: str, start_offset_inclusive: int, end_offset_inclusive: int, offset_type: str, new_content: str | bytes) -> str:
+    def modify_file(
+        self,
+        path: str,
+        start_offset_inclusive: int,
+        end_offset_inclusive: int,
+        offset_type: str,
+        new_content: str | bytes,
+        input_format: str = "quoted-printable",
+        file_encoding: str = "utf-8",
+    ) -> str:
         """Modifies a file by replacing a range of content with new content."""
         try:
             offset_type_enum = OffsetType[offset_type.upper()]
-            logging.info("Modifying file %s (offset_type: %s, start: %s, end: %s)", path, offset_type_enum.name, start_offset_inclusive, end_offset_inclusive)
-            return FileUtils.modify_file(path, self.root_dir, start_offset_inclusive, end_offset_inclusive, offset_type_enum, new_content)
+            input_format_enum = InputFormat[input_format.replace("-", "_").upper()]
+            logging.info(
+                "Modifying file %s (offset_type: %s, start: %s, end: %s, input_format: %s, file_encoding: %s)",
+                path,
+                offset_type_enum.name,
+                start_offset_inclusive,
+                end_offset_inclusive,
+                input_format_enum.name,
+                file_encoding,
+            )
+            return FileUtils.modify_file(
+                path, self.root_dir, start_offset_inclusive, end_offset_inclusive, offset_type_enum, new_content, input_format_enum, file_encoding
+            )
         except Exception as e:  # pylint: disable=broad-exception-caught
             logging.error("Failed to modify file %s: %s", path, e)
             raise e
 
-    def replace_content_in_file(self, path: str, old_content: str | bytes, new_content: str | bytes, number_of_occurrences: int = -1) -> str:
+    def replace_content_in_file(
+        self,
+        path: str,
+        old_content: str | bytes,
+        new_content: str | bytes,
+        number_of_occurrences: int = -1,
+        is_regex: bool = False,
+        mode: str = "text",
+        input_format: str = "quoted-printable",
+        file_encoding: str = "utf-8",
+    ) -> str:
         """Replaces all occurrences of old_content with new_content within a file."""
         try:
-            logging.info("Replacing content in file %s", path)
-            return FileUtils.replace_content_in_file(path, self.root_dir, old_content, new_content, number_of_occurrences)
+            input_format_enum = InputFormat[input_format.replace("-", "_").upper()]
+            logging.info("Replacing content in file %s (input_format: %s, file_encoding: %s)", path, input_format_enum.name, file_encoding)
+            return FileUtils.replace_content_in_file(
+                path, self.root_dir, old_content, new_content, number_of_occurrences, is_regex, mode, input_format_enum, file_encoding
+            )
         except Exception as e:  # pylint: disable=broad-exception-caught
             logging.error("Failed to replace content in file %s: %s", path, e)
             raise e
