@@ -180,31 +180,42 @@ class FileUtils:
 
     @staticmethod
     def _read_text_content(path_obj: Path, start_offset_inclusive: int, end_offset_inclusive: int, offset_type: OffsetType, encoding: str) -> str:
-        content = path_obj.read_text(encoding=encoding)
-        normalized_content = FileUtils.normalize_line_endings(content, "\n")
-        if content.endswith(("\r\n", "\n", "\r")) and not normalized_content.endswith("\n"):
-            normalized_content += "\n"
+        full_content = path_obj.read_text(encoding=encoding)
+        normalized_full_content = FileUtils.normalize_line_endings(full_content, "\n")
+        if full_content.endswith(("\r\n", "\n", "\r")) and not normalized_full_content.endswith("\n"):
+            normalized_full_content += "\n"
+
+        processed_content_lines = []
+        start_line_for_display = 0  # This will be the actual line number in the file for the first line of processed_content
 
         if offset_type == OffsetType.LINE:
-            all_lines = normalized_content.splitlines(keepends=True)
+            all_lines = normalized_full_content.splitlines(keepends=True)
             end_line = len(all_lines) if end_offset_inclusive == -1 else end_offset_inclusive + 1
-            processed_lines = all_lines[start_offset_inclusive:end_line]
-            numbered_lines = [f"{i + start_offset_inclusive + 1: >4} | {line.rstrip('\n')}" for i, line in enumerate(processed_lines)]
-            return "\n".join(numbered_lines)
+            processed_content_lines = all_lines[start_offset_inclusive:end_line]
+            start_line_for_display = start_offset_inclusive + 1  # Line numbers are 1-indexed
+
         if offset_type == OffsetType.CHAR:
-            end_char = len(normalized_content) if end_offset_inclusive == -1 else end_offset_inclusive + 1
-            processed_content = normalized_content[start_offset_inclusive:end_char]
-            lines = processed_content.splitlines()
-            numbered_lines = [f"{i + 1: >4} | {line}" for i, line in enumerate(lines)]
-            return "\n".join(numbered_lines)
+            end_char = len(normalized_full_content) if end_offset_inclusive == -1 else end_offset_inclusive + 1
+            processed_content_segment = normalized_full_content[start_offset_inclusive:end_char]
+            processed_content_lines = processed_content_segment.splitlines(keepends=True)
+
+            # Calculate the starting line number for CHAR offset
+            start_line_for_display = normalized_full_content[:start_offset_inclusive].count("\n") + 1
+
         if offset_type == OffsetType.BYTE:
-            content_bytes = path_obj.read_bytes()
-            end_byte = len(content_bytes) if end_offset_inclusive == -1 else end_offset_inclusive + 1
-            processed_content = FileUtils.normalize_line_endings(content_bytes[start_offset_inclusive:end_byte].decode(encoding), "\n")
-            lines = processed_content.splitlines()
-            numbered_lines = [f"{i + 1: >4} | {line}" for i, line in enumerate(lines)]
-            return "\n".join(numbered_lines)
-        raise ValueError(f"Unknown offset type: {offset_type}")
+            full_content_bytes = path_obj.read_bytes()
+            end_byte = len(full_content_bytes) if end_offset_inclusive == -1 else end_offset_inclusive + 1
+            processed_content_bytes_segment = full_content_bytes[start_offset_inclusive:end_byte]
+            processed_content_segment = processed_content_bytes_segment.decode(encoding, errors="ignore")
+            processed_content_lines = FileUtils.normalize_line_endings(processed_content_segment, "\n").splitlines(keepends=True)
+
+            # Calculate the starting line number for BYTE offset
+            char_offset_at_start_byte = len(full_content_bytes[:start_offset_inclusive].decode(encoding, errors="ignore"))
+            start_line_for_display = normalized_full_content[:char_offset_at_start_byte].count("\n") + 1
+
+        # Now, unify the numbering logic
+        numbered_lines = [f"{i + start_line_for_display: >4} | {line.rstrip('\n')}" for i, line in enumerate(processed_content_lines)]
+        return "\n".join(numbered_lines)
 
     @staticmethod
     def _read_binary_content(path_obj: Path, start_offset_inclusive: int, end_offset_inclusive: int, offset_type: OffsetType) -> bytes:
