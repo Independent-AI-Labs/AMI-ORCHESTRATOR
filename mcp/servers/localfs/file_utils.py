@@ -186,23 +186,25 @@ class FileUtils:
             normalized_content += "\n"
 
         if offset_type == OffsetType.LINE:
-            lines = normalized_content.splitlines(keepends=True)
-            end_line = len(lines) if end_offset_inclusive == -1 else end_offset_inclusive + 1
-            processed_content = "".join(lines[start_offset_inclusive:end_line])
-        elif offset_type == OffsetType.CHAR:
+            all_lines = normalized_content.splitlines(keepends=True)
+            end_line = len(all_lines) if end_offset_inclusive == -1 else end_offset_inclusive + 1
+            processed_lines = all_lines[start_offset_inclusive:end_line]
+            numbered_lines = [f"{i + start_offset_inclusive + 1: >4} | {line.rstrip('\n')}" for i, line in enumerate(processed_lines)]
+            return "\n".join(numbered_lines)
+        if offset_type == OffsetType.CHAR:
             end_char = len(normalized_content) if end_offset_inclusive == -1 else end_offset_inclusive + 1
             processed_content = normalized_content[start_offset_inclusive:end_char]
-        elif offset_type == OffsetType.BYTE:
+            lines = processed_content.splitlines()
+            numbered_lines = [f"{i + 1: >4} | {line}" for i, line in enumerate(lines)]
+            return "\n".join(numbered_lines)
+        if offset_type == OffsetType.BYTE:
             content_bytes = path_obj.read_bytes()
             end_byte = len(content_bytes) if end_offset_inclusive == -1 else end_offset_inclusive + 1
             processed_content = FileUtils.normalize_line_endings(content_bytes[start_offset_inclusive:end_byte].decode(encoding), "\n")
-        else:
-            raise ValueError(f"Unknown offset type: {offset_type}")
-
-        lines = processed_content.splitlines()
-        start_line = start_offset_inclusive if offset_type == OffsetType.LINE else 0
-        numbered_lines = [f"{i + start_line + 1: >4} | {line}" for i, line in enumerate(lines)]
-        return "\n".join(numbered_lines)
+            lines = processed_content.splitlines()
+            numbered_lines = [f"{i + 1: >4} | {line}" for i, line in enumerate(lines)]
+            return "\n".join(numbered_lines)
+        raise ValueError(f"Unknown offset type: {offset_type}")
 
     @staticmethod
     def _read_binary_content(path_obj: Path, start_offset_inclusive: int, end_offset_inclusive: int, offset_type: OffsetType) -> bytes:
