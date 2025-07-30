@@ -153,5 +153,4 @@ def get_tool_declarations():
                 "required": ["path", "new_content"],
             },
         },
-
     ]
