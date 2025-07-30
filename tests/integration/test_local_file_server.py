@@ -1,4 +1,5 @@
 import ast
+import base64
 import json
 import os
 import signal
@@ -245,8 +246,8 @@ def test_mcp_read_from_file_text(client: MCPClient, temp_file: str):
 def test_mcp_read_from_file_binary(client: MCPClient, temp_binary_file: str):
     """Tests reading a binary file using MCP."""
     result = client.call_tool("read_from_file", path=temp_binary_file)
-    expected_content_qp = encodestring(b"\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09").decode("ascii")
-    assert result["content"][0]["text"] == expected_content_qp
+    expected_content_base64 = base64.b64encode(b"\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09").decode("ascii")
+    assert result["content"][0]["text"] == expected_content_base64
 
 
 def test_mcp_write_to_file_text(client: MCPClient):
@@ -261,8 +262,14 @@ def test_mcp_write_to_file_text(client: MCPClient):
 def test_mcp_write_to_file_binary(client: MCPClient):
     """Tests writing a binary file using MCP."""
     file_path = Path(client.root_dir) / "write_binary_test.bin"
-    content_qp = encodestring(b"\x0a\x0b\x0c").decode("ascii")
-    result = client.call_tool("write_to_file", path=str(file_path), new_content=content_qp, mode="binary")
+    content_bytes = b"\x0a\x0b\x0c"
+    result = client.call_tool(
+        "write_to_file",
+        path=str(file_path),
+        new_content=base64.b64encode(content_bytes).decode("ascii"),
+        mode="binary",
+        input_format="raw-utf8",
+    )
     assert "Successfully wrote binary content" in result["content"][0]["text"]
     assert file_path.read_bytes() == b"\x0a\x0b\x0c"
 

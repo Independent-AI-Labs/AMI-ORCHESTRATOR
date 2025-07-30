@@ -304,7 +304,7 @@ class FileUtils:
         end_offset_inclusive: int = -1,
         offset_type: OffsetType = OffsetType.BYTE,
         file_encoding: str = "utf-8",
-        output_format: OutputFormat = OutputFormat.QUOTED_PRINTABLE,
+        output_format: OutputFormat = OutputFormat.RAW_UTF8,
     ):
         """Read file content with proper error handling and normalization, with offset support."""
         validated_path = FileUtils.validate_file_path(file_path, root_dir)
@@ -326,6 +326,9 @@ class FileUtils:
             if is_image:
                 return FileUtils._encode_content(path_obj.read_bytes(), output_format)
             if not is_text:
+                if output_format == OutputFormat.RAW_UTF8:
+                    # For binary files, if RAW_UTF8 is requested, base64 encode it
+                    return base64.b64encode(path_obj.read_bytes()).decode("ascii")
                 return FileUtils._encode_content(
                     FileUtils._read_binary_content(path_obj, start_offset_inclusive, end_offset_inclusive, offset_type), output_format
                 )
@@ -445,6 +448,8 @@ class FileUtils:
 
         if mode == "binary":
             if isinstance(content, str):
+                if input_format == InputFormat.RAW_UTF8:
+                    return base64.b64decode(content.encode("ascii"))
                 return FileUtils._decode_content(content, input_format)
             if isinstance(content, bytes):
                 return content
@@ -573,7 +578,7 @@ class FileUtils:
         number_of_occurrences: int = -1,
         is_regex: bool = False,
         mode: str = "text",
-        input_format: InputFormat = InputFormat.QUOTED_PRINTABLE,
+        input_format: InputFormat = InputFormat.RAW_UTF8,
         file_encoding: str = "utf-8",
     ) -> str:
         """Replaces occurrences of old_content with new_content within a file, with regex support."""

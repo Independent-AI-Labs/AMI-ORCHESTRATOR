@@ -97,7 +97,7 @@ def get_tool_declarations():
                     "output_format": {
                         "type": "string",
                         "enum": ["quoted-printable", "base64", "raw-utf8"],
-                        "default": "quoted-printable",
+                        "default": "raw-utf8",
                         "description": "The format in which to return the content (Quoted-Printable, Base64, or raw UTF-8 string).",
                     },
                     "file_encoding": {
@@ -132,7 +132,7 @@ def get_tool_declarations():
                     "input_format": {
                         "type": "string",
                         "enum": ["quoted-printable", "base64", "raw-utf8"],
-                        "default": "quoted-printable",
+                        "default": "raw-utf8",
                         "description": "The format of the `new_content` (Quoted-Printable, Base64, or raw UTF-8 string).",
                     },
                     "file_encoding": {
@@ -175,7 +175,7 @@ def get_tool_declarations():
                     "input_format": {
                         "type": "string",
                         "enum": ["quoted-printable", "base64", "raw-utf8"],
-                        "default": "quoted-printable",
+                        "default": "raw-utf8",
                         "description": "The format of the `new_content` (Quoted-Printable, Base64, or raw UTF-8 string).",
                     },
                     "file_encoding": {
@@ -221,7 +221,7 @@ def get_tool_declarations():
                     "input_format": {
                         "type": "string",
                         "enum": ["quoted-printable", "base64", "raw-utf8"],
-                        "default": "quoted-printable",
+                        "default": "raw-utf8",
                         "description": "The format of the `old_content` and `new_content` (Quoted-Printable, Base64, or raw UTF-8 string).",
                     },
                     "file_encoding": {

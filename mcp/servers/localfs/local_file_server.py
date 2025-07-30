@@ -78,7 +78,7 @@ class LocalFiles:
         end_offset_inclusive: int = -1,
         offset_type: str = "BYTE",
         file_encoding: str = "utf-8",
-        output_format: str = "quoted-printable",
+        output_format: str = "raw-utf8",
     ) -> str:
         """Read content from a file with offset support."""
         try:
@@ -99,6 +99,8 @@ class LocalFiles:
             )
 
             if isinstance(content, bytes):
+                if output_format_enum == OutputFormat.RAW_UTF8:
+                    return content.decode("latin-1")  # Represent raw bytes as a string
                 return content.decode("ascii")  # Should be ascii for QP or Base64
             return content
 
@@ -114,9 +116,7 @@ class LocalFiles:
         message, diff_output = FileUtils.get_write_success_message_text(file_path, cast(str, content), cast(str | None, original_content))
         return {"message": message, "diff": diff_output}
 
-    def write_to_file(
-        self, path: str, new_content: str | bytes, mode: str = "text", input_format: str = "quoted-printable", file_encoding: str = "utf-8"
-    ) -> str:
+    def write_to_file(self, path: str, new_content: str | bytes, mode: str = "text", input_format: str = "raw-utf8", file_encoding: str = "utf-8") -> str:
         """Write content to a file."""
         try:
             input_format_enum = InputFormat[input_format.replace("-", "_").upper()]
