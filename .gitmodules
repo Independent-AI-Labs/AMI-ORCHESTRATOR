@@ -1,0 +1,9 @@
+[submodule "browser"]
+	path = browser
+	url = git@github.com:Independent-AI-Labs/AMI-WEB.git
+[submodule "ux"]
+	path = ux
+	url = git@github.com:Independent-AI-Labs/AMI-UX.git
+[submodule "base"]
+	path = base
+	url = https://github.com/Independent-AI-Labs/AMI-BASE.git

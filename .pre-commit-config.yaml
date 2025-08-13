@@ -1,0 +1,58 @@
+repos:
+  # Ruff - replaces black, isort, pylint, and bandit
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.1.9
+    hooks:
+      # Linting (includes security checks)
+      - id: ruff
+        args: [ --fix, --exit-non-zero-on-fix ]
+        stages: [ pre-commit ]
+      # Formatting (replaces black)
+      - id: ruff-format
+        stages: [ pre-commit ]
+
+  # Type checking
+  - repo: local
+    hooks:
+      - id: mypy
+        name: mypy
+        entry: mypy
+        language: python
+        language_version: python3.12
+        types: [ python ]
+        require_serial: true
+        stages: [ pre-commit ]
+
+  - repo: local
+    hooks:
+      - id: mypy-tests
+        name: mypy (tests)
+        entry: mypy
+        language: python
+        language_version: python3.12
+        types: [ python ]
+        require_serial: true
+        stages: [ pre-commit ]
+
+  - repo: local
+    hooks:
+      - id: pytest
+        name: pytest
+        entry: pytest
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [ pre-push ]
+
+  # Additional useful hooks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: check-yaml
+        stages: [ pre-commit ]
+      - id: check-added-large-files
+        stages: [ pre-commit ]
+      - id: check-merge-conflict
+        stages: [ pre-commit ]
+      - id: debug-statements
+        stages: [ pre-commit ]

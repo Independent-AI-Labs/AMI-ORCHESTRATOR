@@ -1,0 +1,49 @@
+line-length = 160
+target-version = "py312"
+
+[lint]
+# Comprehensive rule set replacing pylint + bandit
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort (import sorting)
+    "B",   # flake8-bugbear
+    "S",   # flake8-bandit (security)
+    "C4",  # flake8-comprehensions
+    "UP",  # pyupgrade
+    "PL",  # pylint
+    "A",   # flake8-builtins
+    "C90", # mccabe complexity
+    "N",   # pep8-naming
+    "SIM", # flake8-simplify
+    "RET", # flake8-return
+    "ARG", # flake8-unused-arguments
+    "PTH", # flake8-use-pathlib
+    "ERA", # eradicate (remove commented code)
+    "PIE", # flake8-pie
+    "T20", # flake8-print
+    "Q",   # flake8-quotes
+]
+
+ignore = [
+    # Add any specific rules you want to ignore based on your codebase
+    "S101",  # Use of assert (if you use asserts in tests)
+    "T201",  # print() statements (if you want to keep some)
+    "S603",
+    "S607",
+    "A003",
+]
+
+[lint.mccabe]
+max-complexity = 10
+
+[lint.pylint]
+max-args = 16
+max-locals = 64
+max-statements = 96
+max-branches = 16
+
+[format]
+line-ending = "auto"
+quote-style = "double"
