@@ -7,3 +7,6 @@
 [submodule "base"]
 	path = base
 	url = https://github.com/Independent-AI-Labs/AMI-BASE.git
+[submodule "streams"]
+	path = streams
+	url = git@github.com:Independent-AI-Labs/AMI-STREAMS.git
