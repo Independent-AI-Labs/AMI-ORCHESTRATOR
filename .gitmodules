@@ -10,3 +10,12 @@
 [submodule "streams"]
 	path = streams
 	url = git@github.com:Independent-AI-Labs/AMI-STREAMS.git
+[submodule "compliance"]
+	path = compliance
+	url = git@github.com:Independent-AI-Labs/AMI-COMPLIANCE.git
+[submodule "domains"]
+	path = domains
+	url = git@github.com:Independent-AI-Labs/AMI-DOMAINS.git
+[submodule "files"]
+	path = files
+	url = git@github.com:Independent-AI-Labs/AMI-FILES.git
