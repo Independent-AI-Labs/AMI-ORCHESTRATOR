@@ -21,6 +21,9 @@ Deploy and manage automation across any environment - from bare metal to contain
 ### Advanced Media and Data Streaming
 Stream, capture, and process media in real-time. Integrate with OBS Studio for professional streaming setups, create virtual displays for headless automation, manage RDP sessions programmatically, and process data streams at scale with sub-second latency.
 
+### Unified DataOps Infrastructure
+Seamlessly manage data across multiple storage backends with a single, unified API. Automatically sync between Dgraph, MongoDB, PostgreSQL, Redis, and more. Built-in security with ACL-based permissions, UUID v7 for time-ordered IDs, and BPMN 2.0 workflow support. Access everything through a minimal MCP server interface that provides CRUD operations for all your data models.
+
 ### Intelligent File Management
 Navigate, analyze, and understand your codebase like never before. Visualize AST structures, dissect PDF documents, synchronize files across systems, and search through millions of files using semantic understanding rather than simple text matching.
 
@@ -61,6 +64,9 @@ AMI-ORCHESTRATOR is built on principles that prioritize:
 - **Event-Driven Architecture** - No polling, no waiting, just instant response to changes as they happen
 - **Modular Composition** - Combine capabilities like building blocks to create exactly what you need
 - **Transparent Operation** - Know what the AI is doing, why it's doing it, and how to control it
+- **Unified Data Layer** - Single source of truth with Dgraph, automatic synchronization across all storage backends
+- **Time-Ordered Operations** - UUID v7 ensures all operations are naturally sortable and traceable
+- **Minimal Tool Surface** - MCP servers expose only essential operations, keeping complexity low
 
 ## Getting Started
 
