@@ -1,6 +1,6 @@
 # AMI-ORCHESTRATOR
 
-## Autonomous Machine Intelligence for Enterprise Automation
+## Advanced Machine Intelligence for Enterprise Automation
 
 AMI-ORCHESTRATOR is a next-generation enterprise automation framework that enables organizations to build, deploy, and manage AI-driven automation at scale while maintaining full compliance with EU AI Act, NIST, and ISO standards.
 
