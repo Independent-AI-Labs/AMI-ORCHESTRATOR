@@ -1,3 +1,4 @@
+
 [submodule "browser"]
 	path = browser
 	url = git@github.com:Independent-AI-Labs/AMI-WEB.git
