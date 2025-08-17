@@ -22,7 +22,13 @@ Deploy and manage automation across any environment - from bare metal to contain
 Stream, capture, and process media in real-time. Integrate with OBS Studio for professional streaming setups, create virtual displays for headless automation, manage RDP sessions programmatically, and process data streams at scale with sub-second latency.
 
 ### Unified DataOps Infrastructure
-Seamlessly manage data across multiple storage backends with a single, unified API. Automatically sync between Dgraph, MongoDB, PostgreSQL, Redis, and more. Built-in security with ACL-based permissions, UUID v7 for time-ordered IDs, and BPMN 2.0 workflow support. Access everything through a minimal MCP server interface that provides CRUD operations for all your data models.
+Seamlessly manage data across multiple storage backends with a single, unified API. Automatically sync between Dgraph (graph database), MongoDB (documents), PostgreSQL (relational), Redis (cache), and S3 (blob storage). Features include:
+- **Security-First Design**: Dgraph as the single source of truth for ACL-based permissions with role and group support
+- **Time-Ordered Operations**: UUID v7 ensures all operations are naturally sortable and traceable
+- **BPMN 2.0 Workflows**: Complete support for business process modeling and execution
+- **Multiple Sync Strategies**: Primary-first, parallel, or transactional synchronization
+- **MCP Server Access**: Minimal interface exposing only essential CRUD operations for all models
+- **100% Test Coverage**: All 114 tests passing with comprehensive integration testing
 
 ### Intelligent File Management
 Navigate, analyze, and understand your codebase like never before. Visualize AST structures, dissect PDF documents, synchronize files across systems, and search through millions of files using semantic understanding rather than simple text matching.
@@ -72,16 +78,25 @@ AMI-ORCHESTRATOR is built on principles that prioritize:
 
 ```bash
 # Clone the repository with all submodules
-git clone --recursive https://github.com/your-org/ami-orchestrator.git
+git clone --recursive https://github.com/Independent-AI-Labs/AMI-ORCHESTRATOR.git
 
 # Navigate to the project
-cd ami-orchestrator
+cd AMI-ORCHESTRATOR
 
-# Initialize the environment
-./scripts/setup.sh
+# Setup Python environment with uv
+uv venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 
-# Start the orchestrator
-./scripts/start.sh
+# Install dependencies for each module
+cd base && uv pip install -r requirements.txt && cd ..
+cd compliance && uv pip install -r requirements.txt && cd ..
+cd domains && uv pip install -r requirements.txt && cd ..
+
+# Start Dgraph (requires Docker)
+docker run -d -p 8080:8080 -p 9080:9080 dgraph/standalone:latest
+
+# Run tests to verify setup
+cd base && python -m pytest
 ```
 
 ## Use Cases
@@ -104,11 +119,13 @@ Process video streams in real-time, generate automated content, manage digital a
 ## System Requirements
 
 - **Operating Systems**: Windows 10+, Ubuntu 20.04+, macOS 12+
-- **Python**: 3.10 or higher
+- **Python**: 3.10 or higher (3.12 recommended)
 - **Node.js**: 18.0 or higher
-- **Docker**: 20.0 or higher (optional)
+- **Docker**: 20.0 or higher (for Dgraph and other services)
 - **Memory**: 8GB minimum, 16GB recommended
 - **Storage**: 50GB available space
+- **Dependencies Manager**: uv (modern Python package installer)
+- **Database**: Dgraph 21.0+ (primary storage backend)
 
 ## Security and Compliance
 
@@ -134,6 +151,16 @@ AMI-ORCHESTRATOR is released under the [MIT License](LICENSE).
 - **Community Forum**: [https://community.ami-orchestrator.io](https://community.ami-orchestrator.io)
 - **Enterprise Support**: [https://ami-orchestrator.io/enterprise](https://ami-orchestrator.io/enterprise)
 
+## Project Structure
+
+```
+AMI-ORCHESTRATOR/
+├── base/           # Core infrastructure (DataOps, MCP servers, worker pools)
+├── compliance/     # EU AI Act, NIST, ISO compliance validation
+├── domains/        # Domain-specific automation modules
+└── scripts/        # Setup and management scripts
+```
+
 ## Roadmap
 
 Our vision extends beyond current capabilities:
@@ -143,6 +170,7 @@ Our vision extends beyond current capabilities:
 - **Autonomous Self-Improvement** - AI that optimizes its own operations
 - **Global Mesh Networking** - Distributed automation across edge devices
 - **Advanced Visualization** - Enhanced dashboards and monitoring for complex system management
+- **Extended DataOps** - Support for vector databases, time-series, and blockchain storage
 
 ---
 
