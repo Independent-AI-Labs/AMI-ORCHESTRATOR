@@ -42,3 +42,6 @@ This document tracks the implementation progress of the Intelligent Document Pro
 - ✅ Created PgVectorDAO implementation with auto-embeddings
 - ✅ Implemented vector_search and semantic_search methods
 - ✅ Registered PgVectorDAO with DAOFactory
+- ✅ Fixed SQL injection vulnerabilities with proper validation
+- ✅ Added real embedding generation with sentence-transformers
+- ✅ Extended DgraphDAO with graph-specific operations (k-hop, shortest path, components)
