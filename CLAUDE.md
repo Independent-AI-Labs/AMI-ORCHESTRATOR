@@ -6,12 +6,41 @@
 - Virtual environment is at `.venv/` (created with `uv venv .venv`)
 - Python executable: `".venv/Scripts/python.exe"` (USE QUOTES!)
 - Install deps: `uv pip install -r requirements.txt`
-- Run tests: `python run_tests.py [args]` or `".venv/Scripts/python.exe" -m pytest`
 - NEVER modify requirements.txt without testing the exact version first
 - To add a new dependency:
   1. `uv pip install <package>` (install it first)
   2. `uv pip list | grep <package>` (check exact version)
   3. Add to requirements.txt with the EXACT version installed
+
+## 🚨 CRITICAL TEST RUNNING INSTRUCTIONS - MUST FOLLOW!!!
+
+**ALWAYS RUN TESTS USING THE MODULE'S OWN run_tests.py SCRIPT!!!**
+
+- **ROOT/ORCHESTRATOR**: `python scripts/run_tests.py [args]`
+- **BASE MODULE**: `python base/scripts/run_tests.py [args]`
+- **BROWSER MODULE**: `python browser/scripts/run_tests.py [args]`
+- **FILES MODULE**: `python files/scripts/run_tests.py [args]`
+- **COMPLIANCE MODULE**: `python compliance/scripts/run_tests.py [args]`
+- **DOMAINS MODULE**: `python domains/scripts/run_tests.py [args]`
+
+**FOR INDIVIDUAL TESTS:**
+```bash
+# WRONG - NEVER DO THIS:
+pytest tests/unit/test_something.py::TestClass::test_method
+
+# CORRECT - ALWAYS DO THIS:
+python scripts/run_tests.py tests/unit/test_something.py::TestClass::test_method
+
+# For submodules:
+python base/scripts/run_tests.py tests/unit/test_something.py::TestClass::test_method
+python browser/scripts/run_tests.py tests/unit/test_something.py::TestClass::test_method
+```
+
+**WHY THIS MATTERS:**
+- Each module has its own test environment and dependencies
+- The run_tests.py scripts ensure proper environment setup
+- Direct pytest calls WILL FAIL due to missing module paths and configs
+- NEVER use pytest directly, ALWAYS use the module's run_tests.py script!!!
 
 ## 📋 MANDATORY CHECKLIST FOR EVERY CHANGE
 
