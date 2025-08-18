@@ -30,6 +30,15 @@ Seamlessly manage data across multiple storage backends with a single, unified A
 - **MCP Server Access**: Minimal interface exposing only essential CRUD operations for all models
 - **100% Test Coverage**: All 114 tests passing with comprehensive integration testing
 
+### Intelligent Document Processing (IDP)
+Transform unstructured documents into actionable insights with our advanced IDP system:
+- **Multi-format Support**: Process PDFs, Word documents, Excel spreadsheets, and images with specialized extractors
+- **Semantic Search**: Find documents by meaning, not just keywords, using vector embeddings
+- **Structured Extraction**: Automatically extract tables, sections, metadata, and relationships
+- **Image Analysis**: Analyze charts, diagrams, and scanned documents with Gemini Vision AI
+- **Multi-storage Sync**: Documents automatically sync across graph, vector, relational, and cache storage
+- **MCP Tools**: Access document processing via standardized MCP server interface
+
 ### Intelligent File Management
 Navigate, analyze, and understand your codebase like never before. Visualize AST structures, dissect PDF documents, synchronize files across systems, and search through millions of files using semantic understanding rather than simple text matching.
 
@@ -155,10 +164,25 @@ AMI-ORCHESTRATOR is released under the [MIT License](LICENSE).
 
 ```
 AMI-ORCHESTRATOR/
-├── base/           # Core infrastructure (DataOps, MCP servers, worker pools)
-├── compliance/     # EU AI Act, NIST, ISO compliance validation
-├── domains/        # Domain-specific automation modules
-└── scripts/        # Setup and management scripts
+├── base/                   # Core infrastructure (DataOps, MCP servers, worker pools)
+│   ├── backend/
+│   │   ├── dataops/       # Multi-storage data operations layer
+│   │   │   ├── implementations/  # Storage-specific DAOs (Dgraph, PostgreSQL, Redis, etc.)
+│   │   │   ├── storage_model.py  # Base model for all data objects
+│   │   │   └── unified_crud.py   # Automatic multi-storage synchronization
+│   │   └── mcp/           # Model Context Protocol servers
+│   └── tests/             # Comprehensive test suite
+├── files/                  # File and document processing module
+│   ├── backend/
+│   │   ├── extractors/    # Document extractors (PDF, DOCX, Excel, Images)
+│   │   ├── models/        # Document models with multi-storage configs
+│   │   ├── services/      # Gemini AI client for image analysis
+│   │   └── mcp/           # MCP server for document operations
+│   └── tests/
+├── browser/               # Browser automation and web scraping
+├── compliance/            # EU AI Act, NIST, ISO compliance validation
+├── domains/               # Domain-specific automation modules
+└── scripts/               # Setup and management scripts
 ```
 
 ## Roadmap
