@@ -16,9 +16,8 @@ repos:
     hooks:
       - id: mypy
         name: mypy
-        entry: mypy
-        language: python
-        language_version: python3.12
+        entry: .venv/bin/mypy
+        language: system
         types: [ python ]
         require_serial: true
         stages: [ pre-commit ]
@@ -27,9 +26,8 @@ repos:
     hooks:
       - id: mypy-tests
         name: mypy (tests)
-        entry: mypy
-        language: python
-        language_version: python3.12
+        entry: .venv/bin/mypy
+        language: system
         types: [ python ]
         require_serial: true
         stages: [ pre-commit ]
