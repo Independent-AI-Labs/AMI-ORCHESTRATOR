@@ -22,6 +22,7 @@ repos:
         require_serial: true
         stages: [ pre-commit ]
 
+  # Run ALL tests before push
   - repo: local
     hooks:
       - id: pytest
@@ -31,6 +32,8 @@ repos:
         pass_filenames: false
         always_run: true
         stages: [ pre-push ]
+        verbose: true  # Show output immediately
+        require_serial: true  # Run before any network operations
 
   # Additional useful hooks
   - repo: https://github.com/pre-commit/pre-commit-hooks
