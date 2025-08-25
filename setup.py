@@ -98,6 +98,64 @@ class OrchestratorSetup:
             print(f"✗ {module_name} module setup failed")
             print(f"  Error: {result.stderr}")
 
+    def _check_uv_available(self) -> bool:
+        """Check if uv is available."""
+        try:
+            self.run_command(["uv", "--version"], check=False)
+            return True
+        except FileNotFoundError:
+            print("⚠ uv not found, using standard venv")
+            return False
+
+    def _setup_with_uv(self, venv_path: Path) -> None:
+        """Set up virtual environment using uv."""
+        # Create venv with uv
+        if not venv_path.exists():
+            print("Creating virtual environment with uv...")
+            self.run_command(["uv", "venv", ".venv", "--python", "python3.12"])
+
+        # Install base requirements
+        base_reqs = self.root_dir / "base" / "requirements.txt"
+        if base_reqs.exists():
+            print("Installing base requirements...")
+            self.run_command(["uv", "pip", "install", "-r", str(base_reqs)])
+
+        # Install base test requirements
+        base_test_reqs = self.root_dir / "base" / "requirements-test.txt"
+        if base_test_reqs.exists():
+            print("Installing base test requirements...")
+            self.run_command(["uv", "pip", "install", "-r", str(base_test_reqs)])
+
+        # Install orchestrator requirements if they exist
+        orch_reqs = self.root_dir / "requirements.txt"
+        if orch_reqs.exists():
+            print("Installing orchestrator requirements...")
+            self.run_command(["uv", "pip", "install", "-r", str(orch_reqs)])
+
+    def _setup_with_standard_venv(self, venv_path: Path) -> None:
+        """Set up virtual environment using standard venv."""
+        # Create venv if needed
+        if not venv_path.exists():
+            print("Creating virtual environment...")
+            self.run_command([sys.executable, "-m", "venv", ".venv"])
+
+        # Get pip path
+        if sys.platform == "win32":
+            pip_path = venv_path / "Scripts" / "pip.exe"
+        else:
+            pip_path = venv_path / "bin" / "pip"
+
+        # Install requirements
+        base_reqs = self.root_dir / "base" / "requirements.txt"
+        if base_reqs.exists():
+            print("Installing base requirements...")
+            self.run_command([str(pip_path), "install", "-r", str(base_reqs)])
+
+        base_test_reqs = self.root_dir / "base" / "requirements-test.txt"
+        if base_test_reqs.exists():
+            print("Installing base test requirements...")
+            self.run_command([str(pip_path), "install", "-r", str(base_test_reqs)])
+
     def setup_orchestrator_venv(self) -> None:
         """Set up the orchestrator's own virtual environment."""
         print("\n" + "=" * 60)
@@ -106,60 +164,11 @@ class OrchestratorSetup:
 
         venv_path = self.root_dir / ".venv"
 
-        # Check if uv is available
-        try:
-            self.run_command(["uv", "--version"], check=False)
-            has_uv = True
-        except FileNotFoundError:
-            has_uv = False
-            print("⚠ uv not found, using standard venv")
-
-        if has_uv:
-            # Create venv with uv
-            if not venv_path.exists():
-                print("Creating virtual environment with uv...")
-                self.run_command(["uv", "venv", ".venv", "--python", "python3.12"])
-
-            # Install base requirements
-            base_reqs = self.root_dir / "base" / "requirements.txt"
-            if base_reqs.exists():
-                print("Installing base requirements...")
-                self.run_command(["uv", "pip", "install", "-r", str(base_reqs)])
-
-            # Install base test requirements
-            base_test_reqs = self.root_dir / "base" / "requirements-test.txt"
-            if base_test_reqs.exists():
-                print("Installing base test requirements...")
-                self.run_command(["uv", "pip", "install", "-r", str(base_test_reqs)])
-
-            # Install orchestrator requirements if they exist
-            orch_reqs = self.root_dir / "requirements.txt"
-            if orch_reqs.exists():
-                print("Installing orchestrator requirements...")
-                self.run_command(["uv", "pip", "install", "-r", str(orch_reqs)])
-
+        # Use uv if available, otherwise fallback to standard venv
+        if self._check_uv_available():
+            self._setup_with_uv(venv_path)
         else:
-            # Fallback to standard venv
-            if not venv_path.exists():
-                print("Creating virtual environment...")
-                self.run_command([sys.executable, "-m", "venv", ".venv"])
-
-            # Get pip path
-            if sys.platform == "win32":
-                pip_path = venv_path / "Scripts" / "pip.exe"
-            else:
-                pip_path = venv_path / "bin" / "pip"
-
-            # Install requirements
-            base_reqs = self.root_dir / "base" / "requirements.txt"
-            if base_reqs.exists():
-                print("Installing base requirements...")
-                self.run_command([str(pip_path), "install", "-r", str(base_reqs)])
-
-            base_test_reqs = self.root_dir / "base" / "requirements-test.txt"
-            if base_test_reqs.exists():
-                print("Installing base test requirements...")
-                self.run_command([str(pip_path), "install", "-r", str(base_test_reqs)])
+            self._setup_with_standard_venv(venv_path)
 
         # Install pre-commit hooks for orchestrator
         self.install_precommit_hooks(self.root_dir)
