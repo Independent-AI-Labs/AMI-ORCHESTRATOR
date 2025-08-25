@@ -67,7 +67,7 @@ class OrchestratorSetup:
         # Update submodules
         self.run_command(["git", "submodule", "update", "--init", "--recursive"])
 
-        print("✓ All submodules initialized and synced")
+        print("[OK] All submodules initialized and synced")
 
     def setup_module(self, module_name: str) -> None:
         """Set up a single module's environment.
@@ -78,7 +78,7 @@ class OrchestratorSetup:
         module_path = self.root_dir / module_name
 
         if not module_path.exists():
-            print(f"⚠ Module {module_name} not found, skipping")
+            print(f"[WARN] Module {module_name} not found, skipping")
             return
 
         print(f"\n--- Setting up {module_name} module ---")
@@ -86,16 +86,16 @@ class OrchestratorSetup:
         # Check if setup.py exists
         setup_script = module_path / "setup.py"
         if not setup_script.exists():
-            print(f"⚠ No setup.py found in {module_name}, skipping")
+            print(f"[WARN] No setup.py found in {module_name}, skipping")
             return
 
         # Run the module's setup.py
         result = self.run_command([sys.executable, "setup.py"], cwd=module_path, check=False)
 
         if result.returncode == 0:
-            print(f"✓ {module_name} module setup complete")
+            print(f"[OK] {module_name} module setup complete")
         else:
-            print(f"✗ {module_name} module setup failed")
+            print(f"[ERROR] {module_name} module setup failed")
             print(f"  Error: {result.stderr}")
 
     def _check_uv_available(self) -> bool:
@@ -108,10 +108,15 @@ class OrchestratorSetup:
 
     def _setup_with_uv(self, venv_path: Path) -> None:
         """Set up virtual environment using uv."""
-        # Create venv with uv
-        if not venv_path.exists():
-            print("Creating virtual environment with uv...")
-            self.run_command(["uv", "venv", ".venv", "--python", "python3.12"])
+        # Always recreate venv to ensure clean state
+        if venv_path.exists():
+            print(f"Removing existing venv at {venv_path}...")
+            import shutil
+
+            shutil.rmtree(venv_path, ignore_errors=True)
+
+        print("Creating virtual environment with uv...")
+        self.run_command(["uv", "venv", str(venv_path), "--python", "python3.12"])
 
         # Install base requirements
         base_reqs = self.root_dir / "base" / "requirements.txt"
@@ -147,13 +152,15 @@ class OrchestratorSetup:
             print("\nOr download from: https://github.com/astral-sh/uv")
             sys.exit(1)
 
+        # Create orchestrator venv
         venv_path = self.root_dir / ".venv"
+        print(f"Creating orchestrator venv at {venv_path}...")
         self._setup_with_uv(venv_path)
 
         # Install pre-commit hooks for orchestrator
         self.install_precommit_hooks(self.root_dir)
 
-        print("✓ Orchestrator environment setup complete")
+        print("[OK] Orchestrator environment setup complete")
 
     def install_precommit_hooks(self, module_path: Path) -> None:
         """Install pre-commit hooks for a module.
@@ -215,7 +222,7 @@ class OrchestratorSetup:
             self.setup_all_modules()
 
             print("\n" + "=" * 60)
-            print("✓ SETUP COMPLETE!")
+            print("[OK] SETUP COMPLETE!")
             print("=" * 60)
             print("\nTo activate the orchestrator environment:")
             if sys.platform == "win32":
@@ -228,7 +235,7 @@ class OrchestratorSetup:
             return 0
 
         except Exception as e:
-            print(f"\n✗ Setup failed: {e}")
+            print(f"\n[ERROR] Setup failed: {e}")
             import traceback
 
             traceback.print_exc()
