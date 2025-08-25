@@ -104,7 +104,6 @@ class OrchestratorSetup:
             self.run_command(["uv", "--version"], check=False)
             return True
         except FileNotFoundError:
-            print("⚠ uv not found, using standard venv")
             return False
 
     def _setup_with_uv(self, venv_path: Path) -> None:
@@ -132,43 +131,24 @@ class OrchestratorSetup:
             print("Installing orchestrator requirements...")
             self.run_command(["uv", "pip", "install", "-r", str(orch_reqs)])
 
-    def _setup_with_standard_venv(self, venv_path: Path) -> None:
-        """Set up virtual environment using standard venv."""
-        # Create venv if needed
-        if not venv_path.exists():
-            print("Creating virtual environment...")
-            self.run_command([sys.executable, "-m", "venv", ".venv"])
-
-        # Get pip path
-        if sys.platform == "win32":
-            pip_path = venv_path / "Scripts" / "pip.exe"
-        else:
-            pip_path = venv_path / "bin" / "pip"
-
-        # Install requirements
-        base_reqs = self.root_dir / "base" / "requirements.txt"
-        if base_reqs.exists():
-            print("Installing base requirements...")
-            self.run_command([str(pip_path), "install", "-r", str(base_reqs)])
-
-        base_test_reqs = self.root_dir / "base" / "requirements-test.txt"
-        if base_test_reqs.exists():
-            print("Installing base test requirements...")
-            self.run_command([str(pip_path), "install", "-r", str(base_test_reqs)])
-
     def setup_orchestrator_venv(self) -> None:
         """Set up the orchestrator's own virtual environment."""
         print("\n" + "=" * 60)
         print("STEP 2: Setting up Orchestrator Environment")
         print("=" * 60)
 
-        venv_path = self.root_dir / ".venv"
+        # Require uv to be installed
+        if not self._check_uv_available():
+            print("\n" + "=" * 60)
+            print("ERROR: uv is required but not found!")
+            print("=" * 60)
+            print("\nPlease install uv first:")
+            print("  pip install uv")
+            print("\nOr download from: https://github.com/astral-sh/uv")
+            sys.exit(1)
 
-        # Use uv if available, otherwise fallback to standard venv
-        if self._check_uv_available():
-            self._setup_with_uv(venv_path)
-        else:
-            self._setup_with_standard_venv(venv_path)
+        venv_path = self.root_dir / ".venv"
+        self._setup_with_uv(venv_path)
 
         # Install pre-commit hooks for orchestrator
         self.install_precommit_hooks(self.root_dir)
