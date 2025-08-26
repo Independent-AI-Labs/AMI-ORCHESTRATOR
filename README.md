@@ -126,10 +126,8 @@ Each module is independently deployable with built-in compliance features:
 git clone --recursive https://github.com/Independent-AI-Labs/AMI-ORCHESTRATOR.git
 cd AMI-ORCHESTRATOR
 
-# Setup each module
-for module in base browser files; do
-    cd $module && uv venv .venv && uv pip install -r requirements.txt && cd ..
-done
+# Run the complete setup (handles all modules automatically)
+python setup.py
 
 # Launch MCP servers
 python base/scripts/run_dataops.py    # Data operations
