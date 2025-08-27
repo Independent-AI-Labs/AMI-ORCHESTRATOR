@@ -129,10 +129,10 @@ cd AMI-ORCHESTRATOR
 # Run the complete setup (handles all modules automatically)
 python setup.py
 
-# Launch MCP servers
-python base/scripts/run_dataops.py    # Data operations
-python browser/scripts/run_chrome.py   # Browser automation
-python files/scripts/run_filesys.py    # File operations
+# Launch MCP servers directly
+python base/backend/mcp/dataops/run_dataops.py    # Data operations
+python browser/backend/mcp/chrome/run_chrome.py   # Browser automation
+python files/backend/mcp/filesys/run_filesys.py   # File operations
 ```
 
 ## 🌐 Distributed Compute & Work Pooling (Work in Progress)
