@@ -23,7 +23,6 @@ def clean_project():
         "htmlcov",
         "*.egg-info",
         "dist",
-        "build",
         ".mypy_cache",
         ".ruff_cache",
     ]
