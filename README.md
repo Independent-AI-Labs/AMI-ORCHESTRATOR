@@ -127,7 +127,7 @@ git clone --recursive https://github.com/Independent-AI-Labs/AMI-ORCHESTRATOR.gi
 cd AMI-ORCHESTRATOR
 
 # Run the complete setup (handles all modules automatically)
-python setup.py
+python module_setup.py
 
 # Launch MCP servers directly
 python base/backend/mcp/dataops/run_dataops.py    # Data operations
