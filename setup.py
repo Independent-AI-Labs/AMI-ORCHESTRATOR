@@ -7,6 +7,7 @@ This script:
 3. Installs pre-commit hooks for all modules
 """
 
+import argparse
 import subprocess
 import sys
 from pathlib import Path
@@ -15,9 +16,16 @@ from pathlib import Path
 class OrchestratorSetup:
     """Master setup for AMI Orchestrator and all submodules."""
 
-    def __init__(self):
-        """Initialize orchestrator setup."""
+    def __init__(self, clean: bool = True, reset: bool = False):
+        """Initialize orchestrator setup.
+
+        Args:
+            clean: Whether to clean all venvs and caches before setup (default: True)
+            reset: Whether to reset submodules to recorded commits (default: False)
+        """
         self.root_dir = Path(__file__).parent.resolve()
+        self.clean = clean
+        self.reset = reset
         self.submodules = [
             "base",
             "browser",
@@ -52,22 +60,47 @@ class OrchestratorSetup:
 
         return result
 
+    def clean_all(self) -> None:
+        """Clean all venvs and caches."""
+        print("\n" + "=" * 60)
+        print("STEP 0: Cleaning Project")
+        print("=" * 60)
+
+        clean_script = self.root_dir / "scripts" / "clean_all.py"
+        if clean_script.exists():
+            self.run_command([sys.executable, str(clean_script)])
+            print("[OK] Project cleaned")
+        else:
+            print("[WARN] clean_all.py not found, skipping clean")
+
     def init_submodules(self) -> None:
         """Initialize and sync all git submodules."""
         print("\n" + "=" * 60)
         print("STEP 1: Initializing Git Submodules")
         print("=" * 60)
 
-        # Initialize submodules
-        self.run_command(["git", "submodule", "init"])
+        for module in self.submodules:
+            module_path = self.root_dir / module
+
+            # Check if module directory exists and has .git
+            if module_path.exists() and (module_path / ".git").exists():
+                print(f"Module {module} already initialized, pulling latest...")
+                self.run_command(["git", "pull"], cwd=module_path, check=False)
+            else:
+                print(f"Module {module} not initialized, initializing...")
+                # Initialize this specific submodule
+                self.run_command(["git", "submodule", "init", module])
+                self.run_command(["git", "submodule", "update", "--init", module])
 
         # Sync submodule URLs
         self.run_command(["git", "submodule", "sync", "--recursive"])
 
-        # Update submodules
-        self.run_command(["git", "submodule", "update", "--init", "--recursive"])
-
-        print("[OK] All submodules initialized and synced")
+        if self.reset:
+            print("[WARN] Reset flag is set - resetting all submodules to recorded commits")
+            self.run_command(["git", "submodule", "update", "--init", "--recursive", "--force"])
+            print("[OK] All submodules reset to recorded commits")
+        else:
+            print("[OK] All submodules initialized/pulled (preserving current commits)")
 
     def setup_module(self, module_name: str) -> None:
         """Set up a single module's environment.
@@ -212,6 +245,10 @@ class OrchestratorSetup:
         print("=" * 60)
 
         try:
+            # Step 0: Clean if requested
+            if self.clean:
+                self.clean_all()
+
             # Step 1: Initialize submodules
             self.init_submodules()
 
@@ -244,7 +281,16 @@ class OrchestratorSetup:
 
 def main():
     """Main entry point."""
-    setup = OrchestratorSetup()
+    parser = argparse.ArgumentParser(description="AMI Orchestrator Setup Script")
+    parser.add_argument("--no-clean", action="store_true", help="Do not clean venvs and caches before setup (default: clean everything)")
+    parser.add_argument("--reset", action="store_true", help="Reset all submodules to recorded commits (default: preserve current commits)")
+
+    args = parser.parse_args()
+
+    # Clean by default unless --no-clean is specified
+    clean = not args.no_clean
+
+    setup = OrchestratorSetup(clean=clean, reset=args.reset)
     sys.exit(setup.run())
 
 
