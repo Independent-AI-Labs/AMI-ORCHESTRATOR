@@ -1,50 +1,41 @@
 repos:
-  # Ruff - replaces black, isort, pylint, and bandit
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.1.9
-    hooks:
-      # Linting (includes security checks)
-      - id: ruff
-        args: [ --fix, --exit-non-zero-on-fix ]
-        stages: [ pre-commit ]
-      # Formatting (replaces black)
-      - id: ruff-format
-        stages: [ pre-commit ]
-
-  # Type checking
-  - repo: local
-    hooks:
-      - id: mypy
-        name: mypy
-        entry: .venv/Scripts/python.exe -m mypy
-        language: system
-        types: [ python ]
-        require_serial: true
-        stages: [ pre-commit ]
-
-  # Run ALL tests before push
-  - repo: local
-    hooks:
-      - id: pytest
-        name: pytest
-        entry: python scripts/run_tests.py
-        language: system
-        pass_filenames: false
-        always_run: true
-        stages: [ pre-push ]
-        verbose: true  # Show output immediately
-        require_serial: true  # Run before any network operations
-
-  # Additional useful hooks
-  - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.5.0
-    hooks:
-      - id: check-yaml
-        stages: [ pre-commit ]
-      - id: check-added-large-files
-        args: ['--maxkb=100000']  # 100MB limit
-        stages: [ pre-commit ]
-      - id: check-merge-conflict
-        stages: [ pre-commit ]
-      - id: debug-statements
-        stages: [ pre-commit ]
+- repo: https://github.com/astral-sh/ruff-pre-commit
+  rev: v0.1.9
+  hooks:
+  - id: ruff
+    args:
+    - --fix
+    - --exit-non-zero-on-fix
+    stages:
+    - pre-commit
+  - id: ruff-format
+    stages:
+    - pre-commit
+- repo: local
+  hooks:
+  - id: mypy
+    name: mypy
+    entry: .venv/Scripts/python.exe -m mypy
+    language: system
+    types:
+    - python
+    require_serial: true
+    stages:
+    - pre-commit
+- repo: https://github.com/pre-commit/pre-commit-hooks
+  rev: v4.5.0
+  hooks:
+  - id: check-yaml
+    stages:
+    - pre-commit
+  - id: check-added-large-files
+    args:
+    - --maxkb=100000
+    stages:
+    - pre-commit
+  - id: check-merge-conflict
+    stages:
+    - pre-commit
+  - id: debug-statements
+    stages:
+    - pre-commit

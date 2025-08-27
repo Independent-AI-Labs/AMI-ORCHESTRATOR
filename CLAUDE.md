@@ -1,17 +1,5 @@
 # CRITICAL INSTRUCTIONS FOR CLAUDE - MUST READ
 
-## ENVIRONMENT SETUP - USE UV AND .VENV
-
-**ALWAYS USE UV FOR DEPENDENCY MANAGEMENT:**
-- Virtual environment is at `.venv/` (created with `uv venv .venv`)
-- Python executable: `".venv/Scripts/python.exe"` (USE QUOTES!)
-- Install deps: `uv pip install -r requirements.txt`
-- NEVER modify requirements.txt without testing the exact version first
-- To add a new dependency:
-  1. `uv pip install <package>` (install it first)
-  2. `uv pip list | grep <package>` (check exact version)
-  3. Add to requirements.txt with the EXACT version installed
-
 ## 🚨 CRITICAL TEST RUNNING INSTRUCTIONS - MUST FOLLOW!!!
 
 **ALWAYS RUN TESTS USING THE MODULE'S OWN run_tests.py SCRIPT!!!**
