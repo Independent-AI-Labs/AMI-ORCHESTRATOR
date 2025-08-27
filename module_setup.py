@@ -117,13 +117,13 @@ class OrchestratorSetup:
         print(f"\n--- Setting up {module_name} module ---")
 
         # Check if setup.py exists
-        setup_script = module_path / "setup.py"
+        setup_script = module_path / "module_setup.py"
         if not setup_script.exists():
-            print(f"[WARN] No setup.py found in {module_name}, skipping")
+            print(f"[WARN] No module_setup.py found in {module_name}, skipping")
             return
 
-        # Run the module's setup.py
-        result = self.run_command([sys.executable, "setup.py"], cwd=module_path, check=False)
+        # Run the module's module_setup.py
+        result = self.run_command([sys.executable, "module_setup.py"], cwd=module_path, check=False)
 
         if result.returncode == 0:
             print(f"[OK] {module_name} module setup complete")
