@@ -1,18 +1,18 @@
 #!/usr/bin/env python
-"""Test runner for the AMI-ORCHESTRATOR root."""
+"""Test runner for orchestrator root."""
 
 import sys
+from pathlib import Path
 
+# Get orchestrator root
+ORCHESTRATOR_ROOT = Path(__file__).resolve().parent.parent
 
-def main():
-    """Placeholder test runner - orchestrator has no code to test yet."""
-    print("AMI-ORCHESTRATOR: No orchestrator-level code to test.")
-    print("Tests for individual modules should be run in their respective directories:")
-    print("  - base: cd base && python scripts/run_tests.py")
-    print("  - browser: cd browser && python scripts/run_tests.py")
-    print("  - files: cd files && python scripts/run_tests.py")
-    return 0
+# Add orchestrator root to path (for base imports)
+sys.path.insert(0, str(ORCHESTRATOR_ROOT))
 
+# Import from base using proper base. prefix
+from base.scripts.run_tests import main  # noqa: E402
 
 if __name__ == "__main__":
-    sys.exit(main())
+    # Run tests using base test runner with orchestrator root
+    sys.exit(main(project_root=ORCHESTRATOR_ROOT, project_name="Orchestrator"))
