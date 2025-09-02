@@ -2,6 +2,7 @@
 """Find all print statements that should be using logger instead."""
 
 import re
+import sys
 from pathlib import Path
 
 # Root directory to search
@@ -110,6 +111,4 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    import sys
-
     sys.exit(main())
