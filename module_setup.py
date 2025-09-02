@@ -8,9 +8,14 @@ This script:
 """
 
 import argparse
+import logging
+import shutil
 import subprocess
 import sys
+import traceback
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 
 class OrchestratorSetup:
@@ -36,7 +41,7 @@ class OrchestratorSetup:
             "ux",
         ]
 
-    def run_command(self, cmd: list[str], cwd: Path | None = None, check: bool = True) -> subprocess.CompletedProcess:
+    def run_command(self, cmd: list[str], cwd: Path | None = None, check: bool = True) -> subprocess.CompletedProcess[str]:
         """Run a command and return the result.
 
         Args:
@@ -50,11 +55,11 @@ class OrchestratorSetup:
         if cwd is None:
             cwd = self.root_dir
 
-        print(f"Running: {' '.join(cmd)}")
+        logger.info(f"Running: {' '.join(cmd)}")
         result = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, check=False)
 
         if result.returncode != 0:
-            print(f"Error: {result.stderr}")
+            logger.error(f"Error: {result.stderr}")
             if check:
                 sys.exit(1)
 
@@ -62,32 +67,32 @@ class OrchestratorSetup:
 
     def clean_all(self) -> None:
         """Clean all venvs and caches."""
-        print("\n" + "=" * 60)
-        print("STEP 0: Cleaning Project")
-        print("=" * 60)
+        logger.info("\n" + "=" * 60)
+        logger.info("STEP 0: Cleaning Project")
+        logger.info("=" * 60)
 
         clean_script = self.root_dir / "scripts" / "clean_all.py"
         if clean_script.exists():
             self.run_command([sys.executable, str(clean_script)])
-            print("[OK] Project cleaned")
+            logger.info("[OK] Project cleaned")
         else:
-            print("[WARN] clean_all.py not found, skipping clean")
+            logger.warning("[WARN] clean_all.py not found, skipping clean")
 
     def init_submodules(self) -> None:
         """Initialize and sync all git submodules."""
-        print("\n" + "=" * 60)
-        print("STEP 1: Initializing Git Submodules")
-        print("=" * 60)
+        logger.info("\n" + "=" * 60)
+        logger.info("STEP 1: Initializing Git Submodules")
+        logger.info("=" * 60)
 
         for module in self.submodules:
             module_path = self.root_dir / module
 
             # Check if module directory exists and has .git
             if module_path.exists() and (module_path / ".git").exists():
-                print(f"Module {module} already initialized, pulling latest...")
+                logger.info(f"Module {module} already initialized, pulling latest...")
                 self.run_command(["git", "pull"], cwd=module_path, check=False)
             else:
-                print(f"Module {module} not initialized, initializing...")
+                logger.info(f"Module {module} not initialized, initializing...")
                 # Initialize this specific submodule
                 self.run_command(["git", "submodule", "init", module])
                 self.run_command(["git", "submodule", "update", "--init", module])
@@ -96,11 +101,11 @@ class OrchestratorSetup:
         self.run_command(["git", "submodule", "sync", "--recursive"])
 
         if self.reset:
-            print("[WARN] Reset flag is set - resetting all submodules to recorded commits")
+            logger.warning("[WARN] Reset flag is set - resetting all submodules to recorded commits")
             self.run_command(["git", "submodule", "update", "--init", "--recursive", "--force"])
-            print("[OK] All submodules reset to recorded commits")
+            logger.info("[OK] All submodules reset to recorded commits")
         else:
-            print("[OK] All submodules initialized/pulled (preserving current commits)")
+            logger.info("[OK] All submodules initialized/pulled (preserving current commits)")
 
     def setup_module(self, module_name: str) -> None:
         """Set up a single module's environment.
@@ -111,25 +116,25 @@ class OrchestratorSetup:
         module_path = self.root_dir / module_name
 
         if not module_path.exists():
-            print(f"[WARN] Module {module_name} not found, skipping")
+            logger.warning(f"[WARN] Module {module_name} not found, skipping")
             return
 
-        print(f"\n--- Setting up {module_name} module ---")
+        logger.info(f"\n--- Setting up {module_name} module ---")
 
         # Check if setup.py exists
         setup_script = module_path / "module_setup.py"
         if not setup_script.exists():
-            print(f"[WARN] No module_setup.py found in {module_name}, skipping")
+            logger.warning(f"[WARN] No module_setup.py found in {module_name}, skipping")
             return
 
         # Run the module's module_setup.py
         result = self.run_command([sys.executable, "module_setup.py"], cwd=module_path, check=False)
 
         if result.returncode == 0:
-            print(f"[OK] {module_name} module setup complete")
+            logger.info(f"[OK] {module_name} module setup complete")
         else:
-            print(f"[ERROR] {module_name} module setup failed")
-            print(f"  Error: {result.stderr}")
+            logger.error(f"[ERROR] {module_name} module setup failed")
+            logger.error(f"  Error: {result.stderr}")
 
     def _check_uv_available(self) -> bool:
         """Check if uv is available."""
@@ -143,57 +148,55 @@ class OrchestratorSetup:
         """Set up virtual environment using uv."""
         # Always recreate venv to ensure clean state
         if venv_path.exists():
-            print(f"Removing existing venv at {venv_path}...")
-            import shutil
-
+            logger.info(f"Removing existing venv at {venv_path}...")
             shutil.rmtree(venv_path, ignore_errors=True)
 
-        print("Creating virtual environment with uv...")
+        logger.info("Creating virtual environment with uv...")
         self.run_command(["uv", "venv", str(venv_path), "--python", "python3.12"])
 
         # Install base requirements
         base_reqs = self.root_dir / "base" / "requirements.txt"
         if base_reqs.exists():
-            print("Installing base requirements...")
+            logger.info("Installing base requirements...")
             self.run_command(["uv", "pip", "install", "-r", str(base_reqs)])
 
         # Install base test requirements
         base_test_reqs = self.root_dir / "base" / "requirements-test.txt"
         if base_test_reqs.exists():
-            print("Installing base test requirements...")
+            logger.info("Installing base test requirements...")
             self.run_command(["uv", "pip", "install", "-r", str(base_test_reqs)])
 
         # Install orchestrator requirements if they exist
         orch_reqs = self.root_dir / "requirements.txt"
         if orch_reqs.exists():
-            print("Installing orchestrator requirements...")
+            logger.info("Installing orchestrator requirements...")
             self.run_command(["uv", "pip", "install", "-r", str(orch_reqs)])
 
     def setup_orchestrator_venv(self) -> None:
         """Set up the orchestrator's own virtual environment."""
-        print("\n" + "=" * 60)
-        print("STEP 2: Setting up Orchestrator Environment")
-        print("=" * 60)
+        logger.info("\n" + "=" * 60)
+        logger.info("STEP 2: Setting up Orchestrator Environment")
+        logger.info("=" * 60)
 
         # Require uv to be installed
         if not self._check_uv_available():
-            print("\n" + "=" * 60)
-            print("ERROR: uv is required but not found!")
-            print("=" * 60)
-            print("\nPlease install uv first:")
-            print("  pip install uv")
-            print("\nOr download from: https://github.com/astral-sh/uv")
+            logger.error("\n" + "=" * 60)
+            logger.error("ERROR: uv is required but not found!")
+            logger.error("=" * 60)
+            logger.error("\nPlease install uv first:")
+            logger.error("  pip install uv")
+            logger.error("\nOr download from: https://github.com/astral-sh/uv")
             sys.exit(1)
 
         # Create orchestrator venv
         venv_path = self.root_dir / ".venv"
-        print(f"Creating orchestrator venv at {venv_path}...")
+        logger.info(f"Creating orchestrator venv at {venv_path}...")
         self._setup_with_uv(venv_path)
 
         # Install pre-commit hooks for orchestrator
         self.install_precommit_hooks(self.root_dir)
 
-        print("[OK] Orchestrator environment setup complete")
+        logger.info("[OK] Orchestrator environment setup complete")
 
     def install_precommit_hooks(self, module_path: Path) -> None:
         """Install pre-commit hooks for a module.
@@ -215,23 +218,25 @@ class OrchestratorSetup:
 
         if python_path.exists():
             # Install pre-commit hooks
-            print(f"Installing pre-commit hooks in {module_path.name}...")
+            logger.info(f"Installing pre-commit hooks in {module_path.name}...")
             self.run_command([str(python_path), "-m", "pre_commit", "install"], cwd=module_path, check=False)
             self.run_command([str(python_path), "-m", "pre_commit", "install", "--hook-type", "pre-push"], cwd=module_path, check=False)
 
     def setup_all_modules(self) -> None:
         """Set up all submodules."""
-        print("\n" + "=" * 60)
-        print("STEP 3: Setting up All Submodules")
-        print("=" * 60)
+        logger.info("\n" + "=" * 60)
+        logger.info("STEP 3: Setting up All Submodules")
+        logger.info("=" * 60)
 
         # Base module must be set up first
         if "base" in self.submodules:
+            logger.info(f"Setting up base module [1/{len(self.submodules)}]...")
             self.setup_module("base")
-            self.submodules.remove("base")
 
-        # Set up remaining modules
-        for module in self.submodules:
+        # Set up remaining modules (excluding base since it's already done)
+        remaining_modules = [module for module in self.submodules if module != "base"]
+        for i, module in enumerate(remaining_modules, start=2):
+            logger.info(f"Setting up {module} module [{i}/{len(self.submodules)}]...")
             self.setup_module(module)
 
     def run(self) -> int:
@@ -240,9 +245,9 @@ class OrchestratorSetup:
         Returns:
             Exit code (0 for success)
         """
-        print("\n" + "=" * 60)
-        print("AMI ORCHESTRATOR COMPLETE SETUP")
-        print("=" * 60)
+        logger.info("\n" + "=" * 60)
+        logger.info("AMI ORCHESTRATOR COMPLETE SETUP")
+        logger.info("=" * 60)
 
         try:
             # Step 0: Clean if requested
@@ -258,28 +263,26 @@ class OrchestratorSetup:
             # Step 3: Set up all submodules
             self.setup_all_modules()
 
-            print("\n" + "=" * 60)
-            print("[OK] SETUP COMPLETE!")
-            print("=" * 60)
-            print("\nTo activate the orchestrator environment:")
+            logger.info("\n" + "=" * 60)
+            logger.info("[OK] SETUP COMPLETE!")
+            logger.info("=" * 60)
+            logger.info("\nTo activate the orchestrator environment:")
             if sys.platform == "win32":
-                print("  .venv\\Scripts\\activate")
+                logger.info("  .venv\\Scripts\\activate")
             else:
-                print("  source .venv/bin/activate")
-            print("\nEach submodule has its own .venv in its directory.")
-            print("Pre-commit hooks have been installed for all modules.")
+                logger.info("  source .venv/bin/activate")
+            logger.info("\nEach submodule has its own .venv in its directory.")
+            logger.info("Pre-commit hooks have been installed for all modules.")
 
             return 0
 
         except Exception as e:
-            print(f"\n[ERROR] Setup failed: {e}")
-            import traceback
-
+            logger.error(f"\n[ERROR] Setup failed: {e}")
             traceback.print_exc()
             return 1
 
 
-def main():
+def main() -> None:
     """Main entry point."""
     parser = argparse.ArgumentParser(description="AMI Orchestrator Setup Script")
     parser.add_argument("--no-clean", action="store_true", help="Do not clean venvs and caches before setup (default: clean everything)")

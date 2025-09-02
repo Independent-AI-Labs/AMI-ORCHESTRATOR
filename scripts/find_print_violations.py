@@ -38,10 +38,7 @@ def should_skip(file_path: Path) -> bool:
         return True
 
     # Skip cache and venv
-    if "__pycache__" in str_path or ".venv" in str_path or "/venv/" in str_path.replace("\\", "/"):
-        return True
-
-    return False
+    return "__pycache__" in str_path or ".venv" in str_path or "/venv/" in str_path.replace("\\", "/")
 
 
 def find_print_statements(file_path: Path) -> list[tuple[int, str]]:
@@ -65,7 +62,7 @@ def find_print_statements(file_path: Path) -> list[tuple[int, str]]:
     return violations
 
 
-def main():
+def main() -> int:
     """Find all print statement violations."""
 
     print("=" * 80)
