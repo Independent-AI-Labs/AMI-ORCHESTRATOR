@@ -2,10 +2,11 @@
 """Replicate root CLAUDE.md to all submodules."""
 
 import shutil
+import sys
 from pathlib import Path
 
 
-def replicate_claude_md():
+def replicate_claude_md() -> bool:
     """Copy root CLAUDE.md to all submodule directories."""
     root_dir = Path(__file__).parent.parent
     root_claude_md = root_dir / "CLAUDE.md"
@@ -38,7 +39,5 @@ def replicate_claude_md():
 
 
 if __name__ == "__main__":
-    import sys
-
     success = replicate_claude_md()
     sys.exit(0 if success else 1)

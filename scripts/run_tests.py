@@ -4,6 +4,8 @@
 import sys
 from pathlib import Path
 
+from base.scripts.run_tests import main  # noqa: E402
+
 # Get orchestrator root
 ORCHESTRATOR_ROOT = Path(__file__).resolve().parent.parent
 
@@ -11,7 +13,6 @@ ORCHESTRATOR_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ORCHESTRATOR_ROOT))
 
 # Import from base using proper base. prefix
-from base.scripts.run_tests import main  # noqa: E402
 
 if __name__ == "__main__":
     # Run tests using base test runner with orchestrator root
