@@ -16,7 +16,7 @@ repos:
     hooks:
       - id: mypy
         name: mypy
-        entry: cmd /c "cd .. && AMI-ORCHESTRATOR\.venv\Scripts\python.exe -m mypy AMI-ORCHESTRATOR\base\backend --config-file=AMI-ORCHESTRATOR\mypy.ini"
+        entry: "cmd /c "cd .. && AMI-ORCHESTRATOR\.venv\Scripts\python.exe -m mypy AMI-ORCHESTRATOR\backend --config-file=AMI-ORCHESTRATOR\mypy.ini""
         language: system
         types: [ python ]
         require_serial: true
