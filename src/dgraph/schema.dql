@@ -1,0 +1,25 @@
+# --- Node Types ---
+
+type Goal {
+    goalID: String! @id
+    name: String! @search(by: [term])
+    description: String
+    targetValue: Float!
+    currentValue: Float
+    unit: String
+    deadline: DateTime
+}
+
+type Process {
+    processID: String! @id
+    name: String! @search(by: [term])
+    strives_for: [Goal]
+    has_step: [Step] @reverse
+}
+
+type Step {
+    stepID: String! @id
+    type: String! @search(by: [hash]) # New types: APPROVAL, AWAIT_EXTERNAL_EVENT
+    contributes_to: [Goal]
+    is_part_of: Process!
+}
