@@ -11,6 +11,17 @@ repos:
       - id: ruff-format
         stages: [ pre-commit ]
 
+  # Setup contract checker
+  - repo: local
+    hooks:
+      - id: setup-contract-check
+        name: setup-contract-check
+        entry: python scripts/check_setup_contract.py
+        language: system
+        pass_filenames: false
+        stages: [ pre-commit ]
+        require_serial: true
+
   # Type checking
   - repo: local
     hooks:

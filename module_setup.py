@@ -7,6 +7,8 @@ This script:
 3. Installs pre-commit hooks for all modules
 """
 
+from __future__ import annotations
+
 import argparse
 import logging
 import shutil
@@ -31,12 +33,15 @@ class OrchestratorSetup:
         self.root_dir = Path(__file__).parent.resolve()
         self.clean = clean
         self.reset = reset
+        self.module_failures: list[str] = []
+        # Managed submodules (align with .gitmodules)
         self.submodules = [
             "base",
             "browser",
             "compliance",
             "domains",
             "files",
+            "node",
             "streams",
             "ux",
         ]
@@ -61,7 +66,7 @@ class OrchestratorSetup:
         if result.returncode != 0:
             logger.error(f"Error: {result.stderr}")
             if check:
-                sys.exit(1)
+                raise subprocess.CalledProcessError(result.returncode, cmd, output=result.stdout, stderr=result.stderr)
 
         return result
 
@@ -79,26 +84,17 @@ class OrchestratorSetup:
             logger.warning("[WARN] clean_all.py not found, skipping clean")
 
     def init_submodules(self) -> None:
-        """Initialize and sync all git submodules."""
+        """Initialize and sync all git submodules recursively.
+
+        Uses safe submodule commands instead of `git pull` inside submodules
+        (which may be in detached HEAD state).
+        """
         logger.info("\n" + "=" * 60)
         logger.info("STEP 1: Initializing Git Submodules")
         logger.info("=" * 60)
-
-        for module in self.submodules:
-            module_path = self.root_dir / module
-
-            # Check if module directory exists and has .git
-            if module_path.exists() and (module_path / ".git").exists():
-                logger.info(f"Module {module} already initialized, pulling latest...")
-                self.run_command(["git", "pull"], cwd=module_path, check=False)
-            else:
-                logger.info(f"Module {module} not initialized, initializing...")
-                # Initialize this specific submodule
-                self.run_command(["git", "submodule", "init", module])
-                self.run_command(["git", "submodule", "update", "--init", module])
-
-        # Sync submodule URLs
-        self.run_command(["git", "submodule", "sync", "--recursive"])
+        # Sync and initialize all submodules recursively
+        self.run_command(["git", "submodule", "sync", "--recursive"], check=False)
+        self.run_command(["git", "submodule", "update", "--init", "--recursive"])
 
         if self.reset:
             logger.warning("[WARN] Reset flag is set - resetting all submodules to recorded commits")
@@ -127,76 +123,56 @@ class OrchestratorSetup:
             logger.warning(f"[WARN] No module_setup.py found in {module_name}, skipping")
             return
 
-        # Run the module's module_setup.py
-        result = self.run_command([sys.executable, "module_setup.py"], cwd=module_path, check=False)
+        # If module is uv-native (pyproject.toml present), run uv sync first
+        if (module_path / "pyproject.toml").exists():
+            self.run_command(["uv", "sync", "--dev"], cwd=module_path, check=False)
+
+        # Run the module's module_setup.py with Python 3.12 via uv
+        result = self.run_command(["uv", "run", "--python", "3.12", "module_setup.py"], cwd=module_path, check=False)
 
         if result.returncode == 0:
             logger.info(f"[OK] {module_name} module setup complete")
         else:
             logger.error(f"[ERROR] {module_name} module setup failed")
             logger.error(f"  Error: {result.stderr}")
+            self.module_failures.append(module_name)
 
     def _check_uv_available(self) -> bool:
-        """Check if uv is available."""
+        """Check if uv is available on PATH."""
         try:
             self.run_command(["uv", "--version"], check=False)
             return True
         except FileNotFoundError:
             return False
 
-    def _setup_with_uv(self, venv_path: Path) -> None:
-        """Set up virtual environment using uv."""
-        # Always recreate venv to ensure clean state
-        if venv_path.exists():
-            logger.info(f"Removing existing venv at {venv_path}...")
-            shutil.rmtree(venv_path, ignore_errors=True)
+    def ensure_uv_and_python(self) -> None:
+        """Ensure uv is available and Python 3.12 toolchain is installed via uv.
 
-        logger.info("Creating virtual environment with uv...")
-        self.run_command(["uv", "venv", str(venv_path), "--python", "python3.12"])
-
-        # Install base requirements
-        base_reqs = self.root_dir / "base" / "requirements.txt"
-        if base_reqs.exists():
-            logger.info("Installing base requirements...")
-            self.run_command(["uv", "pip", "install", "-r", str(base_reqs)])
-
-        # Install base test requirements
-        base_test_reqs = self.root_dir / "base" / "requirements-test.txt"
-        if base_test_reqs.exists():
-            logger.info("Installing base test requirements...")
-            self.run_command(["uv", "pip", "install", "-r", str(base_test_reqs)])
-
-        # Install orchestrator requirements if they exist
-        orch_reqs = self.root_dir / "requirements.txt"
-        if orch_reqs.exists():
-            logger.info("Installing orchestrator requirements...")
-            self.run_command(["uv", "pip", "install", "-r", str(orch_reqs)])
-
-    def setup_orchestrator_venv(self) -> None:
-        """Set up the orchestrator's own virtual environment."""
-        logger.info("\n" + "=" * 60)
-        logger.info("STEP 2: Setting up Orchestrator Environment")
-        logger.info("=" * 60)
-
-        # Require uv to be installed
+        We do not create a root venv here; each module manages its own uv venv.
+        """
         if not self._check_uv_available():
             logger.error("\n" + "=" * 60)
-            logger.error("ERROR: uv is required but not found!")
-            logger.error("=" * 60)
-            logger.error("\nPlease install uv first:")
-            logger.error("  pip install uv")
-            logger.error("\nOr download from: https://github.com/astral-sh/uv")
+            logger.error("uv is required but not found on PATH.")
+            logger.error("Use scripts/bootstrap_uv_python.py to install uv safely from official sources.")
+            logger.error("Alternatively, install uv manually from https://astral.sh/uv")
             sys.exit(1)
 
-        # Create orchestrator venv
-        venv_path = self.root_dir / ".venv"
-        logger.info(f"Creating orchestrator venv at {venv_path}...")
-        self._setup_with_uv(venv_path)
+        # Ensure a Python 3.12 runtime is available to uv
+        logger.info("Ensuring Python 3.12 toolchain is available via uv...")
+        find = self.run_command(["uv", "python", "find", "3.12"], check=False)
+        if find.returncode != 0 or not find.stdout.strip():
+            logger.info("Python 3.12 not found in uv toolchains. Installing...")
+            self.run_command(["uv", "python", "install", "3.12"])
+        else:
+            logger.info("Python 3.12 already available for uv.")
 
-        # Install pre-commit hooks for orchestrator
-        self.install_precommit_hooks(self.root_dir)
-
-        logger.info("[OK] Orchestrator environment setup complete")
+    def setup_orchestrator_toolchain(self) -> None:
+        """Ensure the orchestrator has the required toolchain (uv + Python 3.12)."""
+        logger.info("\n" + "=" * 60)
+        logger.info("STEP 2: Ensuring Toolchain (uv + Python 3.12)")
+        logger.info("=" * 60)
+        self.ensure_uv_and_python()
+        logger.info("[OK] Toolchain ready (uv + Python 3.12)")
 
     def install_precommit_hooks(self, module_path: Path) -> None:
         """Install pre-commit hooks for a module.
@@ -257,24 +233,25 @@ class OrchestratorSetup:
             # Step 1: Initialize submodules
             self.init_submodules()
 
-            # Step 2: Set up orchestrator environment
-            self.setup_orchestrator_venv()
+            # Step 2: Ensure toolchain (do not create a root venv)
+            self.setup_orchestrator_toolchain()
 
             # Step 3: Set up all submodules
             self.setup_all_modules()
 
             logger.info("\n" + "=" * 60)
-            logger.info("[OK] SETUP COMPLETE!")
-            logger.info("=" * 60)
-            logger.info("\nTo activate the orchestrator environment:")
-            if sys.platform == "win32":
-                logger.info("  .venv\\Scripts\\activate")
+            if self.module_failures:
+                logger.error("[PARTIAL] SETUP COMPLETED WITH FAILURES")
+                logger.error("=" * 60)
+                logger.error("Failed modules: " + ", ".join(self.module_failures))
+                logger.error("Check logs above and re-run their module_setup.py after resolving.")
+                logger.info("\nEach submodule manages its own uv virtual environment.")
+                return 1
             else:
-                logger.info("  source .venv/bin/activate")
-            logger.info("\nEach submodule has its own .venv in its directory.")
-            logger.info("Pre-commit hooks have been installed for all modules.")
-
-            return 0
+                logger.info("[OK] SETUP COMPLETE!")
+                logger.info("=" * 60)
+                logger.info("\nEach submodule manages its own uv virtual environment.")
+                return 0
 
         except Exception as e:
             logger.error(f"\n[ERROR] Setup failed: {e}")
@@ -298,4 +275,6 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    # Initialize basic logging if not configured by parent
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)8s] %(message)s")
     main()
