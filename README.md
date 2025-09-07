@@ -132,7 +132,10 @@ Each module is independently deployable with built-in compliance features.
 git clone --recursive https://github.com/Independent-AI-Labs/AMI-ORCHESTRATOR.git
 cd AMI-ORCHESTRATOR
 
-# Run the complete setup (handles all modules automatically)
+# Bootstrap uv + Python 3.12 toolchain (one-time)
+python scripts/bootstrap_uv_python.py --auto
+
+# Run the complete setup (handles all modules automatically; each module manages its own venv)
 python module_setup.py
 
 # Launch MCP servers directly
