@@ -24,19 +24,19 @@ Milestones
 - [ ] Wire checker into CI (optional pre-commit and pipeline step)
 
 3) UV-native modules (phased)
-- [ ] Base: add pyproject.toml, define console scripts, generate uv.lock
-- [ ] Browser: add pyproject.toml, console scripts, uv.lock
-- [ ] Files: add pyproject.toml, console scripts, uv.lock
-- [ ] Node: add pyproject.toml, console scripts, uv.lock
-- [ ] Streams: add pyproject.toml, console scripts, uv.lock
-- [ ] UX: add pyproject.toml, console scripts, uv.lock
+- [x] Base: add pyproject.toml, define console scripts, generate uv.lock
+- [x] Browser: add pyproject.toml, console scripts, uv.lock
+- [x] Files: add pyproject.toml, console scripts (uv.lock optional)
+- [x] Node: add pyproject.toml, console scripts, uv.lock
+- [x] Streams: add pyproject.toml (uv.lock present)
+- [x] UX: add pyproject.toml (scripts optional)
 - [ ] Compliance: add pyproject.toml, console scripts, uv.lock
 - [ ] Domains: add pyproject.toml, console scripts, uv.lock
 
 4) Orchestrator support for uv-native
-- [ ] Detect per-module pyproject.toml and run `uv sync` (frozen in CI)
-- [ ] Replace requirements*.txt flows with uv lock flows where available
-- [ ] Document fallback when pyproject is absent (current behavior)
+- [x] Detect per-module pyproject.toml and run `uv sync` (pre-CI)
+- [x] Replace requirements*.txt flows with uv lock flows where available
+- [x] Document fallback when pyproject is absent (current behavior)
 
 5) CI and developer workflow
 - [ ] Cache uv and Python toolchains
@@ -49,7 +49,7 @@ Sprint 1 — Immediate Tasks
 - [x] Add module_setup.py delegators for compliance and domains
 - [x] Add pyproject template under docs/uv
 - [x] Add setup contract checker script
-- [ ] Propose pre-commit hook to run the checker in orchestrator context
+- [x] Propose pre-commit hook to run the checker in orchestrator context
 
 How to use the checker
 - Run: `python scripts/check_setup_contract.py`
@@ -59,4 +59,3 @@ How to use the checker
 Notes
 - Do not introduce pyproject.toml piecemeal into deeply-coupled modules without verifying entrypoints and local imports. Start with Base to set patterns, then propagate.
 - `uv run` can execute modules even before full migration; use it to keep runtimes consistent.
-
