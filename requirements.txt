@@ -1,0 +1,7 @@
+pydgraph
+llama-index
+fastapi
+uvicorn
+requests
+celery
+redis
