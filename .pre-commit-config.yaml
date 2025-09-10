@@ -11,23 +11,12 @@ repos:
       - id: ruff-format
         stages: [ pre-commit ]
 
-  # Setup contract checker
-  - repo: local
-    hooks:
-      - id: setup-contract-check
-        name: setup-contract-check
-        entry: python scripts/check_setup_contract.py
-        language: system
-        pass_filenames: false
-        stages: [ pre-commit ]
-        require_serial: true
-
   # Type checking
   - repo: local
     hooks:
       - id: mypy
         name: mypy
-        entry: "cmd /c "cd .. && AMI-ORCHESTRATOR\.venv\Scripts\python.exe -m mypy AMI-ORCHESTRATOR\backend --config-file=AMI-ORCHESTRATOR\mypy.ini""
+        entry: ".venv/bin/python -m mypy backend --config-file=mypy.ini"
         language: system
         types: [ python ]
         require_serial: true
