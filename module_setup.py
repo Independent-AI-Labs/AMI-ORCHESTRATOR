@@ -69,20 +69,21 @@ def _mypy_entry_for(module_name: str, is_root: bool) -> str:
         if is_windows:
             return ".venv/Scripts/python.exe -m mypy backend --config-file=mypy.ini"
         return ".venv/bin/python -m mypy backend --config-file=mypy.ini"
+    # Determine target directory to type-check
+    module_root = ROOT / module_name
+    if (module_root / "backend").exists():
+        target = f"{module_name}/backend"
+    elif (module_root / "scripts").exists():
+        target = f"{module_name}/scripts"
+    else:
+        # Fall back to module root; mypy.ini `files` will constrain scope
+        target = module_name
     # For submodules, hooks may run from the superproject parent
     if is_windows:
-        inner = (
-            f"cd .. && if exist {module_name}\\backend "
-            f"( {module_name}\\.venv\\Scripts\\python.exe -m mypy "
-            f"{module_name}\\backend --config-file={module_name}\\mypy.ini ) "
-            f"else ( echo skip-mypy )"
-        )
+        target_win = target.replace("/", "\\")
+        inner = f"cd .. && {module_name}\\.venv\\Scripts\\python.exe -m mypy " f"{target_win} --config-file={module_name}\\mypy.ini"
         return f'cmd /c "{inner}"'
-    return (
-        f"bash -lc 'cd .. && if [ -d {module_name}/backend ]; then "
-        f"{module_name}/.venv/bin/python -m mypy {module_name}/backend --config-file={module_name}/mypy.ini; "
-        f"else echo skip-mypy; fi'"
-    )
+    return f"bash -lc 'cd .. && {module_name}/.venv/bin/python -m mypy {target} --config-file={module_name}/mypy.ini'"
 
 
 def replicate_configs_from_base() -> None:
@@ -151,6 +152,9 @@ def _expected_configs_for_module(module_path: Path) -> tuple[str | None, str | N
         # For modules that import base, include only ../base plus current dir.
         path_sep = os.pathsep
         mypy_path = "." if module_name == "base" else f"..{os.sep}base{path_sep}."
+        # If module lacks backend but has scripts, adjust files target
+        if not (module_path / "backend").exists() and (module_path / "scripts").exists():
+            content = content.replace("files = backend/", "files = scripts/")
         content = content.replace("{{MYPY_PATH}}", mypy_path)
         mypy_expected = content
 

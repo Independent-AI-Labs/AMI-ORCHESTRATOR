@@ -1,16 +1,32 @@
 #!/usr/bin/env python
-"""Test runner for orchestrator root (delegates to base).
+"""Root test runner that performs no config writes.
 
-Keeps sys.path handling isolated to runner level.
+Behavior:
+- If no tests, exits 0 without modifying any files.
+- Otherwise, invokes pytest in the current (uv) environment.
 """
 
+from __future__ import annotations
+
+import subprocess
 import sys
 from pathlib import Path
 
-ORCHESTRATOR_ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ORCHESTRATOR_ROOT))
+ROOT = Path(__file__).resolve().parents[1]
 
-from base.scripts.run_tests import main  # noqa: E402
+
+def main() -> int:
+    tests_dir = ROOT / "tests"
+    if not tests_dir.exists():
+        print(f"No tests directory found at {tests_dir}. Nothing to test.")
+        return 0
+    test_files = list(tests_dir.rglob("test_*.py")) + list(tests_dir.rglob("*_test.py"))
+    if not test_files:
+        print("No test files found. Nothing to test.")
+        return 0
+    cmd = [sys.executable, "-m", "pytest", "-q"]
+    return subprocess.run(cmd, cwd=str(ROOT), check=False).returncode
+
 
 if __name__ == "__main__":
-    sys.exit(main(project_root=ORCHESTRATOR_ROOT, project_name="Orchestrator"))
+    raise SystemExit(main())
