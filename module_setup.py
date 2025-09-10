@@ -1,280 +1,234 @@
 #!/usr/bin/env python
-"""AMI Orchestrator Master Setup Script.
+"""AMI Orchestrator (root) module setup.
 
-This script:
-1. Initializes and syncs all git submodules
-2. Sets up each submodule's virtual environment and dependencies
-3. Installs pre-commit hooks for all modules
+Goals:
+- Treat root like any other module: its own .venv, configs, hooks
+- Delegate to base/module_setup.py (stdlib only)
+- Replicate critical configs from base/templates for root
 """
 
 from __future__ import annotations
 
 import argparse
+import difflib
 import logging
-import shutil
+import os
+import platform
 import subprocess
 import sys
-import traceback
 from pathlib import Path
 
+logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger(__name__)
 
+ROOT = Path(__file__).resolve().parent
+SUBMODULES = [
+    "base",
+    "browser",
+    "compliance",
+    "domains",
+    "files",
+    "node",
+    "streams",
+    "ux",
+]
 
-class OrchestratorSetup:
-    """Master setup for AMI Orchestrator and all submodules."""
 
-    def __init__(self, clean: bool = True, reset: bool = False):
-        """Initialize orchestrator setup.
+def check_uv() -> bool:
+    try:
+        subprocess.run(["uv", "--version"], capture_output=True, check=True)
+        return True
+    except Exception:
+        logger.error("uv is not installed or not on PATH.")
+        logger.info("Install uv: https://docs.astral.sh/uv/")
+        return False
 
-        Args:
-            clean: Whether to clean all venvs and caches before setup (default: True)
-            reset: Whether to reset submodules to recorded commits (default: False)
-        """
-        self.root_dir = Path(__file__).parent.resolve()
-        self.clean = clean
-        self.reset = reset
-        self.module_failures: list[str] = []
-        # Managed submodules (align with .gitmodules)
-        self.submodules = [
-            "base",
-            "browser",
-            "compliance",
-            "domains",
-            "files",
-            "node",
-            "streams",
-            "ux",
-        ]
 
-    def run_command(self, cmd: list[str], cwd: Path | None = None, check: bool = True) -> subprocess.CompletedProcess[str]:
-        """Run a command and return the result.
+def ensure_uv_python(version: str = "3.12") -> None:
+    find = subprocess.run(["uv", "python", "find", version], capture_output=True, text=True, check=False)
+    if find.returncode != 0 or not find.stdout.strip():
+        logger.info(f"Installing Python {version} toolchain via uv...")
+        subprocess.run(["uv", "python", "install", version], check=False)
 
-        Args:
-            cmd: Command to run as list of strings
-            cwd: Working directory (defaults to root)
-            check: Whether to check return code
 
-        Returns:
-            CompletedProcess result
-        """
-        if cwd is None:
-            cwd = self.root_dir
+def call_base_setup(project_name: str) -> int:
+    base_setup = ROOT / "base" / "module_setup.py"
+    if not base_setup.exists():
+        logger.error("Cannot find base/module_setup.py")
+        return 1
+    cmd = [sys.executable, str(base_setup), "--project-dir", str(ROOT), "--project-name", project_name]
+    logger.info("Delegating to base/module_setup.py …")
+    result = subprocess.run(cmd, check=False)
+    return result.returncode
 
-        logger.info(f"Running: {' '.join(cmd)}")
-        result = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, check=False)
 
-        if result.returncode != 0:
-            logger.error(f"Error: {result.stderr}")
-            if check:
-                raise subprocess.CalledProcessError(result.returncode, cmd, output=result.stdout, stderr=result.stderr)
+def _mypy_entry_for(module_name: str, is_root: bool) -> str:
+    is_windows = platform.system().lower().startswith("win")
+    if is_root or module_name == "base":
+        # Running hooks at the module root itself
+        if is_windows:
+            return ".venv/Scripts/python.exe -m mypy backend --config-file=mypy.ini"
+        return ".venv/bin/python -m mypy backend --config-file=mypy.ini"
+    # For submodules, hooks may run from the superproject parent
+    if is_windows:
+        inner = (
+            f"cd .. && if exist {module_name}\\backend "
+            f"( {module_name}\\.venv\\Scripts\\python.exe -m mypy "
+            f"{module_name}\\backend --config-file={module_name}\\mypy.ini ) "
+            f"else ( echo skip-mypy )"
+        )
+        return f'cmd /c "{inner}"'
+    return (
+        f"bash -lc 'cd .. && if [ -d {module_name}/backend ]; then "
+        f"{module_name}/.venv/bin/python -m mypy {module_name}/backend --config-file={module_name}/mypy.ini; "
+        f"else echo skip-mypy; fi'"
+    )
 
-        return result
 
-    def clean_all(self) -> None:
-        """Clean all venvs and caches."""
-        logger.info("\n" + "=" * 60)
-        logger.info("STEP 0: Cleaning Project")
-        logger.info("=" * 60)
+def replicate_configs_from_base() -> None:
+    base_configs = ROOT / "base" / "configs"
+    if not base_configs.exists():
+        logger.warning("base/configs not found; skipping config replication")
+        return
 
-        clean_script = self.root_dir / "scripts" / "clean_all.py"
-        if clean_script.exists():
-            self.run_command([sys.executable, str(clean_script)])
-            logger.info("[OK] Project cleaned")
-        else:
-            logger.warning("[WARN] clean_all.py not found, skipping clean")
+    module_name = ROOT.name
+    is_root = True
 
-    def init_submodules(self) -> None:
-        """Initialize and sync all git submodules recursively.
+    # 1) Generate mypy.ini from template
+    pyver_file = ROOT / "python.ver"
+    python_version = pyver_file.read_text(encoding="utf-8").strip() if pyver_file.exists() else "3.12"
+    template_file = base_configs / "mypy.ini.template"
+    if template_file.exists():
+        content = template_file.read_text(encoding="utf-8")
+        content = content.replace("{{PYTHON_VERSION}}", python_version)
+        # Root needs access to all submodules for cross-module imports
+        path_sep = os.pathsep
+        mypy_roots = SUBMODULES + ["."]
+        mypy_path = path_sep.join(mypy_roots)
+        content = content.replace("{{MYPY_PATH}}", mypy_path)
+        (ROOT / "mypy.ini").write_text(content, encoding="utf-8")
+        logger.info("Generated mypy.ini from base template")
+    else:
+        logger.warning("mypy.ini.template not found; skipping mypy.ini generation")
 
-        Uses safe submodule commands instead of `git pull` inside submodules
-        (which may be in detached HEAD state).
-        """
-        logger.info("\n" + "=" * 60)
-        logger.info("STEP 1: Initializing Git Submodules")
-        logger.info("=" * 60)
-        # Sync and initialize all submodules recursively
-        self.run_command(["git", "submodule", "sync", "--recursive"], check=False)
-        self.run_command(["git", "submodule", "update", "--init", "--recursive"])
+    # 2) Copy platform-specific pre-commit config and fill placeholders
+    source_cfg = base_configs / ".pre-commit-config.win.yaml" if platform.system().lower().startswith("win") else base_configs / ".pre-commit-config.unix.yaml"
 
-        if self.reset:
-            logger.warning("[WARN] Reset flag is set - resetting all submodules to recorded commits")
-            self.run_command(["git", "submodule", "update", "--init", "--recursive", "--force"])
-            logger.info("[OK] All submodules reset to recorded commits")
-        else:
-            logger.info("[OK] All submodules initialized/pulled (preserving current commits)")
+    if source_cfg.exists():
+        cfg = source_cfg.read_text(encoding="utf-8")
+        cfg = cfg.replace("{{MODULE_NAME}}", module_name)
+        cfg = cfg.replace("{{MYPY_ENTRY}}", _mypy_entry_for(module_name, is_root))
+        (ROOT / ".pre-commit-config.yaml").write_text(cfg, encoding="utf-8")
+        logger.info("Wrote .pre-commit-config.yaml from base template")
+    else:
+        logger.warning("pre-commit config templates not found; skipping pre-commit config")
 
-    def setup_module(self, module_name: str) -> None:
-        """Set up a single module's environment.
 
-        Args:
-            module_name: Name of the module to set up
-        """
-        module_path = self.root_dir / module_name
+def _expected_configs_for_module(module_path: Path) -> tuple[str | None, str | None]:
+    """Render expected pre-commit config and mypy.ini for a given module using base templates.
 
+    Returns (precommit_text, mypy_text) where either may be None if template missing.
+    """
+    base_configs = ROOT / "base" / "configs"
+    if not base_configs.exists():
+        return None, None
+
+    module_name = module_path.name
+    # python.ver
+    pyver_file = module_path / "python.ver"
+    python_version = pyver_file.read_text(encoding="utf-8").strip() if pyver_file.exists() else "3.12"
+
+    # mypy.ini
+    mypy_expected = None
+    mypy_tpl = base_configs / "mypy.ini.template"
+    if mypy_tpl.exists():
+        content = mypy_tpl.read_text(encoding="utf-8")
+        content = content.replace("{{PYTHON_VERSION}}", python_version)
+        # Avoid adding the whole superproject to mypy_path to prevent
+        # duplicate module discovery (e.g., backend.* vs <module>.backend.*).
+        # For modules that import base, include only ../base plus current dir.
+        path_sep = os.pathsep
+        mypy_path = "." if module_name == "base" else f"..{os.sep}base{path_sep}."
+        content = content.replace("{{MYPY_PATH}}", mypy_path)
+        mypy_expected = content
+
+    # pre-commit
+    pre_expected = None
+    src = base_configs / ".pre-commit-config.win.yaml" if platform.system().lower().startswith("win") else base_configs / ".pre-commit-config.unix.yaml"
+    if src.exists():
+        cfg = src.read_text(encoding="utf-8")
+        cfg = cfg.replace("{{MODULE_NAME}}", module_name)
+        cfg = cfg.replace("{{MYPY_ENTRY}}", _mypy_entry_for(module_name, is_root=False))
+        pre_expected = cfg
+
+    return pre_expected, mypy_expected
+
+
+def _show_and_optionally_write(current: str, expected: str, path: Path, label: str, apply: bool) -> bool:
+    if current == expected:
+        return False
+    logger.info(label)
+    for line in difflib.unified_diff(current.splitlines(), expected.splitlines(), fromfile="current", tofile="expected", lineterm=""):
+        logger.debug(line)
+    if apply:
+        path.write_text(expected, encoding="utf-8")
+        logger.info(f"  applied update to {path}")
+    return True
+
+
+def audit_and_optionally_apply_configs(apply: bool = False) -> None:
+    """Audit submodule configs vs base templates, optionally apply updates.
+
+    This does NOT modify submodules unless apply=True is explicitly passed.
+    """
+    logger.info("\nConfig drift audit (vs base/configs):")
+    for name in SUBMODULES:
+        module_path = ROOT / name
         if not module_path.exists():
-            logger.warning(f"[WARN] Module {module_name} not found, skipping")
-            return
+            logger.info(f"- {name}: missing (skipped)")
+            continue
+        pre_expected, mypy_expected = _expected_configs_for_module(module_path)
+        pre_path = module_path / ".pre-commit-config.yaml"
+        mypy_path = module_path / "mypy.ini"
 
-        logger.info(f"\n--- Setting up {module_name} module ---")
+        drift = False
+        if pre_expected is not None:
+            current = pre_path.read_text(encoding="utf-8") if pre_path.exists() else ""
+            drift |= _show_and_optionally_write(current, pre_expected, pre_path, f"- {name}: .pre-commit-config.yaml differs", apply)
 
-        # Check if setup.py exists
-        setup_script = module_path / "module_setup.py"
-        if not setup_script.exists():
-            logger.warning(f"[WARN] No module_setup.py found in {module_name}, skipping")
-            return
+        if mypy_expected is not None:
+            current = mypy_path.read_text(encoding="utf-8") if mypy_path.exists() else ""
+            drift |= _show_and_optionally_write(current, mypy_expected, mypy_path, f"- {name}: mypy.ini differs", apply)
 
-        # If module is uv-native (pyproject.toml present), run uv sync first
-        if (module_path / "pyproject.toml").exists():
-            self.run_command(["uv", "sync", "--dev"], cwd=module_path, check=False)
-
-        # Run the module's module_setup.py with Python 3.12 via uv
-        result = self.run_command(["uv", "run", "--python", "3.12", "module_setup.py"], cwd=module_path, check=False)
-
-        if result.returncode == 0:
-            logger.info(f"[OK] {module_name} module setup complete")
-        else:
-            logger.error(f"[ERROR] {module_name} module setup failed")
-            logger.error(f"  Error: {result.stderr}")
-            self.module_failures.append(module_name)
-
-    def _check_uv_available(self) -> bool:
-        """Check if uv is available on PATH."""
-        try:
-            self.run_command(["uv", "--version"], check=False)
-            return True
-        except FileNotFoundError:
-            return False
-
-    def ensure_uv_and_python(self) -> None:
-        """Ensure uv is available and Python 3.12 toolchain is installed via uv.
-
-        We do not create a root venv here; each module manages its own uv venv.
-        """
-        if not self._check_uv_available():
-            logger.error("\n" + "=" * 60)
-            logger.error("uv is required but not found on PATH.")
-            logger.error("Use scripts/bootstrap_uv_python.py to install uv safely from official sources.")
-            logger.error("Alternatively, install uv manually from https://astral.sh/uv")
-            sys.exit(1)
-
-        # Ensure a Python 3.12 runtime is available to uv
-        logger.info("Ensuring Python 3.12 toolchain is available via uv...")
-        find = self.run_command(["uv", "python", "find", "3.12"], check=False)
-        if find.returncode != 0 or not find.stdout.strip():
-            logger.info("Python 3.12 not found in uv toolchains. Installing...")
-            self.run_command(["uv", "python", "install", "3.12"])
-        else:
-            logger.info("Python 3.12 already available for uv.")
-
-    def setup_orchestrator_toolchain(self) -> None:
-        """Ensure the orchestrator has the required toolchain (uv + Python 3.12)."""
-        logger.info("\n" + "=" * 60)
-        logger.info("STEP 2: Ensuring Toolchain (uv + Python 3.12)")
-        logger.info("=" * 60)
-        self.ensure_uv_and_python()
-        logger.info("[OK] Toolchain ready (uv + Python 3.12)")
-
-    def install_precommit_hooks(self, module_path: Path) -> None:
-        """Install pre-commit hooks for a module.
-
-        Args:
-            module_path: Path to the module
-        """
-        # Check if .pre-commit-config.yaml exists
-        precommit_config = module_path / ".pre-commit-config.yaml"
-        if not precommit_config.exists():
-            return
-
-        # Get python path
-        venv_path = module_path / ".venv"
-        if sys.platform == "win32":
-            python_path = venv_path / "Scripts" / "python.exe"
-        else:
-            python_path = venv_path / "bin" / "python"
-
-        if python_path.exists():
-            # Install pre-commit hooks
-            logger.info(f"Installing pre-commit hooks in {module_path.name}...")
-            self.run_command([str(python_path), "-m", "pre_commit", "install"], cwd=module_path, check=False)
-            self.run_command([str(python_path), "-m", "pre_commit", "install", "--hook-type", "pre-push"], cwd=module_path, check=False)
-
-    def setup_all_modules(self) -> None:
-        """Set up all submodules."""
-        logger.info("\n" + "=" * 60)
-        logger.info("STEP 3: Setting up All Submodules")
-        logger.info("=" * 60)
-
-        # Base module must be set up first
-        if "base" in self.submodules:
-            logger.info(f"Setting up base module [1/{len(self.submodules)}]...")
-            self.setup_module("base")
-
-        # Set up remaining modules (excluding base since it's already done)
-        remaining_modules = [module for module in self.submodules if module != "base"]
-        for i, module in enumerate(remaining_modules, start=2):
-            logger.info(f"Setting up {module} module [{i}/{len(self.submodules)}]...")
-            self.setup_module(module)
-
-    def run(self) -> int:
-        """Run the complete orchestrator setup.
-
-        Returns:
-            Exit code (0 for success)
-        """
-        logger.info("\n" + "=" * 60)
-        logger.info("AMI ORCHESTRATOR COMPLETE SETUP")
-        logger.info("=" * 60)
-
-        try:
-            # Step 0: Clean if requested
-            if self.clean:
-                self.clean_all()
-
-            # Step 1: Initialize submodules
-            self.init_submodules()
-
-            # Step 2: Ensure toolchain (do not create a root venv)
-            self.setup_orchestrator_toolchain()
-
-            # Step 3: Set up all submodules
-            self.setup_all_modules()
-
-            logger.info("\n" + "=" * 60)
-            if self.module_failures:
-                logger.error("[PARTIAL] SETUP COMPLETED WITH FAILURES")
-                logger.error("=" * 60)
-                logger.error("Failed modules: " + ", ".join(self.module_failures))
-                logger.error("Check logs above and re-run their module_setup.py after resolving.")
-                logger.info("\nEach submodule manages its own uv virtual environment.")
-                return 1
-            else:
-                logger.info("[OK] SETUP COMPLETE!")
-                logger.info("=" * 60)
-                logger.info("\nEach submodule manages its own uv virtual environment.")
-                return 0
-
-        except Exception as e:
-            logger.error(f"\n[ERROR] Setup failed: {e}")
-            traceback.print_exc()
-            return 1
+        if not drift:
+            logger.info(f"- {name}: in sync")
 
 
-def main() -> None:
-    """Main entry point."""
-    parser = argparse.ArgumentParser(description="AMI Orchestrator Setup Script")
-    parser.add_argument("--no-clean", action="store_true", help="Do not clean venvs and caches before setup (default: clean everything)")
-    parser.add_argument("--reset", action="store_true", help="Reset all submodules to recorded commits (default: preserve current commits)")
-
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Set up root Orchestrator module")
+    parser.add_argument("--project-name", type=str, default="Orchestrator")
+    parser.add_argument("--audit-configs", action="store_true", help="Audit submodule configs vs. base templates (dry-run)")
+    parser.add_argument("--apply-configs", action="store_true", help="Apply base templates to submodules (destructive; not run without explicit ask)")
     args = parser.parse_args()
 
-    # Clean by default unless --no-clean is specified
-    clean = not args.no_clean
+    if not check_uv():
+        return 1
+    ensure_uv_python("3.12")
 
-    setup = OrchestratorSetup(clean=clean, reset=args.reset)
-    sys.exit(setup.run())
+    # Delegate to Base to create venv and sync deps (if any)
+    rc = call_base_setup(args.project_name)
+    if rc != 0:
+        return rc
+
+    # Replicate configs for root from base templates
+    replicate_configs_from_base()
+
+    if args.audit_configs or args.apply_configs:
+        audit_and_optionally_apply_configs(apply=args.apply_configs)
+
+    logger.info("Root module setup complete.")
+    return 0
 
 
 if __name__ == "__main__":
-    # Initialize basic logging if not configured by parent
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)8s] %(message)s")
-    main()
+    sys.exit(main())
