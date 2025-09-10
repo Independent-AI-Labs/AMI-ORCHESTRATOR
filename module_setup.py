@@ -118,6 +118,8 @@ def replicate_configs_from_base() -> None:
         cfg = source_cfg.read_text(encoding="utf-8")
         cfg = cfg.replace("{{MODULE_NAME}}", module_name)
         cfg = cfg.replace("{{MYPY_ENTRY}}", _mypy_entry_for(module_name, is_root))
+        # Ensure tests run inside uv environment at root
+        cfg = cfg.replace("entry: python scripts/run_tests.py", "entry: uv run python scripts/run_tests.py")
         (ROOT / ".pre-commit-config.yaml").write_text(cfg, encoding="utf-8")
         logger.info("Wrote .pre-commit-config.yaml from base template")
     else:
