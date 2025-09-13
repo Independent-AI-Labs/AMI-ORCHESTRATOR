@@ -33,9 +33,8 @@ Status legend: [ ] todo  [-] in-progress  [x] done  [!] blocked
   - [ ] Run sample checks (ruff + mypy) across modules post-alignment
 
 ## Runner Scripts & Docs Consistency
-- [-] base/docs/MCP_SERVERS.md references run_mcp.py
-  - [ ] Add base/scripts/run_mcp.py wrapper that dispatches to existing runners
-  - [ ] Optionally update docs to reflect actual script names
+- [-] base/docs/MCP_SERVERS.md referenced run_mcp.py (fixed)
+  - [x] Update docs to reflect programmatic startup and module-specific runners
 - [ ] Validate all referenced `run_*` scripts exist and are documented
 
 ## Orchestrator Enhancements

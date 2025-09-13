@@ -39,18 +39,47 @@ def venv_versions() -> None:
             run([str(vpy), "-V"])  # module
 
 
+def _mypy_targets(module: str, mpath: Path) -> tuple[list[str], list[str]]:
+    pkgs: list[str] = []
+    paths: list[str] = []
+    # Prefer package-qualified invocation(s) to avoid duplicate module names
+    if (mpath / "__init__.py").exists():
+        pkgs += ["-p", module]
+    # Known nested packages
+    if module == "files" and (mpath / "backend").exists():
+        pkgs += ["-p", "files.backend"]
+    if module == "compliance" and (mpath / "compliance").exists():
+        pkgs += ["-p", "compliance.compliance"]
+    if module == "domains":
+        if (mpath / "risk").exists():
+            pkgs += ["-p", "domains.risk"]
+        if (mpath / "sda").exists():
+            pkgs += ["-p", "domains.sda"]
+    # Also type-check common top-level dirs if present
+    if (mpath / "tests").exists():
+        # If tests is a package (has __init__.py), rely on -p <module> to include it
+        if not (mpath / "tests" / "__init__.py").exists():
+            paths.append("tests")
+    if (mpath / "scripts").exists():
+        paths.append("scripts")
+    # Fallback to module root when nothing else
+    if not pkgs and not paths:
+        paths.append(".")
+    return pkgs, paths
+
+
 def safe_checks() -> None:
-    # Root
-    run(["uv", "run", "ruff", "check", "backend"], cwd=ROOT)
-    run(["uv", "run", "mypy", "--config-file", "mypy.ini", "backend"], cwd=ROOT)
-    # Modules
+    # Modules: run checks from the module root
     for m in MODULES:
         mpath = ROOT / m
         if not mpath.exists():
             continue
-        # prefer module-local venv via `uv run` from module dir
-        run(["uv", "run", "ruff", "check", "backend"], cwd=mpath)
-        run(["uv", "run", "mypy", "--config-file", "mypy.ini", "backend"], cwd=mpath)
+        run(["uv", "run", "ruff", "check", "."], cwd=mpath)
+        pkgs, paths = _mypy_targets(m, mpath)
+        if pkgs:
+            run(["uv", "run", "mypy", "--config-file", "mypy.ini", *pkgs], cwd=mpath)
+        if paths:
+            run(["uv", "run", "mypy", "--config-file", "mypy.ini", *paths], cwd=mpath)
 
 
 def full_hooks() -> None:
