@@ -13,7 +13,7 @@ Immediate actions (1–2 days)
   - Action: Replace `scripts/ami_path.py` usage with `PathFinder` for consistency.
   - Owner: UX
 - MCP runner doc alignment
-  - Action: Either add `base/scripts/run_mcp.py` wrapper or update docs to list concrete runners only.
+  - Action: Update docs to describe programmatic startup and module-specific runners (done in this pass).
   - Owner: Base
 
 Short-term (1 week)

@@ -7,7 +7,7 @@ High-value docs by area
   - `TODO_IDP.md` — IDP backlog and tasks.
 - Base
   - `README.md` — core services and runners.
-  - `docs/MCP_SERVERS.md` — server interfaces and usage (note: references to `run_mcp.py` require update).
+- `docs/MCP_SERVERS.md` — server interfaces and usage (runner references removed; use programmatic startup or module README).
   - `SECURITY*.md` — security architecture, implementation summary, verification report.
   - `CODE_EXCEPTIONS.md` — intentional deviations not to be “fixed”.
 - Browser

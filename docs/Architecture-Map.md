@@ -9,17 +9,17 @@ Purpose: Provide a concise map of the orchestrator and module boundaries, their 
     - `scripts/bootstrap_uv_python.py` — trusted install path for `uv` and Python 3.12 toolchain.
 
 - Base (`base/`)
-  - Responsibilities: core platform contracts, shared utils, path + environment setup centralization, security model, MCP server runners.
-  - Entrypoints: `scripts/run_dataops*.py`, `scripts/run_ssh*.py`, `scripts/run_tests.py`.
+  - Responsibilities: core platform contracts, shared utils, path + environment setup centralization, security model, MCP servers.
+  - Entrypoints: see module README (runners are module-specific).
   - Shared APIs: `base/backend/utils/{path_finder.py, environment_setup.py, path_utils.py}`.
 
 - Browser (`browser/`)
   - Responsibilities: auditable browser automation (MCP).
-  - Entrypoints: `scripts/run_chrome.py`.
+  - Entrypoints: see module README.
 
 - Files (`files/`)
   - Responsibilities: secure local file operations (MCP), analysis utilities.
-  - Entrypoints: `scripts/run_filesys.py`.
+  - Entrypoints: see module README.
 
 - Streams (`streams/`)
   - Responsibilities: streaming and real-time pipelines.

@@ -4,7 +4,7 @@
 
 AMI-ORCHESTRATOR is a **compliance-first** automation platform that ensures all data operations, business processes, and AI decisions meet EU AI Act, ISO 27001, and enterprise regulatory requirements while reducing cloud dependence through distributed compute and intelligent work pooling.
 
-## 🌟 Compliance-First Architecture
+## Compliance-First Architecture
 
 ### Built for Regulatory Requirements
 
@@ -19,31 +19,31 @@ AMI-ORCHESTRATOR addresses critical enterprise needs:
 
 ### Key Features
 
-**🔓 Open Source First**
+Open Source First
 - MIT licensed, forever free
 - No premium tiers, no hidden features
 - Community-driven development
 - Your contributions make it better for everyone
 
-**🏛️ Compliance as Code**
+Compliance as Code
 - Every operation auditable and traceable
 - Built-in regulatory compliance (EU AI Act, GDPR, SOC2)
 - Cryptographically signed audit trails
 - Explainable AI decisions by default
 
-**🔒 Security Without Compromise**
+Security Without Compromise
 - Self-hosted = your data never leaves your control
 - Zero-trust architecture
 - End-to-end encryption for distributed operations
 - Row-level security on all data operations
 
-**🌐 Distributed Compute Architecture**
+Distributed Compute Architecture
 - Intelligent work pooling across infrastructure
 - Automatic task distribution and load balancing
 - Edge-to-cloud seamless orchestration
 - Reduce cloud costs through local compute utilization
 
-## 🚀 Core Capabilities
+## Core Capabilities
 
 ### Universal Data Layer with Compliance Built-In
 AMI-ORCHESTRATOR's data layer ensures every operation meets regulatory requirements:
@@ -69,15 +69,12 @@ Built from the ground up to meet EU AI Act requirements:
 - **Human Oversight Built-In** - Configurable approval workflows for high-risk operations
 - **Local-First Processing** - Keep sensitive data on your infrastructure
 
-## 📦 Compliance-First Modular Architecture
+## Modular Architecture
 
 Each module is independently deployable with built-in compliance features.
 
-### Recent Updates (September 2025)
-- **Import System Overhaul**: Complete migration to absolute imports across all modules ([Import Conventions](IMPORT_CONVENTIONS.md))
-- **Code Quality Analysis**: Comprehensive quality assessment with remediation plan ([Master Quality Report](MASTER_CODE_QUALITY_REPORT.md))
-- **Configuration Management**: Centralized template system for cross-module consistency ([QA Report](QA.md))
-- **Type Safety Audit**: Complete audit of type ignore comments ([Type Ignore Audit](TYPE_IGNORE_AUDIT.md))
+### Documentation Note
+This README avoids referencing non-existent files. Module-specific READMEs under each module (e.g., `base/README.md`, `browser/README.md`, `files/README.md`, `node/README.md`) provide details for those components.
 
 ### [AMI-BASE](base/README.md) - Compliance Infrastructure
 - **Security Model** - Row-level access control with audit trails
@@ -97,7 +94,7 @@ Each module is independently deployable with built-in compliance features.
 - **Pre-commit Validation** - Automatic security and compliance checks
 - **Local Processing** - Document analysis without cloud dependencies
 
-## 🏗️ Built on Principles, Not Compromises
+## Principles
 
 ### Our Commitments
 
@@ -118,33 +115,31 @@ Each module is independently deployable with built-in compliance features.
 - **No Limits** - Scale to your needs
 - **No Surprises** - Deterministic execution
 
-## 🚀 Quick Start - Your Infrastructure, Your Way
+## Quick Start
 
 ### Prerequisites
 - Python 3.12+ (or Docker, or Kubernetes, or bare metal)
 - Git (to clone once and own forever)
 - Your servers (or laptop, or Raspberry Pi, or data center)
 
-### Installation
+### Setup
 
 ```bash
 # Clone the repository
 git clone --recursive https://github.com/Independent-AI-Labs/AMI-ORCHESTRATOR.git
 cd AMI-ORCHESTRATOR
 
-# Bootstrap uv + Python 3.12 toolchain (one-time)
-python scripts/bootstrap_uv_python.py --auto
-
-# Run the complete setup (handles all modules automatically; each module manages its own venv)
+# Run the orchestrator setup (delegates to base; manages per-module configs)
 python module_setup.py
 
-# Launch MCP servers directly
-python base/backend/mcp/dataops/run_dataops.py    # Data operations
-python browser/backend/mcp/chrome/run_chrome.py   # Browser automation
-python files/backend/mcp/filesys/run_filesys.py   # File operations
+# Validate configs and types/lints per module
+python scripts/validate_all.py
+
+# Enforce empty __init__.py files repository-wide
+python scripts/ensure_empty_inits.py --fix
 ```
 
-## 🌐 Distributed Compute & Work Pooling (Work in Progress)
+## Distributed Compute & Work Pooling (WIP)
 
 ### Intelligent Work Distribution
 AMI-ORCHESTRATOR reduces cloud dependency through smart work distribution:
