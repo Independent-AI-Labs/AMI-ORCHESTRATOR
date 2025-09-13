@@ -18,7 +18,7 @@ Per-module setup observations
 - domains: No `module_setup.py`. Same as compliance.
 
 Documentation mismatches (examples)
-- `base/docs/MCP_SERVERS.md` references `base/scripts/run_mcp.py`, which does not exist; update doc or add the runner.
+- `base/docs/MCP_SERVERS.md` references to `run_mcp.py` removed; docs now direct to programmatic startup or module-specific runners.
 - Root `README.md` references `IMPORT_CONVENTIONS.md`, `MASTER_CODE_QUALITY_REPORT.md`, `QA.md`, `TYPE_IGNORE_AUDIT.md` which are not present. Track in Docs-Gaps.
 
 Next validation steps
