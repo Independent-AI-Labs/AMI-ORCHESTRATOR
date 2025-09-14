@@ -42,26 +42,27 @@ def venv_versions() -> None:
 def _mypy_targets(module: str, mpath: Path) -> tuple[list[str], list[str]]:
     pkgs: list[str] = []
     paths: list[str] = []
+
     # Prefer package-qualified invocation(s) to avoid duplicate module names
     if (mpath / "__init__.py").exists():
         pkgs += ["-p", module]
-    # Known nested packages
-    if module == "files" and (mpath / "backend").exists():
-        pkgs += ["-p", "files.backend"]
-    if module == "compliance" and (mpath / "compliance").exists():
-        pkgs += ["-p", "compliance.compliance"]
-    if module == "domains":
-        if (mpath / "risk").exists():
-            pkgs += ["-p", "domains.risk"]
-        if (mpath / "sda").exists():
-            pkgs += ["-p", "domains.sda"]
+
+    # Known nested packages (data-driven to reduce branching)
+    nested: dict[str, list[str]] = {
+        "files": ["backend"],
+        "compliance": ["compliance"],
+        "domains": ["risk", "sda"],
+    }
+    for sub in nested.get(module, []):
+        if (mpath / sub).exists():
+            pkgs += ["-p", f"{module}.{sub}"]
+
     # Also type-check common top-level dirs if present
-    if (mpath / "tests").exists():
-        # If tests is a package (has __init__.py), rely on -p <module> to include it
-        if not (mpath / "tests" / "__init__.py").exists():
-            paths.append("tests")
+    if (mpath / "tests").exists() and not (mpath / "tests" / "__init__.py").exists():
+        paths.append("tests")
     if (mpath / "scripts").exists():
         paths.append("scripts")
+
     # Fallback to module root when nothing else
     if not pkgs and not paths:
         paths.append(".")

@@ -1,6 +1,19 @@
 line-length = 160
 target-version = "py312"
 
+# Exclude submodules and external data dirs from root-level checks; each module has its own hooks
+exclude = [
+    "dgraph/**",
+    "base/**",
+    "browser/**",
+    "compliance/**",
+    "domains/**",
+    "files/**",
+    "node/**",
+    "streams/**",
+    "ux/**",
+]
+
 [lint]
 # Comprehensive rule set replacing pylint + bandit
 select = [
