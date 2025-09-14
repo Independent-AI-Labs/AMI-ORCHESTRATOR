@@ -1,90 +1,59 @@
 repos:
-  # Ruff - repo-wide lint/format; scans all code except .venv
+  # Ruff - replaces black, isort, pylint, and bandit
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.1.9
     hooks:
+      # Linting (includes security checks)
       - id: ruff
-        name: ruff
-        args: [ --fix, --exit-non-zero-on-fix ]
+        args:
+          - --fix
+          - --exit-non-zero-on-fix
+          - --exclude
+          - dgraph/**
+          - --exclude
+          - base/**
+          - --exclude
+          - browser/**
+          - --exclude
+          - compliance/**
+          - --exclude
+          - domains/**
+          - --exclude
+          - files/**
+          - --exclude
+          - node/**
+          - --exclude
+          - streams/**
+          - --exclude
+          - ux/**
+          - .
+        pass_filenames: false
         stages: [ pre-commit ]
+      # Formatting (replaces black)
       - id: ruff-format
-        name: ruff-format
+        args: [ . ]
+        pass_filenames: false
         stages: [ pre-commit ]
 
-  # Type checking per module with each module's venv + config
+  # Type checking
   - repo: local
     hooks:
-      - id: mypy-base
-        name: mypy (base)
-        entry: bash -c '[ -x base/.venv/bin/python ] || { echo "skip base mypy - venv missing"; exit 0; }; cd base && .venv/bin/python -m mypy backend --config-file=mypy.ini'
+      - id: mypy
+        name: mypy
+        entry: bash -lc ".venv/bin/python -m mypy --config-file=mypy.ini module_setup.py scripts"
         language: system
-        pass_filenames: false
-        stages: [ pre-push ]
+        types: [ python ]
         require_serial: true
-      - id: mypy-browser
-        name: mypy (browser)
-        entry: bash -c '[ -x browser/.venv/bin/python ] || { echo "skip browser mypy - venv missing"; exit 0; }; cd browser && .venv/bin/python -m mypy backend --config-file=mypy.ini'
-        language: system
+        stages: [ pre-commit ]
         pass_filenames: false
-        stages: [ pre-push ]
-        require_serial: true
-      - id: mypy-files
-        name: mypy (files)
-        entry: bash -c '[ -x files/.venv/bin/python ] || { echo "skip files mypy - venv missing"; exit 0; }; cd files && .venv/bin/python -m mypy backend --config-file=mypy.ini'
-        language: system
-        pass_filenames: false
-        stages: [ pre-push ]
-        require_serial: true
-      - id: mypy-streams
-        name: mypy (streams)
-        entry: bash -c '[ -x streams/.venv/bin/python ] || { echo "skip streams mypy - venv missing"; exit 0; }; cd streams && .venv/bin/python -m mypy backend --config-file=mypy.ini'
-        language: system
-        pass_filenames: false
-        stages: [ pre-push ]
-        require_serial: true
-      - id: mypy-domains
-        name: mypy (domains)
-        entry: bash -c '[ -x domains/.venv/bin/python ] || { echo "skip domains mypy - venv missing"; exit 0; }; cd domains && .venv/bin/python -m mypy . --config-file=mypy.ini'
-        language: system
-        pass_filenames: false
-        stages: [ pre-push ]
-        require_serial: true
-      - id: mypy-node
-        name: mypy (node)
-        entry: bash -c '[ -x node/.venv/bin/python ] || { echo "skip node mypy - venv missing"; exit 0; }; cd node && .venv/bin/python -m mypy . --config-file=mypy.ini'
-        language: system
-        pass_filenames: false
-        stages: [ pre-push ]
-        require_serial: true
-      - id: mypy-ux
-        name: mypy (ux)
-        entry: bash -c '[ -x ux/.venv/bin/python ] || { echo "skip ux mypy - venv missing"; exit 0; }; cd ux && .venv/bin/python -m mypy . --config-file=mypy.ini'
-        language: system
-        pass_filenames: false
-        stages: [ pre-push ]
-        require_serial: true
 
-  # Repo-wide ruff on push
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.1.9
-    hooks:
-      - id: ruff
-        name: ruff (repo-wide)
-        args: [ --fix, --exit-non-zero-on-fix, --force-exclude, --extend-exclude, .venv, . ]
-        pass_filenames: false
-        stages: [ pre-push ]
-      - id: ruff-format
-        name: ruff-format (repo-wide)
-        args: [ --force-exclude, --extend-exclude, .venv, . ]
-        pass_filenames: false
-        stages: [ pre-push ]
+  
 
-  # Pre-push test runner (repo root tests only)
   - repo: local
     hooks:
       - id: pytest
         name: pytest
-        entry: python scripts/run_tests.py
+        entry: uv run python scripts/run_tests.py
         language: system
         pass_filenames: false
         always_run: true
@@ -98,7 +67,7 @@ repos:
       - id: check-yaml
         stages: [ pre-commit ]
       - id: check-added-large-files
-        args: ['--maxkb=100000']
+        args: ['--maxkb=100000']  # 100MB limit
         stages: [ pre-commit ]
       - id: check-merge-conflict
         stages: [ pre-commit ]

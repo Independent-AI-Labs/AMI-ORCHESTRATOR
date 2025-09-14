@@ -34,14 +34,120 @@ SUBMODULES = [
 ]
 
 
+def _run(cmd: list[str], cwd: Path | None = None, check: bool = False, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
+    """Run a command with text output, returning the CompletedProcess.
+
+    Logs the command for transparency. Does not raise unless check=True.
+    """
+    where = str(cwd or ROOT)
+    logger.info("$ %s (cwd=%s)", " ".join(cmd), where)
+    return subprocess.run(cmd, cwd=where, text=True, capture_output=True, check=check, env=env)
+
+
+def _submodules_from_gitmodules() -> list[tuple[str, str]]:
+    """Return list of (path, url) from .gitmodules if present."""
+    gm = ROOT / ".gitmodules"
+    if not gm.exists():
+        return []
+    path: str | None = None
+    url: str | None = None
+    results: list[tuple[str, str]] = []
+    for raw_line in gm.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if line.startswith("[submodule "):
+            if path and url:
+                results.append((path, url))
+            path, url = None, None
+        elif line.startswith("path = "):
+            path = line.split("=", 1)[1].strip()
+        elif line.startswith("url = "):
+            url = line.split("=", 1)[1].strip()
+    if path and url:
+        results.append((path, url))
+    return results
+
+
+def _to_https(url: str) -> str:
+    """Convert SSH GitHub URL to HTTPS if applicable."""
+    if url.startswith("git@github.com:"):
+        return "https://github.com/" + url.split(":", 1)[1]
+    return url
+
+
+def ensure_git_submodules() -> None:
+    """Initialize and update git submodules, retrying via HTTPS if SSH fails.
+
+    This modifies submodule remote URLs in local git config if SSH auth fails,
+    but does not edit .gitmodules on disk.
+    """
+    if not (ROOT / ".git").exists():
+        logger.warning("No .git directory found; skipping submodule init.")
+        return
+
+    logger.info("Initializing git submodules (recursive)…")
+    res = _run(["git", "submodule", "update", "--init", "--recursive"])
+    if res.returncode == 0:
+        logger.info("Submodules are initialized.")
+        return
+
+    stderr = res.stderr or ""
+    if "Permission denied (publickey)" in stderr or "fatal: Could not read from remote repository" in stderr:
+        logger.warning("SSH auth failed for submodules; attempting HTTPS fallback.")
+        subs = _submodules_from_gitmodules()
+        changed = False
+        for path, url in subs:
+            https_url = _to_https(url)
+            if https_url == url:
+                continue
+            _run(["git", "submodule", "set-url", path, https_url])
+            changed = True
+        if changed:
+            _run(["git", "submodule", "sync", "--recursive"])  # sync local config
+        # Retry update
+        res2 = _run(["git", "submodule", "update", "--init", "--recursive"])
+        if res2.returncode == 0:
+            logger.info("Submodules initialized via HTTPS.")
+            return
+        logger.error("Submodule init still failing. stderr=\n%s", res2.stderr)
+        return
+
+    # Other failure: surface stderr for clarity
+    if res.stderr:
+        logger.error("Submodule init failed:\n%s", res.stderr)
+    else:
+        logger.error("Submodule init failed with exit code %s", res.returncode)
+
+
 def check_uv() -> bool:
     try:
         subprocess.run(["uv", "--version"], capture_output=True, check=True)
         return True
     except Exception:
-        logger.error("uv is not installed or not on PATH.")
-        logger.info("Install uv: https://docs.astral.sh/uv/")
-        return False
+        logger.warning("uv is not installed or not on PATH. Attempting bootstrap…")
+        bootstrap = ROOT / "scripts" / "bootstrap_uv_python.py"
+        if not bootstrap.exists():
+            logger.error("Missing scripts/bootstrap_uv_python.py. Please install uv manually: https://docs.astral.sh/uv/")
+            return False
+        # Best-effort bootstrap (user-local install); do not raise on failure
+        subprocess.run([sys.executable, str(bootstrap), "--auto", "--only-uv"], check=False)
+        try:
+            subprocess.run(["uv", "--version"], capture_output=True, check=True)
+            logger.info("uv installed successfully.")
+            return True
+        except Exception:
+            # Also try common install locations in case PATH wasn't updated yet
+            for cand in ("~/.cargo/bin/uv", "~/.local/bin/uv"):
+                cand_path = str(Path(cand).expanduser())
+                try:
+                    subprocess.run([cand_path, "--version"], capture_output=True, check=True)
+                    os.environ["PATH"] = f"{str(Path(cand_path).parent)}{os.pathsep}" + os.environ.get("PATH", "")
+                    logger.info(f"uv found at {cand_path} and added to PATH for this process.")
+                    return True
+                except Exception as exc:
+                    logger.debug("uv probe failed at %s: %s", cand_path, exc)
+                    continue
+            logger.error("Failed to install uv automatically. See https://docs.astral.sh/uv/ for manual installation.")
+            return False
 
 
 def ensure_uv_python(version: str = "3.12") -> None:
@@ -217,6 +323,9 @@ def main() -> int:
     parser.add_argument("--apply-configs", action="store_true", help="Apply base templates to submodules (destructive; not run without explicit ask)")
     args = parser.parse_args()
 
+    # Ensure submodules are present before any delegation
+    ensure_git_submodules()
+
     if not check_uv():
         return 1
     ensure_uv_python("3.12")
@@ -228,6 +337,24 @@ def main() -> int:
 
     # Replicate configs for root from base templates
     replicate_configs_from_base()
+
+    # Best-effort install of headless Chrome runtime deps for Browser module on Unix.
+    # This is a convenience step; failures are non-fatal.
+    try:
+        browser_dir = ROOT / "browser"
+        install_script = browser_dir / "scripts" / "install_chrome_deps.sh"
+        if install_script.exists() and os.name == "posix":
+            logger.info("Attempting to install Browser headless Chrome runtime dependencies…")
+            env = {**os.environ, "SUDO_PASSWORD": os.environ.get("SUDO_PASSWORD", "docker")}
+            res = _run(["bash", str(install_script)], cwd=browser_dir, env=env)
+            if res.returncode == 0:
+                logger.info("Browser runtime dependencies installed (or already present).")
+            else:
+                logger.warning("Browser deps installer exited with %s.\nstdout:\n%s\nstderr:\n%s", res.returncode, res.stdout, res.stderr)
+        else:
+            logger.info("Skipping Browser deps install (non-posix or script missing).")
+    except Exception as exc:
+        logger.warning("Browser deps install step skipped due to error: %s", exc)
 
     if args.audit_configs or args.apply_configs:
         audit_and_optionally_apply_configs(apply=args.apply_configs)
