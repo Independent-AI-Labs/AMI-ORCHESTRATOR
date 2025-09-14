@@ -1,0 +1,98 @@
+version: '3.8'
+
+services:
+  # Postgres with pgvector extension
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: ami-postgres
+    profiles: ["postgres"]
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-postgres}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 10s
+      timeout: 10s
+      retries: 30
+
+  # Redis cache
+  redis:
+    image: redis:7
+    container_name: ami-redis
+    profiles: ["redis"]
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+  # Dgraph Zero
+  dgraph-zero:
+    image: dgraph/zero:v24.0.0
+    container_name: ami-dgraph-zero
+    profiles: ["dgraph"]
+    ports:
+      - "${DGRAPH_ZERO_INTERNAL_PORT:-5080}:5080"  # intra-cluster
+      - "${DGRAPH_ZERO_HTTP_PORT:-6080}:6080"      # admin HTTP
+    command: ["dgraph", "zero", "--bindall", "--telemetry" , "off"]
+    volumes:
+      - dgraphzero:/dgraph
+
+  # Dgraph Alpha
+  dgraph-alpha:
+    image: dgraph/alpha:v24.0.0
+    container_name: ami-dgraph-alpha
+    profiles: ["dgraph"]
+    depends_on:
+      - dgraph-zero
+    environment:
+      DGRAPH_ALPHA_SECURITY: whitelist=0.0.0.0/0
+    ports:
+      - "${DGRAPH_HTTP_PORT:-8080}:8080"  # HTTP
+      - "${DGRAPH_GRPC_PORT:-9080}:9080"  # gRPC
+    command:
+      - dgraph
+      - alpha
+      - --bindall
+      - --zero
+      - dgraph-zero:5080
+      - --telemetry
+      - off
+    volumes:
+      - dgraphalpha:/dgraph
+
+  # MongoDB
+  mongo:
+    image: mongo:7
+    container_name: ami-mongo
+    profiles: ["mongo"]
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME:-x}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD:-x}
+    ports:
+      - "${MONGO_PORT:-27017}:27017"
+    volumes:
+      - mongodata:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.runCommand({ ping: 1 })"]
+      interval: 10s
+      timeout: 10s
+      retries: 30
+
+volumes:
+  pgdata:
+  redisdata:
+  dgraphzero:
+  dgraphalpha:
+  mongodata:
+
