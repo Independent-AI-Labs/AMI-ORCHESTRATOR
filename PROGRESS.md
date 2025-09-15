@@ -69,5 +69,9 @@ Remaining
   - Uses `/api/serve` POST/DELETE; app serving remains disabled server-side (501) and is surfaced via alert
 - Live served/app badges and polling
   - Tabs show a ● badge when served (file/dir) or when an app is detected running via `/api/app/status`
-  - Background polling: `/api/serve` every 5s to sync instances; `/api/app/status` every 8s for app tabs
-  - Status pill updates accordingly for the active tab
+- Background polling: `/api/serve` every 5s to sync instances; `/api/app/status` every 8s for app tabs
+- Status pill updates accordingly for the active tab
+
+### Runner cleanup
+- Added JS launcher `ux/cms/scripts/server.mjs` for start/stop/status/logs/kill-orphans
+- Removed legacy Bash script `ux/cms/scripts/server.sh` and updated README to use the JS runner exclusively
