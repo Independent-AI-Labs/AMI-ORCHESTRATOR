@@ -38,3 +38,36 @@ Pending polish / next steps
 - Integrate runner status pill for D
 - Expand `/api/media/list` sources and add labels
 - Add persistence for selected entry + recents; add `PATCH` in config
+
+## 2025-09-15
+
+- Status pill integration in Shell
+  - Added status updates per active tab in `ux/cms/public/js/shell.js`
+  - Shows Mode A/B for files, Docs for directories, and Next.js app running state via `/api/app/status` for apps
+
+- Recents persistence
+  - `shell.js` now appends entries to `recents` via `/api/config` `recentsAdd` on open and initial seed
+  - `config` API already supports `recents` and `PATCH`
+
+- Enhanced media roots listing
+  - Expanded `/api/media/list` to include `files/` when present and optional `MEDIA_ROOTS` env entries with labels
+  - Retained `Configured docRoot` and `Uploads`
+
+- A/B/D detection review
+  - File mode decided via `/api/pathinfo` (`hasJs` → B else A)
+  - Apps detected from `package.json` + Next.js structure; serving disabled by default for safety
+  - Modal Enter Path and tab seeding both use detection
+
+Remaining
+- Optional: surface serve/start controls and live served-status in tabs for apps
+- Polish Library drawer (rename, delete, context actions) and Upload flows
+
+### Shell controls and live status
+- Tab context menu with Start/Stop Serving
+  - Right-click a tab to open a minimal menu: Open, Start Serving, Stop Serving, Close Tab
+  - Disabled when `entryId` is missing (seeded tabs) or when not served
+  - Uses `/api/serve` POST/DELETE; app serving remains disabled server-side (501) and is surfaced via alert
+- Live served/app badges and polling
+  - Tabs show a ● badge when served (file/dir) or when an app is detected running via `/api/app/status`
+  - Background polling: `/api/serve` every 5s to sync instances; `/api/app/status` every 8s for app tabs
+  - Status pill updates accordingly for the active tab
