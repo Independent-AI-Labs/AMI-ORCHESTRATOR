@@ -30,7 +30,7 @@ Scope: `ux/cms` (Next.js app) and its public viewer. Goal: support four visualiz
 
 - [x] A/B: iframe with strict CSP; static content from `/api/media`
 - [ ] C: existing doc-tree UI mounted via Visualizer C
-- [ ] D: orchestrate with `scripts/server.sh` (start/stop/status) and embed
+- [ ] D: orchestrate with JS runner `npm run serve` (start/stop/status) and embed
 
 ## APIs and Config
 
@@ -80,7 +80,7 @@ Scope: `ux/cms` (Next.js app) and its public viewer. Goal: support four visualiz
   - [ ] Support theme param `?theme=dark|light`
   - [ ] Add `postMessage` handlers (search, expand/collapse)
 - [ ] D Mode orchestration
-  - [ ] /api/app/start|stop|restart endpoints (call `scripts/server.sh`)
+  - [ ] /api/app/start|stop|restart endpoints (call JS runner `npm run serve`)
   - [ ] Status polling and logs link in shell
   - [ ] Decide proxy `/app/*` vs direct port; implement chosen path
 
