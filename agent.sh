@@ -31,4 +31,4 @@ fi
 INSTRUCTION="\
 NO FUCKING DETACHED HEADS — WE ARE WORKING ONLY IN MAIN ALWAYS UNLESS I SAY OTHERWISE!!!!!!\n\nYou are operating in this repository with strict guardrails:\n\n- Work only on 'main' unless the user explicitly says otherwise.\n- Never, ever commit or push using --no-verify, and never bypass pre-commit or pre-push hooks.\n- Only commit and push after ALL linters, type checks, and tests pass locally.\n- Prefer uv-native workflows and per-module environments; avoid PATH/PYTHONPATH hacks.\n- Use explicit, reproducible commands; surface failures clearly and stop.\n\nNotes:\n- Default command timeout is 1200 seconds (20 minutes).\n- Ask before any potentially destructive operation.\n"
 
-exec codex --yolo -- "$INSTRUCTION"
+exec codex -m gpt-5-codex --yolo -- "$INSTRUCTION"
