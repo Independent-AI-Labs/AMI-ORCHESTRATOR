@@ -15,3 +15,9 @@ Enforcement:
 Commit discipline:
 - Do not bypass hooks (no `--no-verify`).
 - Commit only after linters, type checks, and tests pass.
+
+Process management:
+- Run `npm run dev` for the UX app in the background (for example, `npm run dev &`) or in a separate terminal since it blocks the current shell.
+
+Reference code:
+- `ux/ui-concept` is prototype/reference code; do not spend cycles fixing lint or build failures there unless explicitly asked.
