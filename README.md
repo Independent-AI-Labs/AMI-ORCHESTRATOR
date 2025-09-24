@@ -74,7 +74,7 @@ Built from the ground up to meet EU AI Act requirements:
 Each module is independently deployable with built-in compliance features.
 
 ### Documentation Note
-This README avoids referencing non-existent files. Module-specific READMEs under each module (e.g., `base/README.md`, `browser/README.md`, `files/README.md`, `node/README.md`) provide details for those components.
+This README avoids referencing non-existent files. Module-specific READMEs under each module (e.g., `base/README.md`, `browser/README.md`, `files/README.md`, `nodes/README.md`) provide details for those components.
 
 ### [AMI-BASE](base/README.md) - Compliance Infrastructure
 - **Security Model** - Row-level access control with audit trails
@@ -138,6 +138,16 @@ python scripts/validate_all.py
 # Enforce empty __init__.py files repository-wide
 python scripts/ensure_empty_inits.py --fix
 ```
+
+### Service Stacks
+- `docker-compose.data.yml` provides Postgres (pgvector + plain), Redis, Mongo, and Dgraph. Start it with `docker-compose -f docker-compose.data.yml up -d`.
+- `docker-compose.services.yml` bundles SearXNG, Vaultwarden, OpenVPN-AS, and Matrix Synapse. Bring it up separately when those services are required.
+- After adding yourself to the `docker` group, open a fresh shell (`newgrp docker`) before running either compose file.
+
+### Nodes Setup Automation
+- `python nodes/scripts/setup_service.py preinstall` runs the shared preflight checks (command availability, optional apt installs).
+- `python nodes/scripts/setup_service.py verify` runs `module_setup.py` for every module; add `--no-tests` to skip module test suites.
+- Managed docker/python/npm processes can be orchestrated via `python nodes/scripts/setup_service.py process <start|stop|status>` or through the `NodeSetupMCP` server.
 
 ## Distributed Compute & Work Pooling (WIP)
 

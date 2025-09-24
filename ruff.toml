@@ -9,7 +9,7 @@ exclude = [
     "compliance/**",
     "domains/**",
     "files/**",
-    "node/**",
+    "nodes/**",
     "streams/**",
     "ux/**",
 ]

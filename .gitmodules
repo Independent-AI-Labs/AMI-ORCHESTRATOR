@@ -20,6 +20,6 @@
 [submodule "files"]
 	path = files
 	url = git@github.com:Independent-AI-Labs/AMI-FILES.git
-[submodule "node"]
-	path = node
-	url = git@github.com:Independent-AI-Labs/AMI-NODE.git
+[submodule "nodes"]
+	path = nodes
+	url = git@github.com:Independent-AI-Labs/AMI-NODES.git

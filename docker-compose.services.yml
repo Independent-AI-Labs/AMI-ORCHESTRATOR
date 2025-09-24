@@ -1,0 +1,95 @@
+version: '3.8'
+
+services:
+  # Meta search engine
+  searxng:
+    image: searxng/searxng:2025.2.24-3f6b9d57
+    container_name: ami-searxng
+    profiles: ["extras", "searxng"]
+    depends_on:
+      - searxng-redis
+    environment:
+      BASE_URL: ${SEARXNG_BASE_URL:-http://127.0.0.1:8888}
+      SEARXNG_SECRET: ${SEARXNG_SECRET:-change-me}
+      REDIS_URL: ${SEARXNG_REDIS_URL:-redis://searxng-redis:6379/0}
+      LIMITER: ${SEARXNG_LIMITER:-true}
+      USE_DEFAULT_SETTINGS: ${SEARXNG_USE_DEFAULT_SETTINGS:-true}
+    ports:
+      - "${SEARXNG_PORT:-8888}:8080"
+    volumes:
+      - searxng_settings:/etc/searxng
+    restart: unless-stopped
+
+  # Dedicated Redis for SearXNG
+  searxng-redis:
+    image: redis:7-alpine
+    container_name: ami-searxng-redis
+    profiles: ["extras", "searxng"]
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    volumes:
+      - searxng_redis_data:/data
+    restart: unless-stopped
+
+  # Password manager
+  vaultwarden:
+    image: vaultwarden/server:1.32.3
+    container_name: ami-vaultwarden
+    profiles: ["extras", "vaultwarden"]
+    environment:
+      DOMAIN: ${VAULTWARDEN_DOMAIN:-http://127.0.0.1:${VAULTWARDEN_PORT:-8083}}
+      ROCKET_ADDRESS: 0.0.0.0
+      ROCKET_PORT: 80
+      SIGNUPS_ALLOWED: ${VAULTWARDEN_SIGNUPS_ALLOWED:-false}
+      INVITATIONS_ALLOWED: ${VAULTWARDEN_INVITATIONS_ALLOWED:-false}
+      WEBSOCKET_ENABLED: ${VAULTWARDEN_WEBSOCKET_ENABLED:-true}
+    ports:
+      - "${VAULTWARDEN_PORT:-8083}:80"
+    volumes:
+      - vaultwarden_data:/data
+    restart: unless-stopped
+
+  # VPN entrypoint
+  openvpn:
+    image: ghcr.io/linuxserver/openvpn-as:2.13.1
+    container_name: ami-openvpn
+    profiles: ["extras", "openvpn"]
+    cap_add:
+      - NET_ADMIN
+    environment:
+      PUID: ${OPENVPN_PUID:-1000}
+      PGID: ${OPENVPN_PGID:-1000}
+      TZ: ${OPENVPN_TZ:-UTC}
+      INTERFACE: ${OPENVPN_INTERFACE:-eth0}
+    ports:
+      - "${OPENVPN_TCP_PORT:-943}:943"
+      - "${OPENVPN_ADMIN_PORT:-9443}:9443"
+      - "${OPENVPN_UDP_PORT:-1194}:1194/udp"
+    volumes:
+      - openvpn_config:/config
+    restart: unless-stopped
+
+  # Matrix (Synapse) communication server
+  matrix:
+    image: matrixdotorg/synapse:latest
+    container_name: ami-matrix
+    profiles: ["extras", "matrix"]
+    environment:
+      SYNAPSE_SERVER_NAME: ${MATRIX_SERVER_NAME:-localhost}
+      SYNAPSE_REPORT_STATS: ${MATRIX_REPORT_STATS:-no}
+      SYNAPSE_NO_TLS: "true"
+      SYNAPSE_ENABLE_REGISTRATION: ${MATRIX_ENABLE_REGISTRATION:-false}
+      UID: ${MATRIX_UID:-991}
+      GID: ${MATRIX_GID:-991}
+    volumes:
+      - matrix_data:/data
+    ports:
+      - "${MATRIX_HTTP_PORT:-8008}:8008"
+      - "${MATRIX_FEDERATION_PORT:-8448}:8448"
+    restart: unless-stopped
+
+volumes:
+  searxng_settings:
+  searxng_redis_data:
+  vaultwarden_data:
+  openvpn_config:
+  matrix_data:

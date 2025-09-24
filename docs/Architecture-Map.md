@@ -25,7 +25,7 @@ Purpose: Provide a concise map of the orchestrator and module boundaries, their 
   - Responsibilities: streaming and real-time pipelines.
   - Entrypoints: module-specific runners (TBD), see README.
 
-- Node (`node/`)
+- Nodes (`nodes/`)
   - Responsibilities: network tunnel/infra MCP server(s) per SPEC-TUNNEL.
   - Entrypoints: see `README.md` and `tests/README.md`.
 
