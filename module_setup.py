@@ -4,13 +4,14 @@
 Goals:
 - Treat root like any other module: its own .venv, configs, hooks
 - Delegate to base/module_setup.py (stdlib only)
-- Replicate critical configs from base/templates for root
+- Optionally replicate critical configs from base/templates for root
 """
 
 from __future__ import annotations
 
 import argparse
 import difflib
+import importlib
 import logging
 import os
 import platform
@@ -28,10 +29,64 @@ SUBMODULES = [
     "compliance",
     "domains",
     "files",
-    "node",
+    "nodes",
     "streams",
     "ux",
 ]
+
+
+def _dotenv_values(path: Path) -> dict[str, str]:
+    """Return key/value pairs from a .env file using python-dotenv if available."""
+    if not path.exists():
+        return {}
+    try:
+        dotenv_module = importlib.import_module("dotenv")
+        loader = getattr(dotenv_module, "dotenv_values", None)
+        if callable(loader):
+            try:
+                values = loader(path)
+                return {k: v for k, v in values.items() if isinstance(k, str) and isinstance(v, str)}
+            except Exception as exc:  # noqa: BLE001 - fall back to manual parsing
+                logger.debug("dotenv loader failed (%s); falling back to manual parser", exc)
+    except ModuleNotFoundError:
+        pass
+
+    data: dict[str, str] = {}
+    for raw in path.read_text(encoding="utf-8").splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        if "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        key = key.strip()
+        value = value.strip().strip('"').strip("'")
+        if key:
+            data[key] = value
+    return data
+
+
+def _resolve_sudo_password() -> str | None:
+    """Resolve sudo password from env or .env files.
+
+    Priority: explicit env vars, then browser/.env, then root .env.
+    """
+    for key in ("SUDO_PASS", "SUDO_PASSWORD"):
+        direct = os.environ.get(key)
+        if direct:
+            return direct
+
+    browser_env = _dotenv_values(ROOT / "browser" / ".env")
+    for key in ("SUDO_PASS", "SUDO_PASSWORD"):
+        if key in browser_env and browser_env[key]:
+            return browser_env[key]
+
+    root_env = _dotenv_values(ROOT / ".env")
+    for key in ("SUDO_PASS", "SUDO_PASSWORD"):
+        if key in root_env and root_env[key]:
+            return root_env[key]
+
+    return None
 
 
 def _run(cmd: list[str], cwd: Path | None = None, check: bool = False, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
@@ -321,6 +376,11 @@ def main() -> int:
     parser.add_argument("--project-name", type=str, default="Orchestrator")
     parser.add_argument("--audit-configs", action="store_true", help="Audit submodule configs vs. base templates (dry-run)")
     parser.add_argument("--apply-configs", action="store_true", help="Apply base templates to submodules (destructive; not run without explicit ask)")
+    parser.add_argument(
+        "--propagate-configs",
+        action="store_true",
+        help="Replicate root config templates from base (combine with --apply-configs for submodules)",
+    )
     args = parser.parse_args()
 
     # Ensure submodules are present before any delegation
@@ -335,8 +395,11 @@ def main() -> int:
     if rc != 0:
         return rc
 
-    # Replicate configs for root from base templates
-    replicate_configs_from_base()
+    if args.propagate_configs:
+        logger.info("Propagating root config templates from base …")
+        replicate_configs_from_base()
+    else:
+        logger.info("Root config propagation disabled; run with --propagate-configs to update templates.")
 
     # Best-effort install of headless Chrome runtime deps for Browser module on Unix.
     # This is a convenience step; failures are non-fatal.
@@ -345,7 +408,15 @@ def main() -> int:
         install_script = browser_dir / "scripts" / "install_chrome_deps.sh"
         if install_script.exists() and os.name == "posix":
             logger.info("Attempting to install Browser headless Chrome runtime dependencies…")
-            env = {**os.environ, "SUDO_PASSWORD": os.environ.get("SUDO_PASSWORD", "docker")}
+            env = {**os.environ}
+            sudo_pass = _resolve_sudo_password()
+            if sudo_pass:
+                env.setdefault("SUDO_PASS", sudo_pass)
+                env["SUDO_PASSWORD"] = sudo_pass
+                logger.info("Using SUDO_PASS value from environment or .env file for Browser setup.")
+            else:
+                env.setdefault("SUDO_PASSWORD", "docker")
+                logger.info("No SUDO_PASS found; defaulting Browser setup sudo password to 'docker'.")
             res = _run(["bash", str(install_script)], cwd=browser_dir, env=env)
             if res.returncode == 0:
                 logger.info("Browser runtime dependencies installed (or already present).")

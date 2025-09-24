@@ -1,7 +1,7 @@
 version: '3.8'
 
 services:
-  # Postgres with pgvector extension
+  # Postgres with pgvector extension (full PostgreSQL 16 + pgvector)
   postgres:
     image: pgvector/pgvector:pg16
     container_name: ami-postgres
@@ -16,6 +16,25 @@ services:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 10s
+      timeout: 10s
+      retries: 30
+
+  # Plain PostgreSQL (no vector extension)
+  postgres-plain:
+    image: postgres:16
+    container_name: ami-postgres-plain
+    profiles: ["postgres-plain"]
+    environment:
+      POSTGRES_DB: ${POSTGRES_PLAIN_DB:-postgres}
+      POSTGRES_USER: ${POSTGRES_PLAIN_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PLAIN_PASSWORD:-postgres}
+    ports:
+      - "${POSTGRES_PLAIN_PORT:-5433}:5432"
+    volumes:
+      - pgdata_plain:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_PLAIN_USER:-postgres}"]
       interval: 10s
       timeout: 10s
       retries: 30
@@ -36,40 +55,18 @@ services:
       timeout: 5s
       retries: 30
 
-  # Dgraph Zero
-  dgraph-zero:
-    image: dgraph/zero:v24.0.0
-    container_name: ami-dgraph-zero
+  # Dgraph standalone (Zero + Alpha in one container)
+  dgraph:
+    image: dgraph/standalone:v24.0.0
+    container_name: ami-dgraph
     profiles: ["dgraph"]
-    ports:
-      - "${DGRAPH_ZERO_INTERNAL_PORT:-5080}:5080"  # intra-cluster
-      - "${DGRAPH_ZERO_HTTP_PORT:-6080}:6080"      # admin HTTP
-    command: ["dgraph", "zero", "--bindall", "--telemetry" , "off"]
-    volumes:
-      - dgraphzero:/dgraph
-
-  # Dgraph Alpha
-  dgraph-alpha:
-    image: dgraph/alpha:v24.0.0
-    container_name: ami-dgraph-alpha
-    profiles: ["dgraph"]
-    depends_on:
-      - dgraph-zero
     environment:
       DGRAPH_ALPHA_SECURITY: whitelist=0.0.0.0/0
     ports:
       - "${DGRAPH_HTTP_PORT:-8080}:8080"  # HTTP
       - "${DGRAPH_GRPC_PORT:-9080}:9080"  # gRPC
-    command:
-      - dgraph
-      - alpha
-      - --bindall
-      - --zero
-      - dgraph-zero:5080
-      - --telemetry
-      - off
     volumes:
-      - dgraphalpha:/dgraph
+      - dgraphdata:/dgraph
 
   # MongoDB
   mongo:
@@ -91,8 +88,7 @@ services:
 
 volumes:
   pgdata:
+  pgdata_plain:
   redisdata:
-  dgraphzero:
-  dgraphalpha:
+  dgraphdata:
   mongodata:
-
