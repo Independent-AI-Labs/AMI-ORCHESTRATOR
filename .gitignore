@@ -63,6 +63,7 @@ Thumbs.db
 /temp/
 /uploads/
 *.pid
+*.pdf
 config.yaml
 config.local.yaml
 config.test.yaml

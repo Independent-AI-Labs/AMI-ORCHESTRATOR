@@ -1,27 +1,29 @@
-# Integration Status (Initial)
+# Integration Status
 
-Scope: Current operational state of module setup under orchestrator control, with observed issues to be addressed by code changes inside the respective modules (not here).
+Scope: Track how well modules adhere to the setup contract, highlight remaining drift from Base patterns, and flag documentation required for compliance alignment.
 
-Summary
-- Toolchain: `uv` + Python 3.12 bootstrap script present and working (`scripts/bootstrap_uv_python.py`).
-- Orchestrator: `module_setup.py` initializes submodules, ensures toolchain, and drives per-module setup with `uv run --python 3.12`.
-- Base: Provides `AMIModuleSetup`, `PathFinder`, and `EnvironmentSetup` as the central contract.
+## Summary
 
-Per-module setup observations
-- base: Uses centralized setup; OK.
-- streams: Delegates to base `module_setup.py`; OK.
-- browser: Has `module_setup.py`; ensure third-party imports are deferred until after venv creation (verify).
-- files: Has `module_setup.py`; ensure third-party imports are deferred until after venv creation (verify).
-- node: `module_setup.py` imports `loguru` at top-level (violates setup policy: third-party imports before venv). Use stdlib logging in setup script or defer import until after deps install.
-- ux: Uses `scripts/ami_path.py` for path discovery; previously failed to find module root on some paths. Align with Base `PathFinder` for consistency.
-- compliance: No `module_setup.py`. Documented as non-setup module for now; decide whether to add a no-op setup or a contract-compliant setup delegating to Base.
-- domains: No `module_setup.py`. Same as compliance.
+- Toolchain bootstrap via `scripts/bootstrap_uv_python.py` works on macOS/Linux/Windows; fallback paths cover user-local installs.
+- Root `module_setup.py` now invokes every module’s setup script (base, browser, files, domains, compliance, nodes, streams, ux) with stdlib logging only.
+- Base exposes the authoritative environment helpers (`base/backend/utils/path_finder.py`, `environment_setup.py`); modules are expected to lean on these rather than duplicating path logic.
 
-Documentation mismatches (examples)
-- `base/docs/MCP_SERVERS.md` references to `run_mcp.py` removed; docs now direct to programmatic startup or module-specific runners.
-- Root `README.md` references `IMPORT_CONVENTIONS.md`, `MASTER_CODE_QUALITY_REPORT.md`, `QA.md`, `TYPE_IGNORE_AUDIT.md` which are not present. Track in Docs-Gaps.
+## Per-Module Observations
 
-Next validation steps
-- Align module setup scripts to use Base `AMIModuleSetup` and avoid third-party imports pre-venv.
-- Ensure all MCP runner references in docs correspond to real scripts; update or add wrappers where missing.
-- Converge typing configs to Python 3.12 via Base templates across modules.
+- **base** – Delegates to `AMIModuleSetup` and supplies canonical path/environment utilities. Test runner available at `base/scripts/run_tests.py`.
+- **browser** – `module_setup.py` defers all third-party imports until after venv creation and provisions Chrome when missing. Verified ✅.
+- **files** – Delegates cleanly to Base. Python-only today; extraction services reference actual code paths in docs. ✅
+- **domains** – Delegates to Base; models rely on DataOps. Needs additional docs/tests once predictive services ship.
+- **compliance** – Setup delegates to Base. Backend and MCP server are still unimplemented; spec lives in `docs/COMPLIANCE_BACKEND_SPEC.md`. Flagged as critical roadmap item.
+- **nodes** – Setup script switched to stdlib logging. Automation lives in `nodes/scripts/setup_service.py`; ensure docs mention the managed process CLI.
+- **streams** – Setup exists, but runtime services are placeholders. Documented as experimental; no MCP runners yet.
+- **ux** – Setup delegates to Base, but `scripts/run_tests.py` inserts paths manually. Needs migration to Base `PathFinder`. NextAuth middleware and `[...nextauth]` route are live; remaining work is wiring the DataOps adapter and trimming legacy path utilities.
+
+## Outstanding Actions
+
+1. Replace `sys.path.insert` calls in `ux/scripts/run_tests.py` with `PathFinder` helpers once the module adopts the shared utilities package.
+2. Implement the compliance backend + MCP server per `compliance/docs/COMPLIANCE_BACKEND_SPEC.md` and wire it into module docs.
+3. Flesh out Streams service runners or mark the module as dormant in its README to avoid overstating functionality.
+4. Continue verifying consolidated compliance markdown against authoritative PDFs before publishing.
+
+Track additional backlog items in `docs/Docs-Gaps.md` and `docs/Next-Steps.md`.

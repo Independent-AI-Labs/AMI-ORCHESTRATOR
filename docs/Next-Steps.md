@@ -1,33 +1,17 @@
 # Next Steps & Suggested Owners
 
-Objective: Converge code and docs on the documented Setup Contract and Quality Policy.
+Objective: keep documentation, setup tooling, and compliance specs aligned with the code that actually ships.
 
-Immediate actions (1–2 days)
-- Align typing target to Python 3.12
-  - Action: Generate module-local `mypy.ini` from Base template; review root `mypy.ini` usage.
-  - Owner: Base
-- Fix top-level imports in setup scripts
-  - Action: Browser/Files/Node `module_setup.py` → replace `loguru`/`yaml` top-level imports with stdlib `logging` or lazy import post-venv.
-  - Owners: Browser, Files, Node
-- UX path discovery
-  - Action: Replace `scripts/ami_path.py` usage with `PathFinder` for consistency.
-  - Owner: UX
-- MCP runner doc alignment
-  - Action: Update docs to describe programmatic startup and module-specific runners (done in this pass).
-  - Owner: Base
+## Immediate Actions (1–2 days)
+- **UX path hygiene** – Replace `sys.path` inserts in `ux/scripts/run_tests.py` with Base `PathFinder` helpers once shared utilities are imported (Owner: UX).
+- **Streams status update** – Clarify in `streams/README.md` whether runtime services are paused or provide a minimal runner stub (Owner: Streams).
+- **Compliance backend kick-off** – Scaffold the `compliance/backend/` package per `docs/COMPLIANCE_BACKEND_SPEC.md` and stub the MCP server for documentation parity (Owner: Compliance).
 
-Short-term (1 week)
-- Submodule access guidance
-  - Action: Document HTTPS alternatives for `.gitmodules` and CI usage in `/docs/Quality-Policy.md`.
-  - Owner: Orchestrator
-- Pre-commit cross-platform
-  - Action: Validate template expansion (`{{MYPY_ENTRY}}`) across modules; run sample hooks on Windows/macOS/Linux.
-  - Owner: Base
+## Short-Term (1 week)
+- **NextAuth DataOps adapter** – Connect the shared auth module to DataOps persistence and update `docs/NextAuth-Integration.md` with the revised flow (Owner: UX).
+- **Compliance evidence workflow docs** – Extend `compliance/docs/CURRENT_IMPLEMENTATION_STATUS.md` with the backend roadmap milestones so engineering can trace coverage (Owner: Compliance).
+- **Runners & logging review** – Ensure each module documents how to start its MCP servers or services, and that audit logging hooks are referenced where implemented (Owner: Module leads).
 
-Documentation backlog
-- Fill missing references from root `README.md`: `IMPORT_CONVENTIONS.md`, `MASTER_CODE_QUALITY_REPORT.md`, `QA.md`, `TYPE_IGNORE_AUDIT.md`.
-- Owner: Orchestrator (coordinate), Module leads (content)
-
-Verification
-- Re-run `python module_setup.py` after fixes; capture per-module logs into `artifacts/setup-<module>.log` (optional enhancement to orchestrator runner).
-- Smoke-run MCP servers via listed runners; ensure imports succeed without ad-hoc path hacks.
+## Verification & Automation
+- Re-run `python module_setup.py` after each module update; capture logs to module-specific artefacts for traceability.
+- Add doc-check or markdown-link-check jobs if available to catch stale references early.

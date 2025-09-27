@@ -1,41 +1,31 @@
 # Architecture Map
 
-Purpose: Provide a concise map of the orchestrator and module boundaries, their responsibilities, and primary entrypoints, without duplicating per-module READMEs.
+This document summarises the current module boundaries, responsibilities, and primary entry points. For deeper detail, follow the links to module READMEs and docs.
 
-- Orchestrator (root)
-  - Responsibilities: submodule orchestration, bootstrap of toolchain (uv + Python 3.12), unified setup runner, cross-module policy.
-  - Entrypoints:
-    - `module_setup.py` — initializes submodules, ensures toolchain, runs each module’s setup.
-    - `scripts/bootstrap_uv_python.py` — trusted install path for `uv` and Python 3.12 toolchain.
+## Root Orchestrator
 
-- Base (`base/`)
-  - Responsibilities: core platform contracts, shared utils, path + environment setup centralization, security model, MCP servers.
-  - Entrypoints: see module README (runners are module-specific).
-  - Shared APIs: `base/backend/utils/{path_finder.py, environment_setup.py, path_utils.py}`.
+- **Responsibilities** – Bootstraps the toolchain, initialises submodules, and enforces the setup contract across modules.
+- **Key entry points**
+  - `module_setup.py` – Runs `uv` provisioning and dispatches to each module’s setup script.
+  - `scripts/bootstrap_uv_python.py` – Trusted installer for `uv` and Python 3.12.
+  - `scripts/run_tests.py` – Minimal root test harness (currently a no-op placeholder).
 
-- Browser (`browser/`)
-  - Responsibilities: auditable browser automation (MCP).
-  - Entrypoints: see module README.
+## Modules
 
-- Files (`files/`)
-  - Responsibilities: secure local file operations (MCP), analysis utilities.
-  - Entrypoints: see module README.
+| Module | Responsibilities | Primary entry points / notes |
+| --- | --- | --- |
+| `base/` | Shared environment management, DataOps storage layer (async PostgreSQL, Dgraph, in-memory), FastMCP DataOps + SSH servers, security utilities. | `module_setup.py`, `scripts/run_tests.py`, `backend/mcp/dataops/dataops_server.py`, `backend/utils/path_finder.py`. |
+| `browser/` | Managed Chromium provisioning and auditable browser automation tooling. | `module_setup.py`, `scripts/setup_chrome.py`, `backend/automation/**`. Uses stdlib logging until dependencies are installed. |
+| `files/` | Secure file ingestion/extraction services and MCP tooling for file operations. | `module_setup.py`, `scripts/run_tests.py`, `backend/mcp/**`, `backend/extractors/**`. |
+| `domains/` | Domain models (risk, predictive analytics, SDA) that extend Base DataOps patterns. | `module_setup.py`, `docs/`, `predict/` packages. Focused on models; execution services pending. |
+| `compliance/` | Canonical compliance documentation, gap analysis, and forthcoming compliance backend + MCP server. | `module_setup.py`, `docs/COMPLIANCE_BACKEND_SPEC.md`, `docs/COMPLIANCE_GAP_ANALYSIS.md`. Implementation of backend still TODO. |
+| `nodes/` | Managed infrastructure processes, tunnel configuration, and automation for remote nodes. | `module_setup.py`, `scripts/setup_service.py`, `config/setup-service.yaml`. |
+| `streams/` | Experimental streaming/real-time orchestration. | `module_setup.py`, `docs/` (lightweight). Runtime implementations are in planning. |
+| `ux/` | CMS app, shared Auth package, prototype UIs. | `module_setup.py`, `auth/`, `cms/`, `scripts/run_tests.py`. NextAuth rollout in-progress; legacy ES modules still active. |
 
-- Streams (`streams/`)
-  - Responsibilities: streaming and real-time pipelines.
-  - Entrypoints: module-specific runners (TBD), see README.
+## Cross-Cutting Policies
 
-- Nodes (`nodes/`)
-  - Responsibilities: network tunnel/infra MCP server(s) per SPEC-TUNNEL.
-  - Entrypoints: see `README.md` and `tests/README.md`.
-
-- UX (`ux/`)
-  - Responsibilities: UI/UX concepts and related tooling.
-
-- Compliance (`compliance/`) and Domains (`domains/`)
-  - Responsibilities: policy frameworks, domain models, risk/requirements.
-
-Cross-cutting policies
-- Runner-only path/import initialization: code executed via `run_*` and `run_tests` scripts sets up Python paths; application packages avoid ad-hoc path mutations.
-- Each module owns its `.venv` using `uv`; orchestrator does not provide a root venv.
-- Python 3.12 as the standard runtime and lint/type-check target.
+- Runner scripts (`run_*`, `scripts/run_tests.py`) are responsible for `sys.path` manipulation via Base `PathFinder`; application packages must not mutate paths at import time.
+- Each module owns a local `.venv` created with `uv venv --python 3.12`. No root virtual environment is provided.
+- Setup scripts must log via stdlib `logging` and defer third-party imports until after dependencies are installed.
+- Quality targets (mypy/ruff/test runners) must align with Python 3.12. Module-local configs derive from Base templates.
