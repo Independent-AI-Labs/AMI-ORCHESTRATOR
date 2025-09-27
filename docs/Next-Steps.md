@@ -5,7 +5,7 @@ Objective: keep documentation, setup tooling, and compliance specs aligned with 
 ## Immediate Actions (1–2 days)
 - **UX path hygiene** – Replace `sys.path` inserts in `ux/scripts/run_tests.py` with Base `PathFinder` helpers once shared utilities are imported (Owner: UX).
 - **Streams status update** – Clarify in `streams/README.md` whether runtime services are paused or provide a minimal runner stub (Owner: Streams).
-- **Compliance backend kick-off** – Scaffold the `compliance/backend/` package per `docs/COMPLIANCE_BACKEND_SPEC.md` and stub the MCP server for documentation parity (Owner: Compliance).
+- **Compliance backend kick-off** – When work resumes, scaffold `compliance/backend/` using `docs/research/COMPLIANCE_BACKEND_SPEC.md` and stub the MCP server for documentation parity (Owner: Compliance).
 
 ## Short-Term (1 week)
 - **NextAuth DataOps adapter** – Connect the shared auth module to DataOps persistence and update `docs/NextAuth-Integration.md` with the revised flow (Owner: UX).
