@@ -6,7 +6,7 @@ AMI-ORCHESTRATOR coordinates tooling, documentation, and module setup for a comp
 
 - A consistent setup contract driven by `module_setup.py` at the root and in every module.
 - Shared platform capabilities in `base/` (DataOps persistence, MCP servers, path/environment utilities).
-- A rapidly expanding compliance body of knowledge under `compliance/docs/`, including the `ISMS-Functionality-Spec.md` and the pluggable compliance backend specification at `compliance/docs/COMPLIANCE_BACKEND_SPEC.md`.
+- A rapidly expanding compliance body of knowledge under `compliance/docs/`, including the `ISMS-Functionality-Spec.md` and the pluggable compliance backend specification at `compliance/docs/research/COMPLIANCE_BACKEND_SPEC.md`.
 - Up-to-date documentation that mirrors the actual codebase—legacy marketing copy has been removed in favour of verifiable statements.
 
 ## Repository Layout (Active Modules)
@@ -60,7 +60,7 @@ The documentation modernization initiative is ongoing; expect frequent updates a
 
 ## Current Roadmap
 
-1. Implement the compliance backend + MCP server described in `compliance/docs/COMPLIANCE_BACKEND_SPEC.md`, reusing Base DataOps patterns.
+1. Implement the compliance backend + MCP server described in `compliance/docs/research/COMPLIANCE_BACKEND_SPEC.md`, reusing Base DataOps patterns.
 2. Bring module documentation in sync with real code paths (browser tooling, files extraction, UX auth migration).
 3. Replace the remaining legacy path hacks (e.g., `ux/scripts/ami_path.py`) with Base `PathFinder` helpers.
 4. Continue the compliance documentation verification loop against consolidated references and source PDFs.

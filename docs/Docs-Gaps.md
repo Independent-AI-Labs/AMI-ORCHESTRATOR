@@ -1,7 +1,7 @@
 # Documentation Gaps & TODOs
 
 ## High-Priority
-- Compliance backend documentation leads implementation: the package described in `compliance/docs/COMPLIANCE_BACKEND_SPEC.md` is not yet present. Track progress in `compliance/docs/CURRENT_IMPLEMENTATION_STATUS.md` as soon as scaffolding begins.
+- Compliance backend documentation leads implementation: the package described in `compliance/docs/research/COMPLIANCE_BACKEND_SPEC.md` is not yet present. Track progress in `compliance/docs/research/CURRENT_IMPLEMENTATION_STATUS.md` as soon as scaffolding begins.
 - Keep `streams/README.md` updated as soon as runtime services move beyond the current dormant state.
 
 ## Submodule Access
