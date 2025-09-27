@@ -1,262 +1,68 @@
 # AMI-ORCHESTRATOR
 
-## EU AI Act and ISO-Compliant Data, Process & AI Automation Platform
+## What This Repository Does Today
 
-AMI-ORCHESTRATOR is a **compliance-first** automation platform that ensures all data operations, business processes, and AI decisions meet EU AI Act, ISO 27001, and enterprise regulatory requirements while reducing cloud dependence through distributed compute and intelligent work pooling.
+AMI-ORCHESTRATOR coordinates tooling, documentation, and module setup for a compliance-first automation stack. The focus right now is on:
 
-## Compliance-First Architecture
+- A consistent setup contract driven by `module_setup.py` at the root and in every module.
+- Shared platform capabilities in `base/` (DataOps persistence, MCP servers, path/environment utilities).
+- A rapidly expanding compliance body of knowledge under `compliance/docs/`, including the `ISMS-Functionality-Spec.md` and the pluggable compliance backend specification at `compliance/docs/COMPLIANCE_BACKEND_SPEC.md`.
+- Up-to-date documentation that mirrors the actual codebase—legacy marketing copy has been removed in favour of verifiable statements.
 
-### Built for Regulatory Requirements
+## Repository Layout (Active Modules)
 
-AMI-ORCHESTRATOR addresses critical enterprise needs:
+- `base/` – Houses environment setup helpers, DataOps storage abstractions (PostgreSQL, Dgraph, in-memory), and FastMCP servers for DataOps and SSH. See `base/docs/` for detailed contracts.
+- `browser/` – Provides the audited browser automation agent plus a Chrome provisioning script (`browser/scripts/setup_chrome.py`). Delegates setup to Base and keeps third-party imports lazy.
+- `files/` – Implements document extraction, MCP tooling for secure file operations, and configuration loaders. Setup mirrors Base patterns.
+- `domains/` – Domain models (risk, predictive, SDA) that depend on Base’s storage contracts. Currently focused on data modelling rather than runners.
+- `compliance/` – Consolidated EU AI Act + ISO guidance, gap tracking, and the planned compliance backend/server spec. Implementation work is pending; documentation is the source of truth until the backend ships.
+- `nodes/` – Infrastructure automation and node setup orchestration, including `nodes/scripts/setup_service.py` for managed process control.
+- `streams/` – Streaming/real-time experiments. Setup exists; runtime services are still to be implemented.
+- `ux/` – CMS and shared auth package. The UI currently mixes Next.js API routes with legacy ES modules; the NextAuth rollout is in-progress (see `docs/NextAuth-Integration.md`).
 
-- **EU AI Act Compliance** - Full transparency, explainability, and audit trails for all AI operations
-- **ISO 27001 Certified Design** - Information security management built into every component
-- **GDPR Data Sovereignty** - Complete control over data location and processing
-- **Sandboxed Execution** - Isolated environments for secure automation
-- **Distributed Compute** - Reduce cloud costs through intelligent work distribution
-- **Audit Everything** - Cryptographically signed logs for regulatory compliance
+Refer to `docs/Architecture-Map.md` for a text map of ownership boundaries and entry points.
 
-### Key Features
-
-Open Source First
-- MIT licensed, forever free
-- No premium tiers, no hidden features
-- Community-driven development
-- Your contributions make it better for everyone
-
-Compliance as Code
-- Every operation auditable and traceable
-- Built-in regulatory compliance (EU AI Act, GDPR, SOC2)
-- Cryptographically signed audit trails
-- Explainable AI decisions by default
-
-Security Without Compromise
-- Self-hosted = your data never leaves your control
-- Zero-trust architecture
-- End-to-end encryption for distributed operations
-- Row-level security on all data operations
-
-Distributed Compute Architecture
-- Intelligent work pooling across infrastructure
-- Automatic task distribution and load balancing
-- Edge-to-cloud seamless orchestration
-- Reduce cloud costs through local compute utilization
-
-## Core Capabilities
-
-### Universal Data Layer with Compliance Built-In
-AMI-ORCHESTRATOR's data layer ensures every operation meets regulatory requirements:
-
-- **Multi-Storage Federation** - Unified API across Dgraph, PostgreSQL, MongoDB, Redis, S3
-- **Audit Trail Automation** - Every data operation logged with cryptographic signatures
-- **GDPR-Ready Data Controls** - Right to erasure, data portability, consent management
-- **Time-Ordered Operations** - UUID v7 ensures complete causality tracking for compliance
-
-### Secure Browser Automation
-Enterprise-grade web automation with full transparency and audit capabilities:
-
-- **Compliance-Ready Sessions** - Every browser action logged and auditable
-- **Sandboxed Execution** - Isolated browser instances prevent data leakage
-- **Session Recording** - Complete replay capability for compliance reviews
-- **Distributed & Secure** - Run browsers on-premise, maintain data sovereignty
-
-### AI Operations with EU AI Act Compliance
-Built from the ground up to meet EU AI Act requirements:
-
-- **Model Context Protocol (MCP)** - Standardized AI-agent communication with full transparency
-- **Explainable AI by Default** - Every decision traceable with reasoning chains
-- **Human Oversight Built-In** - Configurable approval workflows for high-risk operations
-- **Local-First Processing** - Keep sensitive data on your infrastructure
-
-## Modular Architecture
-
-Each module is independently deployable with built-in compliance features.
-
-### Documentation Note
-This README avoids referencing non-existent files. Module-specific READMEs under each module (e.g., `base/README.md`, `browser/README.md`, `files/README.md`, `nodes/README.md`) provide details for those components.
-
-### [AMI-BASE](base/README.md) - Compliance Infrastructure
-- **Security Model** - Row-level access control with audit trails
-- **Worker Pools** - Distributed compute with sandboxed execution
-- **MCP Servers** - Standardized interfaces for transparent automation
-- **Data Sovereignty** - Multi-backend storage with location control
-
-### [AMI-WEB](browser/README.md) - Auditable Browser Automation
-- **Session Isolation** - Sandboxed browser profiles prevent data leakage
-- **Action Logging** - Every click, type, and navigation recorded
-- **Compliance Recording** - Full session replay for audit purposes
-- **On-Premise Execution** - Keep browsing data in your infrastructure
-
-### [AMI-FILES](files/README.md) - Secure File Operations
-- **Access Control** - File operations restricted to configured paths
-- **Audit Logging** - Every file operation tracked and signed
-- **Pre-commit Validation** - Automatic security and compliance checks
-- **Local Processing** - Document analysis without cloud dependencies
-
-## Principles
-
-### Our Commitments
-
-1. **Forever Free** - MIT licensed, no premium versions ever
-2. **Radically Transparent** - Every decision, every algorithm, open
-3. **Community First** - Built by developers, for developers
-4. **Privacy Absolute** - Your data never touches our servers
-5. **Standards Based** - Open protocols, no proprietary formats
-6. **Offline First** - Full functionality without internet
-7. **Cryptographically Verified** - Trust through verification
-
-### Technical Excellence
-
-- **No Telemetry** - We don't track you, period
-- **No Phone Home** - Works completely offline
-- **No Binary Blobs** - 100% source code
-- **No Magic** - Every operation explainable
-- **No Limits** - Scale to your needs
-- **No Surprises** - Deterministic execution
-
-## Quick Start
-
-### Prerequisites
-- Python 3.12+ (or Docker, or Kubernetes, or bare metal)
-- Git (to clone once and own forever)
-- Your servers (or laptop, or Raspberry Pi, or data center)
-
-### Setup
+## Getting Started
 
 ```bash
-# Clone the repository
-git clone --recursive https://github.com/Independent-AI-Labs/AMI-ORCHESTRATOR.git
+# Clone the repository (submodules are required)
+git clone --recursive <repo-url>
 cd AMI-ORCHESTRATOR
 
-# Run the orchestrator setup (delegates to base; manages per-module configs)
+# Ensure uv + Python 3.12 toolchain is available
+python scripts/bootstrap_uv_python.py --auto
+
+# Provision root tooling and call each module's setup
 python module_setup.py
 
-# Validate configs and types/lints per module
-python scripts/validate_all.py
-
-# Enforce empty __init__.py files repository-wide
-python scripts/ensure_empty_inits.py --fix
+# Run tests per module (examples)
+uv run --python 3.12 python scripts/run_tests.py          # root (no-op today)
+uv run --python 3.12 --project base python scripts/run_tests.py
+uv run --python 3.12 --project compliance python scripts/run_tests.py
 ```
 
-### Service Stacks
-- `docker-compose.data.yml` provides Postgres (pgvector + plain), Redis, Mongo, and Dgraph. Start it with `docker-compose -f docker-compose.data.yml up -d`.
-- `docker-compose.services.yml` bundles SearXNG, Vaultwarden, OpenVPN-AS, and Matrix Synapse. Bring it up separately when those services are required.
-- After adding yourself to the `docker` group, open a fresh shell (`newgrp docker`) before running either compose file.
+Module-level runners live under `<module>/scripts/run_tests.py` and automatically reuse Base’s path setup helpers. Follow the compute profile guidance in `AGENTS.md` before installing GPU-specific wheels.
 
-### Nodes Setup Automation
-- `python nodes/scripts/setup_service.py preinstall` runs the shared preflight checks (command availability, optional apt installs).
-- `python nodes/scripts/setup_service.py verify` runs `module_setup.py` for every module; add `--no-tests` to skip module test suites.
-- Managed docker/python/npm processes can be orchestrated via `python nodes/scripts/setup_service.py process <start|stop|status>` or through the `NodeSetupMCP` server.
+## Documentation Sources
 
-## Distributed Compute & Work Pooling (WIP)
+- `docs/` – Orchestrator-level policies: setup contract, toolchain bootstrap, integration status, architecture map, NextAuth rollout notes.
+- `compliance/docs/` – Canonical compliance references, including consolidated EU AI Act/ISO markdown, implementation status tracking, and the compliance backend/server specs.
+- Module-specific docs live under `<module>/docs/` (for example `base/docs/` and `files/docs/`).
 
-### Intelligent Work Distribution
-AMI-ORCHESTRATOR reduces cloud dependency through smart work distribution:
+The documentation modernization initiative is ongoing; expect frequent updates as modules evolve.
 
-- **Automatic Pool Management** - Workers scale from 0 to 1000+ based on demand
-- **Resource Optimization** - Hibernates idle workers, pre-warms for instant response
-- **Hybrid Execution** - Seamlessly distribute work between on-premise and cloud
-- **Cost Reduction** - Utilize existing hardware before spinning up cloud resources
+## Expectations for Contributors
 
-### Sandboxed Execution Environment
-Every task runs in isolation for security and compliance:
+- Stay on branch `main` (no detached HEADs) and rely on `module_setup.py` rather than ad-hoc path hacks.
+- Each module is responsible for its own virtual environment (`uv venv --python 3.12`) and must keep `python.ver`, `requirements*.txt`, and `SETUP_CONTRACT.md` up to date.
+- Third-party imports in setup scripts must remain deferred until dependencies are installed—stdlib `logging` only.
+- Run per-module test suites and any required service stacks (`docker-compose -f docker-compose.data.yml up -d`) before committing.
 
-- **Process Isolation** - Each worker runs in its own sandboxed environment
-- **Resource Limits** - CPU, memory, and I/O constraints per task
-- **Network Segmentation** - Control which tasks can access which resources
-- **Audit Trail** - Complete record of task execution and resource usage
+## Current Roadmap
 
-## 🌍 Use Cases
+1. Implement the compliance backend + MCP server described in `compliance/docs/COMPLIANCE_BACKEND_SPEC.md`, reusing Base DataOps patterns.
+2. Bring module documentation in sync with real code paths (browser tooling, files extraction, UX auth migration).
+3. Replace the remaining legacy path hacks (e.g., `ux/scripts/ami_path.py`) with Base `PathFinder` helpers.
+4. Continue the compliance documentation verification loop against consolidated references and source PDFs.
 
-### For Enterprises
-- **Regulatory Compliance** - Meet EU AI Act, GDPR, ISO 27001 requirements
-- **Digital Sovereignty** - Keep data and processing on your infrastructure
-- **Cost Optimization** - Reduce cloud spending through distributed compute
-- **Audit Readiness** - Complete transparency for compliance reviews
-
-### For Developers
-- **Compliance by Default** - Build applications that meet regulations
-- **Distributed Architecture** - Create scalable, resilient systems
-- **Open Standards** - Use MCP and other open protocols
-- **Community Support** - Contribute to and benefit from collective development
-
-
-## 🛡️ Security & Compliance
-
-### Compliance Framework
-- **EU AI Act** - Full compliance with transparency requirements
-- **GDPR** - Privacy by design and default
-- **SOC2** - Security controls built-in
-- **ISO 27001** - Information security managed
-- **NIST** - Cybersecurity framework aligned
-
-### Security Architecture
-- **Zero Trust** - Never assume, always verify
-- **E2E Encryption** - Data protected in transit and at rest
-- **Cryptographic Signing** - Every operation verified
-- **Audit Everything** - Complete forensic capability
-- **Air-Gap Ready** - Run completely isolated if needed
-
-
-## 🤝 Community & Support
-
-### Get Involved
-- **GitHub**: [Project Repository](https://github.com/Independent-AI-Labs/AMI-ORCHESTRATOR)
-- **Issues**: Report bugs, request features
-- **Discussions**: Share ideas, get help
-- **Fork**: Extend and customize for your needs
-
-### Commercial Support
-While AMI-ORCHESTRATOR is forever free, we offer:
-- Training for your team
-- Custom module development
-- Priority bug fixes
-- Compliance certification assistance
-
-100% of commercial proceeds fund core development.
-
-## 🚀 The Road Ahead
-
-### Now (Q1 2025)
-- ✅ Core platform stable and production-ready
-- ✅ MCP protocol for AI agents
-- ✅ Compliance framework operational
-- ✅ Distributed execution working
-
-### Next (Q2 2025)
-- 🔄 Kubernetes native operators
-- 🔄 P2P coordination protocol
-- 🔄 Homomorphic encryption for compute
-- 🔄 Federated learning support
-
-### Future (2025+)
-- 🎯 Quantum-resistant cryptography
-- 🎯 Decentralized governance model
-- 🎯 Global compute marketplace
-- 🎯 Universal automation protocol
-
-## 📜 License & Philosophy
-
-MIT License - Because freedom requires no permission.
-
-We believe:
-- Software should serve humanity, not corporations
-- Transparency is not optional in the age of AI
-- Privacy is a fundamental human right
-- Innovation happens when barriers disappear
-- The future of computing must be open
-
-## 🙏 Acknowledgments
-
-Built on the shoulders of giants:
-- The open source community
-- Privacy advocates worldwide
-- Compliance and security researchers
-- Everyone who believes in digital freedom
-
----
-
-**AMI-ORCHESTRATOR** - Transparent, Compliant, Self-Hosted Enterprise Automation
-
-Built by [Independent AI Labs](https://github.com/Independent-AI-Labs)
+Track work-in-progress items in `docs/Integration-Status.md` and `docs/Next-Steps.md`.

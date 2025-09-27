@@ -1,18 +1,17 @@
 # Documentation Gaps & TODOs
 
-High-priority gaps
-- Missing docs referenced in root `README.md`: `IMPORT_CONVENTIONS.md`, `MASTER_CODE_QUALITY_REPORT.md`, `QA.md`, `TYPE_IGNORE_AUDIT.md`.
-- [Resolved] `base/docs/MCP_SERVERS.md` no longer references a non-existent runner; it now describes programmatic startup.
+## High-Priority
+- Compliance backend documentation leads implementation: the package described in `compliance/docs/COMPLIANCE_BACKEND_SPEC.md` is not yet present. Track progress in `compliance/docs/CURRENT_IMPLEMENTATION_STATUS.md` as soon as scaffolding begins.
+- Keep `streams/README.md` updated as soon as runtime services move beyond the current dormant state.
 
-Submodule access
-- `.gitmodules` uses SSH URLs. For read-only clones or CI without SSH keys, provide HTTPS equivalents in documentation (example command snippet), or document how to switch remotes.
+## Submodule Access
+- `.gitmodules` defaults to SSH URLs. Document HTTPS fallback commands in onboarding material for environments without SSH keys (CI, read-only clones).
 
-Type target mismatch
-- Root `mypy.ini` previously set Python 3.11 while `ruff.toml` targets py312. Standardize on 3.12. Prefer module-level `mypy.ini` generated from Base template; consider minimizing root typing until needed.
+## Runners & Setup Scripts
+- Verify each module README lists the real runner scripts (`scripts/run_tests.py`, forthcoming MCP runners). Streams and compliance currently lack runnable entry points and should say so explicitly.
 
-Setup scripts consistency
-- Ensure every code path described in docs has a corresponding `run_*` script and vice versa. Add stubs if needed or annotate WIP.
+## Quality Notes
+- Root and module `mypy.ini` files now target Python 3.12. Keep Base templates authoritative when adding new modules.
+- Continue to retire legacy references; record any newly discovered gaps here instead of leaving stale statements in place.
 
-Owners & follow-ups
-- Assign module owners to confirm or correct runner lists and fill missing doc references.
-- Track module-specific deviations from the Setup Contract in a short checklist within each module (see `SETUP_CONTRACT.md` files).
+Owners should append or strike items as the modernization sweep progresses module by module.

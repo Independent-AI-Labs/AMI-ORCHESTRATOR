@@ -1,22 +1,30 @@
 # Quality Policy (Cross-Module)
 
-Non-negotiables
-- Centralized path/import control in runner scripts only; application packages do not mutate `sys.path`.
-- Single toolchain: Python 3.12 standard, managed via `uv`. No mixing minor versions.
-- Lint/type targets aligned: `ruff` target-version py312; `mypy` python_version 3.12 (module-local mypy.ini generated from Base template).
-- No third-party imports in setup scripts prior to venv creation and dependency installation.
+## Non-negotiables
 
-Ruff/mypy alignment
-- Root `ruff.toml` already targets py312.
-- Root `mypy.ini` currently sets `python_version = 3.11` (mismatch). Action: converge on 3.12 via Base template generation per module and update root when root typing is required.
+- Centralised path/import control: only runner scripts (`run_*`, `scripts/run_tests.py`) may mutate `sys.path`, and they must do so via Base `PathFinder` helpers.
+- Single toolchain: Python 3.12 via `uv` across every module. No mixed runtimes.
+- Lint/type targets: `ruff` targets `py312` and `mypy` is pinned to `python_version = 3.12` (root and module-level configs already updated).
+- Setup scripts rely on stdlib `logging` and defer third-party imports until after dependencies are installed.
 
-Pre-commit consistency
-- Use Base `configs/.pre-commit-config.{unix,win}.yaml` templates to generate module-local configs via `EnvironmentSetup.copy_platform_precommit_config`.
-- Ensure hooks use `python -m ...` patterns for cross-platform execution; avoid shell/platform-specific binaries in hook definitions.
+## Configuration Hygiene
 
-Documentation integrity
-- Avoid dangling references to non-existent scripts/files. If a plan exists but code is pending, annotate clearly as WIP with owners.
+- Generate module-local `mypy.ini`, `ruff.toml`, and `.pre-commit-config.*.yaml` from Base templates to avoid drift.
+- Hooks must use `python -m ...` executions for portability; avoid hard-coded binary paths.
+- Keep `python.ver`, `requirements*.txt`, and `uv.lock` files in sync with the actual runtime.
 
-Security posture
-- Submodule operations use `git submodule` commands; avoid `git pull` in detached HEAD submodules.
-- SSH URLs in `.gitmodules` require developer keys; document HTTPS alternatives for read-only clones.
+## Documentation Integrity
+
+- Root docs must mirror implemented features. Mark WIP items explicitly (e.g., compliance backend or UX NextAuth rollout).
+- When removing legacy references, update `docs/Docs-Gaps.md` to record the follow-up rather than letting stale links persist.
+
+## Security & SCM Expectations
+
+- Use `git submodule update --init --recursive` (handled by `module_setup.py`) instead of manual pulls inside submodules.
+- `.gitmodules` defaults to SSH; document HTTPS fallbacks for CI in module onboarding guides.
+- Ensure `.gitignore` excludes PDFs and other compliance artefacts generated from source standards (already enforced globally).
+
+## Open Items
+
+- Update `ux/scripts/run_tests.py` to adopt Base `PathFinder` helpers.
+- Add contract tests for the forthcoming compliance backend MCP server once implemented.
