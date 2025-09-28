@@ -1,0 +1,16 @@
+{
+  "id": "ami-trigger-mg3z7hb2-016",
+  "name": "DOM Trigger",
+  "notes": "",
+  "enabled": true,
+  "owner": "",
+  "selector": "",
+  "elementLabel": "",
+  "scenario": "default",
+  "type": "dom",
+  "eventType": "click",
+  "targetCode": "return context.event?.currentTarget || context.element || null;",
+  "conditionCode": "return true;",
+  "actionCode": "console.log(\"Automation trigger fired\", context);",
+  "updatedAt": 1759080734175
+}
