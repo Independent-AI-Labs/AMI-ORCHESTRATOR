@@ -27,7 +27,7 @@
 	path = cli-agents/gemini-cli
 	url = https://github.com/google-gemini/gemini-cli.git
 	branch = main
-[submodule "agents/codex-cli"]
-	path = agents/codex-cli
-	url = https://github.com/microsoft/Codex-CLI.git
+[submodule "cli-agents/codex-cli"]
+	path = cli-agents/codex-cli
+	url = https://github.com/openai/codex.git
 	branch = main
