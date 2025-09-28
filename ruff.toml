@@ -7,6 +7,7 @@ exclude = [
     "base/**",
     "browser/**",
     "compliance/**",
+    "cli-agents/**",
     "domains/**",
     "files/**",
     "nodes/**",

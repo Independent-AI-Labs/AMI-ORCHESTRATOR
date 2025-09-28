@@ -12,11 +12,25 @@ import subprocess
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
+
+def _ensure_repo_on_path() -> Path:
+    current = Path(__file__).resolve().parent
+    while current != current.parent:
+        if (current / ".git").exists() and (current / "base").exists():
+            sys.path.insert(0, str(current))
+            return current
+        current = current.parent
+    raise RuntimeError("Unable to locate AMI orchestrator root")
 
 
 def main() -> int:
-    tests_dir = ROOT / "tests"
+    orchestrator_root = _ensure_repo_on_path()
+
+    from base.backend.utils.runner_bootstrap import ensure_module_venv  # noqa: PLC0415
+
+    ensure_module_venv(Path(__file__))
+
+    tests_dir = orchestrator_root / "tests"
     if not tests_dir.exists():
         print(f"No tests directory found at {tests_dir}. Nothing to test.")
         return 0
@@ -25,7 +39,7 @@ def main() -> int:
         print("No test files found. Nothing to test.")
         return 0
     cmd = [sys.executable, "-m", "pytest", "-q"]
-    return subprocess.run(cmd, cwd=str(ROOT), check=False).returncode
+    return subprocess.run(cmd, cwd=str(orchestrator_root), check=False).returncode
 
 
 if __name__ == "__main__":
