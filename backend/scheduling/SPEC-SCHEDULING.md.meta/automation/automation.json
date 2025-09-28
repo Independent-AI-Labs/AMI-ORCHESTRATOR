@@ -1,0 +1,8 @@
+{
+  "enabled": true,
+  "activeScenario": "default",
+  "capabilities": {
+    "network": true,
+    "plugins": true
+  }
+}
