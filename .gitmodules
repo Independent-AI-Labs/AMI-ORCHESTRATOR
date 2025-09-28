@@ -23,3 +23,11 @@
 [submodule "nodes"]
 	path = nodes
 	url = git@github.com:Independent-AI-Labs/AMI-NODES.git
+[submodule "cli-agents/gemini-cli"]
+	path = cli-agents/gemini-cli
+	url = https://github.com/google-gemini/gemini-cli.git
+	branch = main
+[submodule "agents/codex-cli"]
+	path = agents/codex-cli
+	url = https://github.com/microsoft/Codex-CLI.git
+	branch = main
