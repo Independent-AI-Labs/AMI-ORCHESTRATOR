@@ -9,6 +9,9 @@ Branch policy:
 - Never work on a detached HEAD. If you find yourself detached, switch to a named branch immediately.
 - Submodules should also be on their respective `main` branches unless explicitly instructed otherwise.
 
+Module restrictions:
+- Do not modify ANY module directories (base, browser, compliance, domains, files, nodes, streams, ux, etc.) unless the user explicitly instructs you to.
+
 Enforcement:
 - `agent.sh` only prints an error when a detached HEAD is detected in the root repo or any submodule. It does not exit, and it does not enforce being on `main`.
 
