@@ -2,32 +2,50 @@
 [submodule "browser"]
 	path = browser
 	url = git@github.com:Independent-AI-Labs/AMI-WEB.git
+	branch = main
+	update = checkout
 [submodule "ux"]
 	path = ux
 	url = git@github.com:Independent-AI-Labs/AMI-UX.git
+	branch = main
+	update = checkout
 [submodule "base"]
 	path = base
 	url = git@github.com:Independent-AI-Labs/AMI-BASE.git
+	branch = main
+	update = checkout
 [submodule "streams"]
 	path = streams
 	url = git@github.com:Independent-AI-Labs/AMI-STREAMS.git
+	branch = main
+	update = checkout
 [submodule "compliance"]
 	path = compliance
 	url = git@github.com:Independent-AI-Labs/AMI-COMPLIANCE.git
+	branch = main
+	update = checkout
 [submodule "domains"]
 	path = domains
 	url = git@github.com:Independent-AI-Labs/AMI-DOMAINS.git
+	branch = main
+	update = checkout
 [submodule "files"]
 	path = files
 	url = git@github.com:Independent-AI-Labs/AMI-FILES.git
+	branch = main
+	update = checkout
 [submodule "nodes"]
 	path = nodes
 	url = git@github.com:Independent-AI-Labs/AMI-NODES.git
+	branch = main
+	update = checkout
 [submodule "cli-agents/gemini-cli"]
 	path = cli-agents/gemini-cli
 	url = https://github.com/google-gemini/gemini-cli.git
 	branch = main
+	update = checkout
 [submodule "cli-agents/codex-cli"]
 	path = cli-agents/codex-cli
 	url = https://github.com/openai/codex.git
 	branch = main
+	update = checkout

@@ -18,10 +18,17 @@ Enforcement:
 Commit discipline:
 - Do not bypass hooks (no `--no-verify`).
 - Commit only after linters, type checks, and tests pass.
+- Land work module-by-module (skip `ux` until the user says otherwise) so CI can start verifying while you keep moving; push after each clean chunk.
 
 Testing discipline:
 - Run each module's test suite using the module's script in `scripts/` (for example, `python3 scripts/run_tests.py`).
 - Do not expect the root environment to install per-module dependencies; rely on module-level runners before committing.
+
+Dependency review workflow:
+- Query real registries before bumping anything. Use `python3 - <<'PY'` with `urllib.request` to read `https://pypi.org/pypi/<package>/json` for PyPI packages, and `npm view <package> version` (or `npx pnpm@<version> view`) for Node/Pnpm packages. Never guess or copy numbers from memory.
+- Pin every dependency to an exact version in manifests and lockfiles (no `^`, `~`, or unbounded ranges). Update Python pins via `uv lock --refresh` or `uv sync`, and Node/Pnpm pins via `npm install` or `npx pnpm@<version> install` so lock files stay in sync.
+- After bumping, run the module's setup (`python3 module_setup.py`) and its documented test runner. If the newest release is incompatible, use the latest compatible release and call out the constraint in your summary.
+- Skip `domains/predict` during installs/tests; that module is deprecated and remains out of scope for dependency updates.
 
 Compute profiles:
 - Heavy compute stacks are opt-in. Set `AMI_COMPUTE_PROFILE` to `cpu`, `nvidia`, `intel`, or `amd` before running setup/tests if you genuinely need those wheels.
