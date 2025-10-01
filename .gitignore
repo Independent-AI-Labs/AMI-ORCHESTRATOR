@@ -70,6 +70,7 @@ config.test.yaml
 .coverage
 htmlcov/
 .pytest_cache/
+package-lock.json
 
 nul
 

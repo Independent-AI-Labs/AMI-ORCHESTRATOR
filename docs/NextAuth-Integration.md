@@ -54,12 +54,12 @@
 
 ## Backend & DataOps Alignment
 ### User & AuthProvider Mapping
-- Map NextAuth `User` objects to `base/backend/dataops/models/user.User`, populating `email`, `full_name`, `avatar_url`, and `auth_provider_ids`. Use `find_or_create` to avoid duplicate rows and set ownership metadata (`set_owner`).
+- Map NextAuth `User` objects to `base/backend/dataops/models/user.User`, populating `email`, `full_name`, `avatar_url`, and `auth_provider_ids`. Follow [SPEC – DataOps Data Access Pattern](./SPEC-DATAOPS-DATA-ACCESS.md) by performing lookups/creates through `get_crud(User)` inside a dedicated service (no model-level helpers). Set ownership metadata via the service before persisting.
 - Store provider tokens via `AuthProvider` and mark `Vault` storage for secrets to keep OAuth refresh tokens secure (matches current `AuthProvider.Meta` configs).
 
 ### Custom Auth.js Adapter
-- Implement an adapter that delegates `createUser`, `getUser`, `getSession`, etc. to the `UnifiedCRUD` API. For performant session reads, back the adapter with the Redis config already declared via `StorageConfigFactory.from_yaml("redis")`.
-- Persist session data in Redis with TTL matching `session.maxAge`; optionally mirror to Dgraph for audit trails.
+- Implement an adapter that delegates `createUser`, `getUser`, `getSession`, etc. to the `UnifiedCRUD` API backed by Postgres as the primary store, with Dgraph handling metadata fan-out and Vault safeguarding secrets.
+- Persist session data alongside user/provider records in Postgres (reuse TTL columns or scheduled cleanup) and optionally mirror to Dgraph for audit trails—no Redis cache tier required because keys are requested through backend APIs.
 
 ### SecurityContext & Roles
 - Derive `SecurityContext` from NextAuth session claims: `user_id`, `roles`, `groups`, `tenant_id`. Use callbacks to merge DataOps role assignments (`Role`, `SecurityGroup`) so API route guards can call `check_permission` before touching the filesystem.
@@ -72,7 +72,7 @@
 
 ## Implementation Phasing
 1. **Phase 0 — Foundations**: add dependencies, scaffold auth routes, wire middleware in preview mode, and introduce a credentials provider backed by a mock adapter for local validation.
-2. **Phase 1 — DataOps Adapter**: connect the adapter to Redis + Dgraph, map users/providers, and light up role-based guards on upload/library endpoints.
+2. **Phase 1 — DataOps Adapter**: connect the adapter to Postgres (primary) + Dgraph (metadata), map users/providers, and light up role-based guards on upload/library endpoints while Vault secures secrets.
 3. **Phase 2 — OAuth Providers**: configure Google/GitHub/Azure clients (leveraging `base/backend/opsec/oauth/oauth_config.py`) and enable refresh-token persistence via `AuthProvider.refresh_access_token`.
 4. **Phase 3 — Multi-surface Rollout**: migrate legacy `public/index.html` into React or wrap it in a session-aware loader, integrate the highlight extension, and provide CLI tokens for automation.
 
