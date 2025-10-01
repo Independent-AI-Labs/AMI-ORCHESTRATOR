@@ -4,7 +4,7 @@ Scope: Track how well modules adhere to the setup contract, highlight remaining 
 
 ## Summary
 
-- Toolchain bootstrap via `scripts/bootstrap_uv_python.py` works on macOS/Linux/Windows; fallback paths cover user-local installs.
+- Toolchain bootstrap via `scripts/bootstrap_uv_python.py` works on macOS/Linux/Windows; alternate installer commands cover user-local installs.
 - Root `module_setup.py` now invokes every module’s setup script (base, browser, files, domains, compliance, nodes, streams, ux) with stdlib logging only.
 - Base exposes the authoritative environment helpers (`base/backend/utils/path_finder.py`, `environment_setup.py`); modules are expected to lean on these rather than duplicating path logic.
 

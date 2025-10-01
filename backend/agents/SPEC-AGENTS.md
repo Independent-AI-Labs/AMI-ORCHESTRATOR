@@ -36,7 +36,7 @@
 - Mirror the official Node-based Gemini CLI (`https://github.com/google-gemini/gemini-cli`, see `packages/core/src/code_assist/server.ts`) which hits `https://cloudcode-pa.googleapis.com/v1internal:{method}`.
 - Support the same methods: `generateContent`, `streamGenerateContent` (SSE), `countTokens`, `onboardUser`, `loadCodeAssist`, `getCodeAssistGlobalUserSetting`, and `setCodeAssistGlobalUserSetting`, while keeping space for `embedContent` once Google enables it.
 - Reproduce the CLI's streaming contract (`alt=sse` with `data:` lines) and FinishReason handling when routing responses into LangGraph supervisors.
-- Authenticate via a shared `OAuth2Client` connected to the Base `AuthProvider` store (per `TODO-AUTH.md`) with policy-governed fallbacks to API keys.
+- Authenticate via a shared `OAuth2Client` connected to the Base `AuthProvider` store (per `TODO-AUTH.md`) with policy-governed switchover to API keys.
 - Track API changes through the Code Assist documentation and the CLI's release notes (`GEMINI.md`), and add regression tests that exercise these endpoints end-to-end.
 
 - **External MCP Servers:**
@@ -108,7 +108,7 @@ Responses follow FastMCP JSON schema, returning `content` blocks with JSON paylo
 - **Graph Runtime:** Use LangGraph `StateGraph` with nodes representing steps (LLM call, tool invocation, decision). Supervisory nodes enforce policies (e.g., content moderation, guardrails).
 - **Concurrency:** For long-running tools, dispatch tasks to Base worker pools (`WorkerPoolManager`) with async callbacks to resume the graph when results arrive.
 - **Memory:** Provide pluggable memory adapters (buffer, summary, vector store). Default to DataOps-backed memory with optional retrieval augmentation.
-- **Fallbacks:** Implement multi-provider strategy (Google GenAI primary, fallback to open-source models) with policy-based selection.
+- **Resilience:** Implement multi-provider strategy (Google GenAI primary, with policy-gated switchover to open-source models) and strict selection rules.
 
 ## 11. Multi-Session Scaling & Persistence
 - Sessions stored in document DB with indexes on `tenant_id`, `status`, `created_at`.

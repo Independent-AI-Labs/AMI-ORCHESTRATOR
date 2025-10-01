@@ -5,6 +5,8 @@
 - Reuse authentication primitives across other `ux` surfaces and extensions without duplicating logic.
 - Align frontend session state with the existing `User`, `AuthProvider`, and `SecurityContext` models in `base/backend/dataops` so downstream services inherit the same identity, role, and tenancy guarantees.
 
+_A detailed backend contract lives in [SPEC – Authentication Platform](./SPEC-AUTH.md); this document focuses on the Next.js integration plan._
+
 ## Current Implementation (March 2025)
 - A standalone `ux/auth` workspace now encapsulates NextAuth configuration, middleware builders, and the DataOps-aware credentials bridge. CMS and the highlight browser extension consume these helpers via the local package alias `@ami/auth/*`.
 - All CMS route handlers are wrapped with `withSession`, returning `401` responses for unauthenticated access. A shared middleware enforces sign-in for `/index.html`, API routes, and static assets while allow-listing the auth UI itself.
@@ -58,8 +60,10 @@
 - Store provider tokens via `AuthProvider` and mark `Vault` storage for secrets to keep OAuth refresh tokens secure (matches current `AuthProvider.Meta` configs).
 
 ### Custom Auth.js Adapter
-- Implement an adapter that delegates `createUser`, `getUser`, `getSession`, etc. to the `UnifiedCRUD` API backed by Postgres as the primary store, with Dgraph handling metadata fan-out and Vault safeguarding secrets.
-- Persist session data alongside user/provider records in Postgres (reuse TTL columns or scheduled cleanup) and optionally mirror to Dgraph for audit trails—no Redis cache tier required because keys are requested through backend APIs.
+Follow the backend contract in [SPEC – Authentication Platform](./SPEC-AUTH.md). Once the CRUD-backed service ships, implement the adapter in three deliberate passes:
+1. Replace the stubbed `ux/auth/src/server.ts` persistence with calls to `/auth/sessions` and `/auth/providers` on the DataOps auth gateway (`DATAOPS_AUTH_URL`). Use `DATAOPS_INTERNAL_TOKEN` for server-to-server calls and surface `NEXT_PUBLIC_DATAOPS_AUTH_URL` to the browser so middleware can resolve the same host.
+2. Map Auth.js lifecycle methods to UnifiedCRUD operations: call `createUser`/`linkAccount` against the new endpoints, normalise IDs, and persist secret-bearing fields through the Vault-aware payloads returned by the service; UnifiedCRUD will fall back to the `local_file` StorageConfig automatically if primary stores are unavailable.
+3. Delegate session `getSession`/`updateSession` to the DataOps API, deleting any local JSON cache, and wire error responses into the CMS hint system so validation issues reach the UI.
 
 ### SecurityContext & Roles
 - Derive `SecurityContext` from NextAuth session claims: `user_id`, `roles`, `groups`, `tenant_id`. Use callbacks to merge DataOps role assignments (`Role`, `SecurityGroup`) so API route guards can call `check_permission` before touching the filesystem.

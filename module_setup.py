@@ -147,7 +147,7 @@ def ensure_git_submodules() -> None:
 
     stderr = res.stderr or ""
     if "Permission denied (publickey)" in stderr or "fatal: Could not read from remote repository" in stderr:
-        logger.warning("SSH auth failed for submodules; attempting HTTPS fallback.")
+        logger.warning("SSH auth failed for submodules; attempting HTTPS alternative.")
         subs = _submodules_from_gitmodules()
         changed = False
         for path, url in subs:

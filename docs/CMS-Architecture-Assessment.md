@@ -21,7 +21,7 @@
 ### 3. Static assets bypass Next tooling
 - `public/js/*.js` modules are shipped raw. Edits skip lint/type checks and rely on manual cache-busting query strings (`?v=20250306`).
 - HMR does not apply to the iframe; developers must hard refresh or bump versions to see changes, leading to lost time and stale behaviour in prod.
-- CDN dependencies (Mermaid, KaTeX, React UMD) load per iframe without integrity checks or fallback bundles.
+- CDN dependencies (Mermaid, KaTeX, React UMD) load per iframe without integrity checks or local contingency bundles.
 
 ### 4. Dialog patterns reinvented per feature
 - Highlight settings, content directory drawer, and other overlays each stitch together their own ESC/backdrop handlers.
@@ -55,7 +55,7 @@
 ### D. Bring UI scripts under build governance
 1. Move `/public/js` modules into `src/` and build them with Vite/Next bundler. Enable TypeScript + ESLint for all UI code.
 2. Generate hashed filenames automatically during build so cache busting is automatic.
-3. Replace CDN runtime loads with npm dependencies bundled locally, or at least add Subresource Integrity hashes and fallbacks.
+3. Replace CDN runtime loads with npm dependencies bundled locally, or at least add Subresource Integrity hashes and local contingency bundles.
 
 ### E. Modularise legacy code during transition
 1. Extract tree rendering, highlight configuration, and search into separate modules/classes with explicit init/destroy.

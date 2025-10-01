@@ -62,6 +62,7 @@ Thumbs.db
 /logs/
 /temp/
 /uploads/
+/metadata/
 *.pid
 *.pdf
 config.yaml

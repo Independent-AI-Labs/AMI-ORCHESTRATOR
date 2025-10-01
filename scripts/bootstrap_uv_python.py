@@ -121,7 +121,7 @@ def install_uv_auto() -> bool:
     except Exception as e:  # defensive; fall through to official installer
         _print(f"Package manager install attempt failed: {e}")
 
-    # Official installer fallbacks
+    # Official installer retry path
     if not installed:
         try:
             installed = _install_uv_via_official(system)
