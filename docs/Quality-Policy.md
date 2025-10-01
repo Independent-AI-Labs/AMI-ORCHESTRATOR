@@ -21,7 +21,7 @@
 ## Security & SCM Expectations
 
 - Use `git submodule update --init --recursive` (handled by `module_setup.py`) instead of manual pulls inside submodules.
-- `.gitmodules` defaults to SSH; document HTTPS fallbacks for CI in module onboarding guides.
+- `.gitmodules` defaults to SSH; document HTTPS alternate commands for CI in module onboarding guides.
 - Ensure `.gitignore` excludes PDFs and other compliance artefacts generated from source standards (already enforced globally).
 
 ## Open Items

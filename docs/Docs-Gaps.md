@@ -5,7 +5,7 @@
 - Keep `streams/README.md` updated as soon as runtime services move beyond the current dormant state.
 
 ## Submodule Access
-- `.gitmodules` defaults to SSH URLs. Document HTTPS fallback commands in onboarding material for environments without SSH keys (CI, read-only clones).
+- `.gitmodules` defaults to SSH URLs. Document HTTPS companion commands in onboarding material for environments without SSH keys (CI, read-only clones).
 
 ## Runners & Setup Scripts
 - Verify each module README lists the real runner scripts (`scripts/run_tests.py`, forthcoming MCP runners). Streams and compliance currently lack runnable entry points and should say so explicitly.

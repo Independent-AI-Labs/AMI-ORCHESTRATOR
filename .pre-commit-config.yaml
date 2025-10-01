@@ -26,6 +26,15 @@ repos:
         stages: [ pre-commit ]
         pass_filenames: false
 
+  - repo: local
+    hooks:
+      - id: banned-words
+        name: banned-words
+        entry: python3 scripts/check_banned_words.py
+        language: system
+        pass_filenames: false
+        stages: [ pre-commit ]
+
   # Run tests on pre-push
   - repo: local
     hooks:

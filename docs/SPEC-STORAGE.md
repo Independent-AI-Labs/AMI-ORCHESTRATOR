@@ -10,7 +10,7 @@
 ### Configuration Files
 - `base/config/storage-config.yaml` holds environment-agnostic defaults for all named storage backends (`postgres`, `dgraph`, `vault`, …).
 - Values support `${ENV_VAR:-default}` substitution; module setup scripts must populate required env vars via `.env` before validation.
-- `model_defaults.default_storages` acts as the fallback list when a model does not explicitly declare `storage_configs`.
+- `model_defaults.default_storages` defines the order UnifiedCRUD will try when a model omits `storage_configs`. Every entry must be safe for production traffic; no hidden degradations are permitted.
 
 ### Runtime Objects
 - `StorageConfigFactory.from_yaml(name)` resolves a named entry, merges it with overrides, and returns a `StorageConfig` instance.
@@ -63,3 +63,11 @@
 1. Implement the `StorageValidator` and CLI script; wire into base CI.
 2. Add MCP endpoints with appropriate authentication/authorisation guards.
 3. Update developer docs (`AGENTS.md`, module READMEs) with the new workflow and troubleshooting steps.
+
+## 2025-10 Updates
+
+- **Metadata-aware schemata** – the Dgraph DAO now feeds full `ModelMetadata` into schema creation so index declarations in `Meta.indexes` are honoured automatically.
+- **PgVector integration rewritten** – vector-backed models persist through the PostgreSQL DAO, storing structured columns plus a dedicated `vector` field. Embedding dimensions are derived from the stored payload and hnsw indexes are created only after the column receives real data.
+- **Redis as cache-only** – the Redis DAO refuses zero/negative TTLs. All entries must provide an explicit expiration, guaranteeing we never treat Redis as durable storage.
+- **OpenBao listing** – Vault/OpenBao storage enumerates secrets via the native API rather than maintaining an in-repo `__index__` document, eliminating race conditions.
+- **Local JSON storage profile removed** – the file-backed DAO and `StorageType.FILE` profile have been deleted; UnifiedCRUD now stops at Postgres (primary), Dgraph (metadata), and Vault (secrets).

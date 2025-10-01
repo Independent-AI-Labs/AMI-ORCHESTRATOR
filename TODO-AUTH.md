@@ -1,12 +1,12 @@
 # TODO – Authentication Providers & Web Login Enablement
 
 ## Progress Snapshot (2025-10-01)
-- ✅ `AuthProvider` model plus adapter plumbing exist, and `AuthService` now uses dedicated helper utilities (currently backed by an in-memory store) instead of model-level stubs (`base/backend/opsec/auth/auth_service.py:40-314`, `opsec/utils/user_utils.py`).
+- ⚠️ `AuthService` still depends on the temporary in-memory helpers in `base/backend/opsec/utils/user_utils.py`; migration to UnifiedCRUD with the `[postgres, dgraph, vault, local_file]` storage order is tracked in `docs/TODO-MIGRATION-AUTH.md`.
 - ✅ OAuth/API-key/SSH adapters + `AuthService` flows are wired for token refresh/revoke (`base/backend/opsec/auth/provider_adapters.py`, `auth_service.py`), and the target wiring uses Postgres for canonical records, Dgraph for metadata, and Vault for secrets (no Redis cache required).
 - ⚠️ CMS account APIs write to the local JSON cache; there is no call into DataOps for CRUD (`ux/cms/app/lib/store.ts:184-356`, `ux/cms/app/api/account-manager/accounts/route.ts:1-84`).
 - ⚠️ `ux/auth` falls back to a stub NextAuth implementation that manufactures sessions/providers when DataOps/backends fail (`ux/auth/src/server.ts:1-214`).
 - ⚠️ `dataOpsClient` only reaches the backend if `DATAOPS_AUTH_URL` is set; otherwise it serves from local files (`ux/auth/src/dataops-client.ts:1-248`).
-- ⛔ No dedicated SPEC-AUTH or environment documentation; `TODO-AUTH.md` remains the only source.
+- ✅ Dedicated auth documentation now lives in `docs/SPEC-AUTH.md`; migration steps are captured in `docs/TODO-MIGRATION-AUTH.md`.
 
 ## 1. Login Model Overview
 
@@ -18,7 +18,7 @@
 
 ## 2. Cross-Cutting Tasks
 
-- [ ] Source of truth: design provider configuration storage in `base/backend` (likely `base/backend/dataops/models` + DAO) so the UX only references normalized schemas, with Postgres as primary storage, Dgraph handling relationship metadata, and Vault storing secrets (no Redis tier). _(Current state: `AuthProvider` has `StorageModel` scaffolding but `find_or_create` / DAO hooks are TODO; see `base/backend/dataops/models/user.py:101-177`.)_
+- [ ] Source of truth: move `AuthService` persistence onto UnifiedCRUD using the `[postgres, dgraph, vault, local_file]` storage order (see `docs/TODO-MIGRATION-AUTH.md`). Delete the in-memory shim once CRUD-backed helpers land.
 - [x] Align all persistence with [SPEC – DataOps Data Access Pattern](docs/SPEC-DATAOPS-DATA-ACCESS.md): port `AuthService`/related helpers to `get_crud(...)`-backed services and delete model-level CRUD stubs.
 - [ ] Define provider field schema + validations in `base/backend/opsec/oauth` (e.g., extend `OAuthConfig`/new `ProviderConfig` dataclass) and expose via API for the UI. _(Static configs live in `oauth_config.py:102-144`; nothing dynamic or validated.)_
 - [ ] Implement secrets handling (vault integration) for `client_secret`, `api_key`, etc., in `AuthProvider` so values never leave backend once submitted. _(Tokens stored as `SecretStr` and mapped to `StorageType.VAULT`, but there is no DAO persistence or secrets broker integration yet.)_
@@ -82,7 +82,7 @@
 ### HuggingFace (API token / OAuth)
 - Fields: `api_token` (personal access token), optional `organization`, `default_repo`/`space`, `scopes` (read/write), future-proof for OAuth (`client_id`, `client_secret`, `redirect_uri`).
 - Backend:
-  - [ ] Add AuthProviderType and header generation (typically `Authorization: Bearer <token>`); include optional `HF_TOKEN` env fallback. _(Enum + adapter missing.)_
+  - [ ] Add AuthProviderType and header generation (typically `Authorization: Bearer <token>`); allow optional `HF_TOKEN` env default when explicitly configured. _(Enum + adapter missing.)_
   - [ ] Document required scopes (`read`, `write`, `space`, `model`) and validate via HuggingFace Hub `/api/whoami-v2` check. _(Not documented.)_
   - [ ] Support token refresh/rotation reminders and capture rate limit metadata in `provider_data`. _(Not implemented.)_
 

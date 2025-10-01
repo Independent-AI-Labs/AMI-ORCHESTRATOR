@@ -15,8 +15,8 @@ python scripts/bootstrap_uv_python.py --auto
 Manual alternatives
 - macOS: `brew install uv`
 - Windows: `winget install -e --id Astral-Software.UV` or `choco install uv`
-- Linux/macOS fallback: `curl -LsSf https://astral.sh/uv/install.sh | sh`
-- Windows fallback (PowerShell): `irm https://astral.sh/uv/install.ps1 | iex`
+- Linux/macOS direct script: `curl -LsSf https://astral.sh/uv/install.sh | sh`
+- Windows scripted install (PowerShell): `irm https://astral.sh/uv/install.ps1 | iex`
 
 Why no root venv?
 - Each module is independently runnable and self-contained; orchestrator only ensures the toolchain is present and calls `uv run --python 3.12 module_setup.py` inside each module.

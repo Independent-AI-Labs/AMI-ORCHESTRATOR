@@ -19,6 +19,8 @@ Commit discipline:
 - Do not bypass hooks (no `--no-verify`).
 - Commit only after linters, type checks, and tests pass.
 - Land work module-by-module (skip `ux` until the user says otherwise) so CI can start verifying while you keep moving; push after each clean chunk.
+- Read the file before editing it. Open and inspect first, then apply changes with the appropriate tool (no blind scripting).
+- Never build or wire "fallback" behaviour unless the user explicitly requests it for the current task. If a storage option (like the local file config) exists, treat it as opt-in and surface its use clearly instead of silently enabling it.
 
 Testing discipline:
 - Run each module's test suite using the module's script in `scripts/` (for example, `python3 scripts/run_tests.py`).
@@ -37,6 +39,7 @@ Compute profiles:
 Environment configuration:
 - Set `AMI_HOST` (and any module-specific `*_HOST` overrides) in your `.env` when you need to point services at a different machine; defaults fall back to `127.0.0.1`.
 - Populate `SSH_DEFAULT_USER` and `SSH_DEFAULT_PASSWORD` in your `.env` so the SSH MCP tests can log into your local machine; they should reference a real system account.
+- Copy the updated `default.env` files (base/browser/domains/ux) and fill the auth stack variables: `DATAOPS_AUTH_URL`, `NEXT_PUBLIC_DATAOPS_AUTH_URL`, `DATAOPS_INTERNAL_TOKEN`, `SECRETS_BROKER_URL`, the broker tokens, and the `OPENBAO_*` settings that match your secrets instance. These must be valid before running auth or secrets tests.
 
 Process management:
 - Run `npm run dev` for the UX app in the background (for example, `npm run dev &`) or in a separate terminal since it blocks the current shell.
