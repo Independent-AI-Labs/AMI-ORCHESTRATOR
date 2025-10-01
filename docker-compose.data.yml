@@ -20,25 +20,6 @@ services:
       timeout: 10s
       retries: 30
 
-  # Plain PostgreSQL (no vector extension)
-  postgres-plain:
-    image: postgres:16
-    container_name: ami-postgres-plain
-    profiles: ["postgres-plain"]
-    environment:
-      POSTGRES_DB: ${POSTGRES_PLAIN_DB:-postgres}
-      POSTGRES_USER: ${POSTGRES_PLAIN_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PLAIN_PASSWORD:-postgres}
-    ports:
-      - "${POSTGRES_PLAIN_PORT:-5433}:5432"
-    volumes:
-      - pgdata_plain:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_PLAIN_USER:-postgres}"]
-      interval: 10s
-      timeout: 10s
-      retries: 30
-
   # Redis cache
   redis:
     image: redis:7
@@ -88,7 +69,6 @@ services:
 
 volumes:
   pgdata:
-  pgdata_plain:
   redisdata:
   dgraphdata:
   mongodata:

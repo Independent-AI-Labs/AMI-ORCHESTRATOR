@@ -2,33 +2,30 @@
 # Thin wrapper to start Codex CLI with strict guardrails.
 # - Uses YOLO mode and a 20-minute default timeout
 # - Embeds explicit instructions: no branch creation unless told; never bypass hooks
-# - Enforces: NO DETACHED HEADS (do not enforce branch name)
+# - Relies on git hooks for branch enforcement; this script just launches Codex CLI
 
 set -euo pipefail
 
-# Enforce only: no detached HEADs in repo or submodules
-if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo HEAD)
-  if [[ "$branch" == "HEAD" ]]; then
-    echo "ERROR: Detached HEAD detected. NO DETACHED HEADS. Switch to a named branch (e.g., 'main')." >&2
-  fi
-  if git submodule status >/dev/null 2>&1; then
-    mapfile -t offenders < <(git submodule foreach --quiet '
-      b=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo HEAD)
-      if [[ "$b" == "HEAD" ]]; then
-        echo "$path (detached)"
-      fi
-    ' || true)
-    if (( ${#offenders[@]} > 0 )); then
-      echo "ERROR: Detached HEAD detected in submodules:" >&2
-      for o in "${offenders[@]}"; do echo " - $o" >&2; done
-    fi
-  fi
-else
-  echo "WARNING: Not in a git repository; cannot check HEAD state." >&2
-fi
+INSTRUCTION=$(cat <<'EOF'
+Stay on 'main' unless told otherwise — branch discipline is already enforced by git hooks.
 
-INSTRUCTION="\
-NO DETACHED HEADS — WE ARE WORKING ONLY IN MAIN ALWAYS UNLESS I SAY OTHERWISE!!!!!!\n\nYou are operating in this repository with strict guardrails:\n\n- Work only on 'main' unless the user explicitly says otherwise.\n- Never, ever commit or push using --no-verify, and never bypass pre-commit or pre-push hooks.\n- Only commit and push after ALL linters, type checks, and tests pass locally.\n- Prefer uv-native workflows and per-module environments; avoid PATH/PYTHONPATH hacks.\n- Use explicit, reproducible commands; surface failures clearly and stop.\n- Do not touch ANY module (base/browser/compliance/etc.) unless the user explicitly instructs you to.\n- Commit module-by-module (skip UX until told otherwise) so CI starts processing while you continue validating follow-up work.\n- For dependency reviews: query real registries (`python3 - <<'PY'` against PyPI JSON, `npm view` / `npx pnpm@<ver> view`), pin exact versions (no ^ or ~), refresh locks (`uv lock --refresh`, `npm install`, `npx pnpm@<ver> install`), rerun module setup + tests, and call out any incompatibility forcing you off the latest release.\n- Skip `domains/predict` installs/tests; it stays deprecated.\n\nNotes:\n- Default command timeout is 1200 seconds (20 minutes).\n- Ask before any potentially destructive operation.\n\n"
+You are operating in this repository with strict guardrails:
+
+- Work only on 'main' unless the user explicitly says otherwise.
+- Never, ever commit or push using --no-verify, and never bypass pre-commit or pre-push hooks.
+- Only commit and push after ALL linters, type checks, and tests pass locally.
+- Prefer uv-native workflows and per-module environments; avoid PATH/PYTHONPATH hacks.
+- Use explicit, reproducible commands; surface failures clearly and stop.
+- Do not touch ANY module (base/browser/compliance/etc.) unless the user explicitly instructs you to.
+- Commit module-by-module (skip UX until told otherwise) so CI starts processing while you continue validating follow-up work.
+- For dependency reviews: query real registries (`python3 - <<'PY'` against PyPI JSON, `npm view` / `npx pnpm@<ver> view`), pin exact versions (no ^ or ~), refresh locks (`uv lock --refresh`, `npm install`, `npx pnpm@<ver> install`), rerun module setup + tests, and call out any incompatibility forcing you off the latest release.
+- Skip `domains/predict` installs/tests; it stays deprecated.
+
+Notes:
+- Default command timeout is 1200 seconds (20 minutes).
+- Ask before any potentially destructive operation.
+
+EOF
+)
 
 exec codex -m gpt-5-codex --yolo -- "$INSTRUCTION"
