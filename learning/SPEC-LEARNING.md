@@ -41,11 +41,15 @@
 | `ServingEndpoint` | Deployment metadata. | `endpoint_id`, `model_id`, `runtime`, `uri`, `scaling_policy`, `health_state`, `last_validation` | `graph`, `document` |
 | `MetricSnapshot` | Aggregated metrics for monitoring. | `entity_id` (model/endpoint), `timestamp`, `metric_name`, `value`, `threshold`, `breach_state`, `source` | `timeseries` |
 | `DriftReport` | Drift/anomaly detection results. | `report_id`, `model_id`, `dataset_version`, `method`, `severity`, `details`, `recommended_action`, `evidence_refs` | `document`, `graph` |
+| `ProcessObservation` | Normalised event emitted from Base DataOps CRUD hooks. | `observation_id`, `model_type`, `entity_uid`, `security_context`, `feature_vector`, `graph_context`, `ingested_at` | `document`, `timeseries` |
+| `SOMNeuron` | Prototype state for the Growing Self-Organising Map. | `neuron_id`, `layer_id`, `prototype_vector`, `quantisation_error`, `hit_count`, `growth_epoch`, `adjacent_neuron_ids`, `status` | `vector`, `graph` |
+| `ActivationModelState` | Online predictor weights that act on GSOM outputs. | `activation_id`, `target_signal`, `model_payload`, `learning_rate`, `regularisation_meta`, `last_update`, `performance_summary`, `linked_neuron_ids` | `document`, `file` |
 
 ### Model Conventions
 - Extend `StorageModel` and reuse Base mixins for ACLs and timestamps. Register each model with `UnifiedCRUD` via `get_crud()` to ensure caching and multi-storage writes.
 - Use shared enums for status fields (e.g. `ComplianceStatus`, risk severity) and introduce new enums only when not covered by Base/Compliance modules.
 - Maintain lineage edges between datasets, experiments, models, and deployments for auditability and reproducibility.
+- Reuse Base DataOps graph annotations (see `base/backend/dataops/models/bpmn_relational.py`) so GSOM neurons and activation states can live alongside BPMN flow nodes, security principals, and storage configs.
 
 ## 6. Pipeline & BPMN Alignment
 - **Training Workflow Templates**: Provide BPMN definitions for supervised training, evaluation-only runs, hyperparameter search, and fine-tuning. Each template includes tasks for data validation, training launch, metric aggregation, model registration, and compliance review.
@@ -103,6 +107,13 @@
 3. **Phase 2 – Model Registry & Deployment**: Implement artefact registry, model promotion flow, inference runtime wrappers, and deployment MCP tools.
 4. **Phase 3 – Monitoring & Drift**: Add metrics ingestion, drift detection, dashboard MCP tooling, and hooks into risk/compliance modules.
 5. **Phase 4 – Domain SDK & Automation**: Release domain integration SDK, add templated pipelines for common tasks (classification, time-series, RL), and refine agent tooling for interactive experimentation.
+
+## 11. Online GSOM & Activation Learning
+- **Event Ingestion Pipeline**: Extend `UnifiedCRUD` (see `base/backend/dataops/services/unified_crud.py`) with non-blocking emitters that publish `ProcessObservation` payloads whenever BPMN, security, or storage models mutate. Normalise features with the same adapters used by orchestration so online learners consume consistent vectors.
+- **Feature Service**: Maintain a streaming transformer that fuses BPMN telemetry (durations, retries, lane membership from `base/backend/dataops/models/bpmn_relational.py`), security context (roles, classifications from `base/backend/dataops/models/security.py`), and infrastructure descriptors (`StorageConfig`, `SSHConfig`). Cache per-entity histories to compute rolling statistics without replaying entire timelines.
+- **Growing Self-Organising Map**: Implement an always-on GSOM microservice that ingests `ProcessObservation` batches, updates neuron prototypes incrementally, grows the topology when quantisation error exceeds adaptive thresholds, and prunes stale neurons. Persist prototypes in vector storage while mirroring neuron adjacency into the graph layer for downstream traversal.
+- **Activation Layer**: Train lightweight online predictors (logistic/Poisson or shallow NN) on top of GSOM assignments plus raw features to emit activation signals such as auto-approvals, anomaly flags, or prioritisation hints. Version activation weights alongside neuron snapshots so we can audit decision boundaries.
+- **Governance & Monitoring**: Run GSOM and activation services under BPMN control; record lineage between observation windows, neuron states, and activation decisions. Track health KPIs (neuron count, mean quantisation error, activation precision/recall) and gate self-adjusting behaviour behind drift detectors and approval workflows before production rollout.
 
 ---
 
