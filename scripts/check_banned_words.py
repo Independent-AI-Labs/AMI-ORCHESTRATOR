@@ -47,7 +47,7 @@ IGNORED_FILES = {
 # File extensions to ignore
 IGNORED_SUFFIXES = {".tsbuildinfo", ".log", ".lock", ".min.js.map", ".min.js", ".min.css"}
 
-DEFAULT_BANNED_WORDS = ("fallback",)
+DEFAULT_BANNED_WORDS = ("fallback", "backwards compatibility")
 
 
 def should_skip(path: Path) -> bool:
