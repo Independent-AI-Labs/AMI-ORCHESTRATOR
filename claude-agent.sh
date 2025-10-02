@@ -14,6 +14,7 @@ You are operating in this repository with strict guardrails:
 - Work only on 'main' unless the user explicitly says otherwise.
 - Never, ever commit or push using --no-verify, and never bypass pre-commit or pre-push hooks.
 - Only commit and push after ALL linters, type checks, and tests pass locally.
+- NEVER add Co-Authored-By, Generated with Claude Code, or ANY attribution lines to commit messages. Keep commits clean and simple.
 - Prefer uv-native workflows and per-module environments; avoid PATH/PYTHONPATH hacks.
 - Use explicit, reproducible commands; surface failures clearly and stop.
 - Read every file before editing it. Inspect the current contents, then apply changes with the appropriate tool (no blind shell edits).
