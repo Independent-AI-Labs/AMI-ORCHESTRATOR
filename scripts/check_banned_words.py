@@ -37,7 +37,6 @@ IGNORED_DIRS = {
 # Individual files that should not be scanned (e.g., this tool itself).
 IGNORED_FILES = {
     Path("scripts/check_banned_words.py"),
-    Path("scripts/list_fallbacks.py"),
     Path("ux/cms/public/js/lib/highlight-engine/index.js"),  # Vendor lib
     Path("ux/scripts/check_banned_words.py"),
     Path("AGENTS.md"),
@@ -78,6 +77,28 @@ def read_text(path: Path) -> str | None:
         return None
 
 
+def should_skip_word_in_line(word: str, lower_line: str) -> bool:
+    """Return True if the word should be skipped in this line due to exceptions."""
+    # Skip if word appears as a keyword argument (e.g., placeholder="...")
+    if f"{word}=" in lower_line:
+        return True
+
+    # Skip package names (e.g., asyncpg-stubs in requirements)
+    if word in ("stub", "stubs") and "asyncpg-stubs" in lower_line:
+        return True
+
+    # Skip external library classes (e.g., pydgraph.DgraphClientStub)
+    if word in ("stub", "stubs") and "dgraphclientstub" in lower_line:
+        return True
+
+    # Skip SQL parameter placeholders ($1, $2, etc.)
+    if word in ("placeholder", "placeholders") and any(term in lower_line for term in ("sql", "query", "parameter", "$1", "$2")):
+        return True
+
+    # Skip template markers (e.g., {{MODULE_NAME}})
+    return word in ("placeholder", "placeholders") and "{{" in lower_line and "}}" in lower_line
+
+
 def scan_repo(banned_words: tuple[str, ...]) -> dict[str, list[tuple[Path, int, str]]]:
     results: dict[str, list[tuple[Path, int, str]]] = {word: [] for word in banned_words}
 
@@ -101,11 +122,7 @@ def scan_repo(banned_words: tuple[str, ...]) -> dict[str, list[tuple[Path, int, 
 
         for index, lower_line in enumerate(lower_lines, start=1):
             for word in banned_words:
-                if word in lower_line:
-                    # Skip if word appears as a keyword argument (e.g., placeholder="...")
-                    # This allows standard library API parameters
-                    if f"{word}=" in lower_line:
-                        continue
+                if word in lower_line and not should_skip_word_in_line(word, lower_line):
                     results[word].append((relative, index, lines[index - 1].strip()))
 
     return results

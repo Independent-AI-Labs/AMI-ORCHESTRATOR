@@ -1,7 +1,7 @@
 # TODO – Authentication Providers & Web Login Enablement
 
 ## Progress Snapshot (2025-10-01)
-- ⚠️ `AuthService` still depends on the temporary in-memory helpers in `base/backend/opsec/utils/user_utils.py`; migration to UnifiedCRUD with the `[postgres, dgraph, vault, local_file]` storage order is tracked in `docs/TODO-MIGRATION-AUTH.md`.
+- ✅ `AuthService` now persists through UnifiedCRUD (`base/backend/opsec/auth/repository.py`) using the `[postgres, dgraph, vault]` storage order.
 - ✅ OAuth/API-key/SSH adapters + `AuthService` flows are wired for token refresh/revoke (`base/backend/opsec/auth/provider_adapters.py`, `auth_service.py`), and the target wiring uses Postgres for canonical records, Dgraph for metadata, and Vault for secrets (no Redis cache required).
 - ⚠️ CMS account APIs write to the local JSON cache; there is no call into DataOps for CRUD (`ux/cms/app/lib/store.ts:184-356`, `ux/cms/app/api/account-manager/accounts/route.ts:1-84`).
 - ⚠️ `ux/auth` falls back to a stub NextAuth implementation that manufactures sessions/providers when DataOps/backends fail (`ux/auth/src/server.ts:1-214`).
@@ -18,11 +18,11 @@
 
 ## 2. Cross-Cutting Tasks
 
-- [ ] Source of truth: move `AuthService` persistence onto UnifiedCRUD using the `[postgres, dgraph, vault, local_file]` storage order (see `docs/TODO-MIGRATION-AUTH.md`). Delete the in-memory shim once CRUD-backed helpers land.
-- [x] Align all persistence with [SPEC – DataOps Data Access Pattern](docs/SPEC-DATAOPS-DATA-ACCESS.md): port `AuthService`/related helpers to `get_crud(...)`-backed services and delete model-level CRUD stubs.
+- [x] Source of truth: move `AuthService` persistence onto UnifiedCRUD using the `[postgres, dgraph, vault]` storage order (see `docs/TODO-MIGRATION-AUTH.md`).
+- [x] Align all persistence with [SPEC – DataOps Data Access Pattern](docs/SPEC-DATAOPS-DATA-ACCESS.md): port `AuthService`/related helpers to `get_crud(...)`-backed services and delete model-level temporary CRUD implementations.
 - [ ] Define provider field schema + validations in `base/backend/opsec/oauth` (e.g., extend `OAuthConfig`/new `ProviderConfig` dataclass) and expose via API for the UI. _(Static configs live in `oauth_config.py:102-144`; nothing dynamic or validated.)_
 - [ ] Implement secrets handling (vault integration) for `client_secret`, `api_key`, etc., in `AuthProvider` so values never leave backend once submitted. _(Tokens stored as `SecretStr` and mapped to `StorageType.VAULT`, but there is no DAO persistence or secrets broker integration yet.)_
-- [ ] Extend session/account APIs (`cms/app/api/account-manager/...`) to call into `base/backend` for create/update/delete of provider configs and tokens instead of inline stubs. _(Routes still write to `ux/cms/app/lib/store.ts` JSON files.)_
+- [ ] Extend session/account APIs (`cms/app/api/account-manager/...`) to call into `base/backend` for create/update/delete of provider configs and tokens. _(Routes currently write to `ux/cms/app/lib/store.ts` JSON files.)_
 - [ ] Add auditing & error propagation path: map backend validation errors into the new hint system in `cms/public/js/account-drawer.js`. _(UI only sets hints based on local validation.)_
 - [ ] Document environment variables/secret management for local dev vs. deployed (update `docs/` + `.env` templates). _(No `SPEC-AUTH`/`.env` guidance exists.)_
 - [ ] Extend `AuthProviderType` + enums to include SMTP and HuggingFace provider identifiers and update downstream switch statements. _(Enum in `base/backend/dataops/models/types.py:10-24` lacks these entries.)_
@@ -108,8 +108,8 @@
 
 ## 5. API & Session Flow
 
-- [ ] Bridge CMS Next.js API routes with `base/backend` services (use a shared client or RPC) for: session bootstrap, account snapshots, token refresh, revoke. _(Currently stubbed to local store and stub auth.)_
-- [x] Ensure `/api/auth/session` and related endpoints return 200 + session info once backend integration is live (replace current 501). _(Stub implementation responds with session/CSRF/providers; see `ux/auth/src/server.ts:35-123`.)_
+- [ ] Bridge CMS Next.js API routes with `base/backend` services (use a shared client or RPC) for: session bootstrap, account snapshots, token refresh, revoke. _(Currently uses local store and temporary auth implementation.)_
+- [x] Ensure `/api/auth/session` and related endpoints return 200 + session info once backend integration is live (replace current 501). _(Temporary implementation responds with session/CSRF/providers; see `ux/auth/src/server.ts:35-123`.)_
 - [ ] Implement background refresh job leveraging `AuthProvider.refresh_access_token()` for active accounts; record failures and bubble to UI. _(No job runner.)_
 - [ ] Define error taxonomy (invalid_config, token_expired, consent_required, rate_limited) to standardize UI states. _(Not formalised.)_
 

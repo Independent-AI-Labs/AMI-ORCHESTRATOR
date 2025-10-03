@@ -8,7 +8,7 @@ The scope includes:
 - Secrets-handling responsibilities between the DataOps layer and the secrets broker.
 - Session issuance/validation for Next.js surfaces via a custom NextAuth adapter.
 - Required APIs (HTTP + MCP) and environment variables.
-- Phasing required to migrate from the current in-memory shim to the production-ready stack.
+- Timeline considerations for hardening the production-grade stack now that the in-memory helper has been retired.
 
 ## System Overview
 ```
@@ -45,10 +45,10 @@ The scope includes:
 | --- | --- | --- |
 | Canonical user/provider records, sessions, tenant membership | **Postgres (`postgres`)** | Transactional store, primary key/foreign key enforcement, reliable durability. |
 | Relationship metadata, traversal (user ↔ provider ↔ tenant), audit trails | **Dgraph (`dgraph`)** | Graph-first queries for relationship lookups and lineage. |
-| Secrets (OAuth client secret, refresh tokens, API keys) | **OpenBao via Vault DAO (`vault`)** | Dedicated secrets engine with access policies and rotation support. |
+| Provider secrets (OAuth client secret, refresh tokens, API keys) | **OpenBao via Vault DAO (`vault`)** | Dedicated secrets engine with access policies and rotation support. |
 | Ephemeral caches (auth flows, rate limits) | **In-memory / runtime cache** | Provided via `AuthService` in-process caches; no Redis tier is required. |
 
-Auth-facing models now declare `Meta.storage_configs = ["postgres", "dgraph", "vault"]` in that order. There is no implicit disk persistence: opting into any additional storage (for example a JSON file for offline demos) requires defining a custom `StorageConfig` and wiring it deliberately per deployment.
+`AuthProvider` models declare `Meta.storage_configs = ["postgres", "dgraph", "vault"]` in that order so vault-backed fields never touch disk. `User` models rely on `["postgres", "dgraph"]` and avoid OpenBao altogether. There is no implicit disk persistence: opting into any additional storage (for example a JSON file for offline demos) requires defining a custom `StorageConfig` and wiring it deliberately per deployment.
 
 ## Storage Failure Handling
 - UnifiedCRUD surfaces storage failures immediately. Operators must restore the affected backing service rather than relying on hidden degradations.
@@ -117,11 +117,11 @@ Providers that need third-party credentials also require provider-specific env v
 ## Operational Guarantees
 - UnifiedCRUD iterates storages in declaration order and stops on the first success. Errors bubble to callers so infrastructure issues are discovered immediately.
 - Local filesystem persistence is no longer bundled by default. Teams that want an offline or demo mode must create a dedicated `StorageConfig` and document its operational impact.
-- No separate in-memory cache is supported once `user_utils.py` is removed; all read/write paths must use UnifiedCRUD so invariants remain consistent.
+- Auth persistence runs exclusively through `base/backend/opsec/auth/repository.py`; callers must use UnifiedCRUD so invariants stay consistent across storages.
 
 ## Implementation Phases
-1. **CRUD Foundation**
-   - Replace `opsec/utils/user_utils.py` shim with UnifiedCRUD-backed repository layer.
+1. **CRUD Foundation** *(completed)*
+   - AuthService now persists via `opsec/auth/repository.py`, backed by UnifiedCRUD.
    - Ensure `User` / `AuthProvider` models declare the correct storage configs and auto-populate `SecurityContext` metadata.
    - Add Vault DAO integration tests and wire secrets broker calls into CRUD operations.
 2. **Auth Service HTTP Surface**

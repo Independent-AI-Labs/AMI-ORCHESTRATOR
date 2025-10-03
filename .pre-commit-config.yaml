@@ -38,6 +38,22 @@ repos:
   # Run tests on pre-push
   - repo: local
     hooks:
+      - id: launcher-validate
+        name: launcher-validate
+        entry: python3 scripts/launch_services.py validate
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [ pre-push ]
+        require_serial: true
+      - id: launcher-metrics
+        name: launcher-metrics
+        entry: python3 scripts/launch_services.py metrics --format json
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [ pre-push ]
+        require_serial: true
       - id: pytest
         name: pytest
         entry: bash -c "if [ -f scripts/run_tests.py ]; then python3 scripts/run_tests.py; else ./.venv/bin/python -m pytest -q; fi"

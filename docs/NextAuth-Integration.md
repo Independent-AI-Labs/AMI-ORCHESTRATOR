@@ -62,7 +62,7 @@ _A detailed backend contract lives in [SPEC – Authentication Platform](./SPEC-
 ### Custom Auth.js Adapter
 Follow the backend contract in [SPEC – Authentication Platform](./SPEC-AUTH.md). Once the CRUD-backed service ships, implement the adapter in three deliberate passes:
 1. Replace the stubbed `ux/auth/src/server.ts` persistence with calls to `/auth/sessions` and `/auth/providers` on the DataOps auth gateway (`DATAOPS_AUTH_URL`). Use `DATAOPS_INTERNAL_TOKEN` for server-to-server calls and surface `NEXT_PUBLIC_DATAOPS_AUTH_URL` to the browser so middleware can resolve the same host.
-2. Map Auth.js lifecycle methods to UnifiedCRUD operations: call `createUser`/`linkAccount` against the new endpoints, normalise IDs, and persist secret-bearing fields through the Vault-aware payloads returned by the service; UnifiedCRUD will fall back to the `local_file` StorageConfig automatically if primary stores are unavailable.
+2. Map Auth.js lifecycle methods to UnifiedCRUD operations: call `createUser`/`linkAccount` against the new endpoints, normalise IDs, and persist secret-bearing fields through the Vault-aware payloads returned by the service; storage failures surface immediately so operators can restore Postgres/Dgraph/Vault.
 3. Delegate session `getSession`/`updateSession` to the DataOps API, deleting any local JSON cache, and wire error responses into the CMS hint system so validation issues reach the UI.
 
 ### SecurityContext & Roles
