@@ -31,6 +31,7 @@ IGNORED_DIRS = {
     "coverage",
     "out",
     "domains",  # Submodule with separate governance
+    "stubs",  # Type hint files
 }
 
 # Individual files that should not be scanned (e.g., this tool itself).
@@ -40,6 +41,7 @@ IGNORED_FILES = {
     Path("ux/cms/public/js/lib/highlight-engine/index.js"),  # Vendor lib
     Path("ux/scripts/check_banned_words.py"),
     Path("AGENTS.md"),
+    Path("CLAUDE.md"),
     Path("claude-agent.sh"),
     Path("codex-agent.sh"),
 }
@@ -47,7 +49,18 @@ IGNORED_FILES = {
 # File extensions to ignore
 IGNORED_SUFFIXES = {".tsbuildinfo", ".log", ".lock", ".min.js.map", ".min.js", ".min.css"}
 
-DEFAULT_BANNED_WORDS = ("fallback", "backwards compatibility")
+DEFAULT_BANNED_WORDS = (
+    "fallback",
+    "backwards",
+    "compatibility",
+    "legacy",
+    "shim",
+    "shims",
+    "stub",
+    "stubs",
+    "placeholder",
+    "placeholders",
+)
 
 
 def should_skip(path: Path) -> bool:
@@ -89,6 +102,10 @@ def scan_repo(banned_words: tuple[str, ...]) -> dict[str, list[tuple[Path, int, 
         for index, lower_line in enumerate(lower_lines, start=1):
             for word in banned_words:
                 if word in lower_line:
+                    # Skip if word appears as a keyword argument (e.g., placeholder="...")
+                    # This allows standard library API parameters
+                    if f"{word}=" in lower_line:
+                        continue
                     results[word].append((relative, index, lines[index - 1].strip()))
 
     return results
