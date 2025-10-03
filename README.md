@@ -1,68 +1,70 @@
 # AMI-ORCHESTRATOR
 
-## What This Repository Does Today
+A compliance-aware automation framework with multi-storage architecture, document processing, and AI agent integration.
 
-AMI-ORCHESTRATOR coordinates tooling, documentation, and module setup for a compliance-first automation stack. The focus right now is on:
+## What This Is
 
-- A consistent setup contract driven by `module_setup.py` at the root and in every module.
-- Shared platform capabilities in `base/` (DataOps persistence, MCP servers, path/environment utilities).
-- A rapidly expanding compliance body of knowledge under `compliance/docs/`, including the `ISMS-Functionality-Spec.md` and the pluggable compliance backend specification at `compliance/docs/research/COMPLIANCE_BACKEND_SPEC.md`.
-- Up-to-date documentation that mirrors the actual codebase—legacy marketing copy has been removed in favour of verifiable statements.
+This is a research and development project exploring how to build automation systems that can be audited, traced, and verified against compliance requirements. The core idea: instead of bolting compliance onto AI systems after the fact, build it into the architecture from the ground up.
 
-## Repository Layout (Active Modules)
+## What It Does
 
-- `base/` – Houses environment setup helpers, DataOps storage abstractions (PostgreSQL, Dgraph, in-memory), and FastMCP servers for DataOps and SSH. See `base/docs/` for detailed contracts.
-- `browser/` – Provides the audited browser automation agent plus a Chrome provisioning script (`browser/scripts/setup_chrome.py`). Delegates setup to Base and keeps third-party imports lazy.
-- `files/` – Implements document extraction, MCP tooling for secure file operations, and configuration loaders. Setup mirrors Base patterns.
-- `domains/` – Domain models (risk, predictive, SDA) that depend on Base’s storage contracts. Currently focused on data modelling rather than runners.
-- `compliance/` – Consolidated EU AI Act + ISO guidance, gap tracking, and the planned compliance backend/server spec. Implementation work is pending; documentation is the source of truth until the backend ships.
-- `nodes/` – Infrastructure automation and node setup orchestration, including `nodes/scripts/setup_service.py` for managed process control.
-- `streams/` – Streaming/real-time experiments. Setup exists; runtime services are still to be implemented.
-- `ux/` – CMS and shared auth package. The UI currently mixes Next.js API routes with legacy ES modules; the NextAuth rollout is in-progress (see `docs/NextAuth-Integration.md`).
+- **Multi-storage data layer** – Dgraph for ACLs and relationships, PostgreSQL for structured data, vector stores for embeddings, Redis for caching
+- **Document processing** – Extract and index PDFs, Word docs, images with AI-powered analysis
+- **Browser automation** – Auditable web automation with anti-detection and session management
+- **MCP integration** – Standard protocol for AI agents to interact with the system
+- **Compliance documentation** – EU AI Act and ISO reference materials, gap tracking
 
-Refer to `docs/Architecture-Map.md` for a text map of ownership boundaries and entry points.
+## What It's Not
+
+This isn't a finished product. The infrastructure works—storage, processing, automation—but the ambitious parts (self-evolving AI with formal safety proofs) are still in development.
+
+The OpenAMI documentation describes where this is headed: AI systems that improve themselves through verified steps with guarantees they won't violate constraints. What's here is the infrastructure layer.
+
+## Current State
+
+**Production-ready foundation:**
+- Multi-storage DataOps (Dgraph, PostgreSQL, Redis, in-memory) with unified CRUD
+- MCP servers for AI agent integration (DataOps, SSH, browser automation)
+- Document extraction and indexing (PDF, DOCX, images with Gemini analysis)
+- Browser automation with anti-detection and profile management
+- Infrastructure orchestration and service management
+- Comprehensive test coverage (24 test files in base alone)
+
+**Research complete, implementation in progress:**
+- Compliance framework (EU AI Act, ISO standards documented and mapped)
+- NextAuth integration for authentication
+- Secure process abstractions (SPN/CST formalization)
+
+**Research phase (Open AMI vision):**
+- Self-evolution with formal verification
+- Cryptographic provenance chain
+- Distributed verification protocol
+- AAL/AADL compilers for AI architecture modification
+
+The foundation is solid and tested. The ambitious parts—self-evolving AI with mathematical safety guarantees—are moving from research to implementation.
 
 ## Getting Started
 
 ```bash
-# Clone the repository (submodules are required)
+# Clone with submodules
 git clone --recursive <repo-url>
 cd AMI-ORCHESTRATOR
 
-# Ensure uv + Python 3.12 toolchain is available
+# Bootstrap toolchain
 python scripts/bootstrap_uv_python.py --auto
 
-# Provision root tooling and call each module's setup
+# Run setup
 python module_setup.py
 
-# Run tests per module (examples)
-uv run --python 3.12 python scripts/run_tests.py          # root (no-op today)
+# Run module tests
 uv run --python 3.12 --project base python scripts/run_tests.py
-uv run --python 3.12 --project compliance python scripts/run_tests.py
 ```
 
-Module-level runners live under `<module>/scripts/run_tests.py` and automatically reuse Base’s path setup helpers. Follow the compute profile guidance in `AGENTS.md` before installing GPU-specific wheels.
+See [ARCHITECTURE.md](ARCHITECTURE.md) for system design and [docs/](docs/) for detailed documentation.
 
-## Documentation Sources
+## Philosophy
 
-- `docs/` – Orchestrator-level policies: setup contract, toolchain bootstrap, integration status, architecture map, NextAuth rollout notes.
-- `compliance/docs/` – Canonical compliance references, including consolidated EU AI Act/ISO markdown, implementation status tracking, and the compliance backend/server specs.
-- Module-specific docs live under `<module>/docs/` (for example `base/docs/` and `files/docs/`).
-
-The documentation modernization initiative is ongoing; expect frequent updates as modules evolve.
-
-## Expectations for Contributors
-
-- Stay on branch `main` (no detached HEADs) and rely on `module_setup.py` rather than ad-hoc path hacks.
-- Each module is responsible for its own virtual environment (`uv venv --python 3.12`) and must keep `python.ver`, `requirements*.txt`, and `SETUP_CONTRACT.md` up to date.
-- Third-party imports in setup scripts must remain deferred until dependencies are installed—stdlib `logging` only.
-- Run per-module test suites and any required service stacks (`docker-compose -f docker-compose.data.yml up -d`) before committing.
-
-## Current Roadmap
-
-1. Implement the compliance backend + MCP server described in `compliance/docs/research/COMPLIANCE_BACKEND_SPEC.md`, reusing Base DataOps patterns.
-2. Bring module documentation in sync with real code paths (browser tooling, files extraction, UX auth migration).
-3. Replace the remaining legacy path hacks (e.g., `ux/scripts/ami_path.py`) with Base `PathFinder` helpers.
-4. Continue the compliance documentation verification loop against consolidated references and source PDFs.
-
-Track work-in-progress items in `docs/Integration-Status.md` and `docs/Next-Steps.md`.
+Real compliance and auditability require architectural choices, not add-ons:
+- Explicit over implicit (no magic defaults)
+- Traceable over convenient (audit everything)
+- Verifiable over trusted (prove, don't promise)

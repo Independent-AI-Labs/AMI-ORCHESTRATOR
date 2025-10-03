@@ -3,12 +3,12 @@
 ## Scope
 Define how application code interacts with DataOps storage models so we avoid mixing persistence patterns or embedding business logic inside Pydantic models.
 
-This spec applies to every module that touches `base/backend/dataops` models (Python services, FastAPI routers, management scripts, and tests). Where production-grade CRUD wiring is still pending, modules may use temporary in-memory helpers (e.g., `opsec/utils/user_utils.py`) so long as the logic stays outside the models and can be swapped for UnifiedCRUD without touching call sites.
+This spec applies to every module that touches `base/backend/dataops` models (Python services, FastAPI routers, management scripts, and tests). Where production-grade CRUD wiring is still pending, modules may use temporary adapters sparingly, but they must live outside the models so they can be swapped for UnifiedCRUD-backed helpers such as `opsec/auth/repository.py` without touching call sites.
 
 ## Core Principles
 1. **StorageModel = schema only.** Classes under `base/backend/dataops/models/**` describe fields, validation, and metadata (`Meta.storage_configs`). They must not implement CRUD helpers, caching, or business rules.
 2. **UnifiedCRUD handles persistence.** All reads/writes flow through `base/backend/dataops/services/unified_crud.py` (or the lower-level `core/unified_crud.py`). Use `get_crud(ModelClass)` to obtain a CRUD instance wired to every configured storage backend.
-3. **Services own business logic.** Orchestrate create/update workflows, permission checks, and cross-model coordination in dedicated helpers (e.g., `auth_service.py`, `utils/user_utils.py`). They call UnifiedCRUD and attach `SecurityContext`; models stay passive.
+3. **Services own business logic.** Orchestrate create/update workflows, permission checks, and cross-model coordination in dedicated helpers (e.g., `auth_service.py`, `auth/repository.py`). They call UnifiedCRUD and attach `SecurityContext`; models stay passive.
 4. **One pattern per module.** Do not mix ad-hoc DAO calls, model-level helpers, and UnifiedCRUD in the same workflow. Pick UnifiedCRUD + services and remove bespoke utilities (e.g., `User.find_or_create`).
 5. **Security goes through context.** Whenever a model inherits `SecuredModelMixin`, pass a `SecurityContext` to CRUD operations so ACL/tenant filters apply automatically.
 

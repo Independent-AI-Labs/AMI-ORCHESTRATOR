@@ -1,5 +1,7 @@
 # Agent Guidelines
 
+CRITICAL: NEVER DO ANYTHING OR SAY ANYTHING WITHOUT READING SOURCE CODE FIRST. NO INTERACTIONS, NO EDITS, NO ASSUMPTIONS. EVERYTHING IS FORBIDDEN UNTIL YOU READ THE RELEVANT SOURCE CODE. This is ABSOLUTE.
+
 NO FUCKING DETACHED HEADS — WE ARE WORKING ONLY IN MAIN ALWAYS UNLESS I SAY OTHERWISE!!!!!!
 
 Scope: This file applies to the entire AMI-ORCHESTRATOR repository and all directories under it, including submodules referenced by this repo.
@@ -12,6 +14,23 @@ Branch policy:
 Module restrictions:
 - Do not modify ANY module directories (base, browser, compliance, domains, files, nodes, streams, ux, etc.) unless the user explicitly instructs you to.
 
+Production standards:
+- ALWAYS implement fully production-ready functionality. Stubs, shims, and placeholders are STRICTLY FORBIDDEN.
+
+BANNED WORDS POLICY (ABSOLUTE):
+- The following words/concepts are ABSOLUTELY FORBIDDEN in code, comments, and documentation:
+  - fallback, backwards, compatibility, legacy, shim/shims, stub/stubs, placeholder/placeholders
+- NEVER add code to support old formats, APIs, or field names alongside new ones
+- NEVER add aliasing, field renaming, or dual-format support
+- If old code needs updating: UPDATE THE OLD CODE, do not add compatibility layers
+- When migrating formats: MIGRATE the data/config files, do not add parsers for both formats
+- Violating this policy will result in immediate rollback and re-implementation
+
+New feature development:
+- Any new feature development that requires new dependencies MUST live in a newly created module.
+- ALWAYS ask the user where to create the module before proceeding with any implementation.
+- NEVER add dependencies to existing modules for new features.
+
 Enforcement:
 - `agent.sh` only prints an error when a detached HEAD is detected in the root repo or any submodule. It does not exit, and it does not enforce being on `main`.
 
@@ -21,6 +40,8 @@ Commit discipline:
 - Land work module-by-module (skip `ux` until the user says otherwise) so CI can start verifying while you keep moving; push after each clean chunk.
 - Read the file before editing it. Open and inspect first, then apply changes with the appropriate tool (no blind scripting).
 - Never build or wire "fallback" behaviour unless the user explicitly requests it for the current task. If a storage option (like the local file config) exists, treat it as opt-in and surface its use clearly instead of silently enabling it.
+- Pre-push hooks now run `python3 scripts/launch_services.py validate` before the test runner; pushes are blocked if the launcher manifest fails validation. Fix the manifest instead of bypassing the hook.
+- Pre-push hooks also run `python3 scripts/launch_services.py metrics --format json` to ensure the telemetry snapshot stays healthy. Use the CLI to debug rather than bypassing the guard if it fails.
 
 Testing discipline:
 - Run each module's test suite using the module's script in `scripts/` (for example, `python3 scripts/run_tests.py`).
@@ -55,3 +76,5 @@ Nodes setup automation:
 - Use `python nodes/scripts/setup_service.py preinstall` before provisioning to run the shared preinstall checks.
 - `python nodes/scripts/setup_service.py verify --no-tests` runs module setup; drop `--no-tests` to include each module's tests.
 - Managed processes (docker/python/npm) are declared in `nodes/config/setup-service.yaml`; start or stop them via the CLI or the `NodeSetupMCP` server.
+
+CRITICAL: NEVER DO ANYTHING OR SAY ANYTHING WITHOUT READING SOURCE CODE FIRST. NO INTERACTIONS, NO EDITS, NO ASSUMPTIONS. EVERYTHING IS FORBIDDEN UNTIL YOU READ THE RELEVANT SOURCE CODE. This is ABSOLUTE.

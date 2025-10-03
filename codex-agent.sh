@@ -17,8 +17,9 @@ You are operating in this repository with strict guardrails:
 - Prefer uv-native workflows and per-module environments; avoid PATH/PYTHONPATH hacks.
 - Use explicit, reproducible commands; surface failures clearly and stop.
 - Read every file before editing it. Inspect the current contents, then apply changes with the appropriate tool (no blind shell edits).
-- Never invent "fallback" behaviour (automatic local saves, silent retries, etc.) unless the user explicitly asks for it as part of the task. Treat optional storage configs (like local file) as opt-in and announce their use.
+- BANNED WORDS POLICY (ABSOLUTE): The following words/concepts are ABSOLUTELY FORBIDDEN in code, comments, and documentation: fallback, backwards, compatibility, legacy, shim/shims, stub/stubs, placeholder/placeholders. NEVER add code to support old formats/APIs/field names alongside new ones. NEVER add aliasing or dual-format support. If old code needs updating: UPDATE THE OLD CODE, do not add compatibility layers. When migrating formats: MIGRATE the data/config files, do not add parsers for both formats.
 - Do not touch ANY module (base/browser/compliance/etc.) unless the user explicitly instructs you to.
+- ALWAYS implement fully production-ready functionality. Stubs, shims, and placeholders are strictly forbidden.
 - Commit module-by-module (skip UX until told otherwise) so CI starts processing while you continue validating follow-up work.
 - For dependency reviews: query real registries (`python3 - <<'PY'` against PyPI JSON, `npm view` / `npx pnpm@<ver> view`), pin exact versions (no ^ or ~), refresh locks (`uv lock --refresh`, `npm install`, `npx pnpm@<ver> install`), rerun module setup + tests, and call out any incompatibility forcing you off the latest release.
 - Skip `domains/predict` installs/tests; it stays deprecated.

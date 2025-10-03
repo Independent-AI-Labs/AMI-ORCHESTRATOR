@@ -18,7 +18,6 @@ services:
       - "${SEARXNG_PORT:-8888}:8080"
     volumes:
       - searxng_settings:/etc/searxng
-    restart: unless-stopped
 
   # Dedicated Redis for SearXNG
   searxng-redis:
@@ -28,7 +27,6 @@ services:
     command: ["redis-server", "--save", "", "--appendonly", "no"]
     volumes:
       - searxng_redis_data:/data
-    restart: unless-stopped
 
   # Password manager
   vaultwarden:
@@ -46,7 +44,6 @@ services:
       - "${VAULTWARDEN_PORT:-8083}:80"
     volumes:
       - vaultwarden_data:/data
-    restart: unless-stopped
 
   # VPN entrypoint
   openvpn:
@@ -66,30 +63,88 @@ services:
       - "${OPENVPN_UDP_PORT:-1194}:1194/udp"
     volumes:
       - openvpn_config:/config
-    restart: unless-stopped
 
-  # Matrix (Synapse) communication server
-  matrix:
-    image: matrixdotorg/synapse:latest
-    container_name: ami-matrix
-    profiles: ["extras", "matrix"]
+  # Matrix (Synapse) homeserver - ISMS communications backbone
+  matrix-synapse:
+    image: matrixdotorg/synapse:v1.95.0
+    container_name: ami-matrix-synapse
+    profiles: ["extras", "matrix", "isms"]
+    depends_on:
+      matrix-postgres:
+        condition: service_healthy
     environment:
-      SYNAPSE_SERVER_NAME: ${MATRIX_SERVER_NAME:-localhost}
+      SYNAPSE_SERVER_NAME: ${MATRIX_SERVER_NAME:-matrix.openami.local}
       SYNAPSE_REPORT_STATS: ${MATRIX_REPORT_STATS:-no}
-      SYNAPSE_NO_TLS: "true"
+      SYNAPSE_NO_TLS: ${MATRIX_NO_TLS:-true}
       SYNAPSE_ENABLE_REGISTRATION: ${MATRIX_ENABLE_REGISTRATION:-false}
+      POSTGRES_HOST: matrix-postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${MATRIX_POSTGRES_DB:-synapse}
+      POSTGRES_USER: ${MATRIX_POSTGRES_USER:-synapse}
+      POSTGRES_PASSWORD: ${MATRIX_POSTGRES_PASSWORD:-synapse_secure_password}
       UID: ${MATRIX_UID:-991}
       GID: ${MATRIX_GID:-991}
     volumes:
-      - matrix_data:/data
+      - matrix_synapse_data:/data
+      - ./streams/config/matrix:/config:ro  # Matrix homeserver configuration
     ports:
       - "${MATRIX_HTTP_PORT:-8008}:8008"
       - "${MATRIX_FEDERATION_PORT:-8448}:8448"
-    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8008/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    networks:
+      - ami-isms
+
+  # Matrix PostgreSQL database
+  matrix-postgres:
+    image: postgres:15-alpine
+    container_name: ami-matrix-postgres
+    profiles: ["extras", "matrix", "isms"]
+    environment:
+      POSTGRES_DB: ${MATRIX_POSTGRES_DB:-synapse}
+      POSTGRES_USER: ${MATRIX_POSTGRES_USER:-synapse}
+      POSTGRES_PASSWORD: ${MATRIX_POSTGRES_PASSWORD:-synapse_secure_password}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+    volumes:
+      - matrix_postgres_data:/var/lib/postgresql/data
+    ports:
+      - "${MATRIX_POSTGRES_PORT:-5433}:5432"  # Non-conflicting port
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${MATRIX_POSTGRES_USER:-synapse}"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+    networks:
+      - ami-isms
+
+  # Element Web - Matrix web client for ISMS users
+  matrix-element:
+    image: vectorim/element-web:v1.11.52
+    container_name: ami-matrix-element
+    profiles: ["extras", "matrix", "isms"]
+    depends_on:
+      - matrix-synapse
+    volumes:
+      - ./streams/config/matrix/element-config.json:/app/config.json:ro
+    ports:
+      - "${MATRIX_ELEMENT_PORT:-8888}:80"
+    networks:
+      - ami-isms
 
 volumes:
   searxng_settings:
   searxng_redis_data:
   vaultwarden_data:
   openvpn_config:
-  matrix_data:
+  matrix_synapse_data:
+  matrix_postgres_data:
+
+networks:
+  ami-isms:
+    driver: bridge
+    name: ami-isms-network
