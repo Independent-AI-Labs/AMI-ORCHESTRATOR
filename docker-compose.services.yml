@@ -13,11 +13,10 @@ services:
       SEARXNG_SECRET: ${SEARXNG_SECRET:-change-me}
       REDIS_URL: ${SEARXNG_REDIS_URL:-redis://searxng-redis:6379/0}
       LIMITER: ${SEARXNG_LIMITER:-true}
-      USE_DEFAULT_SETTINGS: ${SEARXNG_USE_DEFAULT_SETTINGS:-true}
     ports:
       - "${SEARXNG_PORT:-8888}:8080"
     volumes:
-      - searxng_settings:/etc/searxng
+      - ./nodes/config/searxng/settings.yml:/etc/searxng/settings.yml:ro
 
   # Dedicated Redis for SearXNG
   searxng-redis:
@@ -137,7 +136,6 @@ services:
       - ami-isms
 
 volumes:
-  searxng_settings:
   searxng_redis_data:
   vaultwarden_data:
   openvpn_config:

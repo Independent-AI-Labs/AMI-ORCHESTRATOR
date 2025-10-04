@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import re
 import sys
 from pathlib import Path
 
@@ -61,6 +62,30 @@ DEFAULT_BANNED_WORDS = (
     "placeholders",
 )
 
+# Banned filename patterns (versioning, temporal markers)
+BANNED_FILENAME_PATTERNS = (
+    "_v1",
+    "_v2",
+    "_v3",
+    "_v4",
+    "_v5",
+    "_old",
+    "_new",
+    "_fixed",
+    "_temp",
+    "_tmp",
+    "_backup",
+    "_copy",
+    "_2",
+    "_final",
+    "_latest",
+    ".old",
+    ".new",
+    ".backup",
+    ".bak",
+    ".orig",
+)
+
 
 def should_skip(path: Path) -> bool:
     """Return True if the relative path is inside an ignored directory or has ignored suffix."""
@@ -75,6 +100,35 @@ def read_text(path: Path) -> str | None:
         return None
     except OSError:
         return None
+
+
+def has_banned_filename_pattern(filename: str) -> str | None:
+    """Check if filename contains banned patterns. Returns the pattern if found."""
+    # Get filename without any extensions
+    path = Path(filename)
+    name_lower = path.name.lower()
+
+    # Skip timestamp patterns (e.g., 20251004_120205)
+    # These are 8+ digits followed by underscore and more digits
+    if re.search(r"\d{8,}_\d+", name_lower):
+        return None
+
+    # Check for banned patterns
+    for pattern in BANNED_FILENAME_PATTERNS:
+        # For underscore/dot patterns, check if they're at word boundaries
+        # (end of stem or before extension)
+        if pattern.startswith(("_", ".")):
+            # Check if pattern appears at the end of the stem or as extension
+            stem = path.stem.lower()
+            if stem.endswith(pattern.lstrip(".")):
+                return pattern
+            if name_lower.endswith(pattern):
+                return pattern
+        # For other patterns, check anywhere in name
+        elif pattern in name_lower:
+            return pattern
+
+    return None
 
 
 def should_skip_word_in_line(word: str, lower_line: str) -> bool:
@@ -103,8 +157,9 @@ def should_skip_word_in_line(word: str, lower_line: str) -> bool:
     return word in ("placeholder", "placeholders") and "{{" in lower_line and "}}" in lower_line
 
 
-def scan_repo(banned_words: tuple[str, ...]) -> dict[str, list[tuple[Path, int, str]]]:
+def scan_repo(banned_words: tuple[str, ...]) -> tuple[dict[str, list[tuple[Path, int, str]]], list[tuple[Path, str]]]:
     results: dict[str, list[tuple[Path, int, str]]] = {word: [] for word in banned_words}
+    filename_violations: list[tuple[Path, str]] = []
 
     for file_path in REPO_ROOT.rglob("*"):
         if not file_path.is_file():
@@ -116,6 +171,11 @@ def scan_repo(banned_words: tuple[str, ...]) -> dict[str, list[tuple[Path, int, 
         name = relative.name.lower()
         if name.endswith("-agent.sh") or name.startswith("agents."):
             continue
+
+        # Check for banned filename patterns
+        banned_pattern = has_banned_filename_pattern(relative.name)
+        if banned_pattern:
+            filename_violations.append((relative, banned_pattern))
 
         content = read_text(file_path)
         if content is None:
@@ -129,7 +189,7 @@ def scan_repo(banned_words: tuple[str, ...]) -> dict[str, list[tuple[Path, int, 
                 if word in lower_line and not should_skip_word_in_line(word, lower_line):
                     results[word].append((relative, index, lines[index - 1].strip()))
 
-    return results
+    return results, filename_violations
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
@@ -147,8 +207,19 @@ def main(argv: list[str]) -> int:
     args = parse_args(argv)
     words = tuple(word.lower() for word in args.words)
 
-    findings = scan_repo(words)
+    findings, filename_violations = scan_repo(words)
     violations = False
+
+    # Report filename violations first
+    if filename_violations:
+        violations = True
+        print(f"BANNED FILENAME PATTERNS FOUND ({len(filename_violations)} file(s)):")
+        for relative, pattern in filename_violations:
+            print(f"  {relative} contains pattern '{pattern}'")
+        print()
+        print("Filenames must not contain versioning or temporal markers.")
+        print("Update existing files instead of creating v2, _old, _new, etc.")
+        print()
 
     for word, matches in findings.items():
         if not matches:
@@ -182,10 +253,10 @@ def main(argv: list[str]) -> int:
         print()
 
     if violations:
-        print("Banned words detected. Please remove or rename them before committing.")
+        print("Banned words or filename patterns detected. Please remove or rename them before committing.")
         return 1
 
-    print("No banned words detected.")
+    print("No banned words or filename patterns detected.")
     return 0
 
 
