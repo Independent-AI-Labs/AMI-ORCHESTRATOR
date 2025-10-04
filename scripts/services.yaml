@@ -124,6 +124,15 @@ services:
     tags:
       - security:internal-only
       - secrets:broker
+  searxng:
+    summary: SearXNG metasearch service for browser tooling.
+    compose:
+      file: docker-compose.services.yml
+      service: searxng
+    module: browser
+    tags:
+      - security:internal-only
+      - search:searxng
   ux-cms:
     summary: UX CMS Next.js development server.
     execution:
@@ -190,6 +199,7 @@ profiles:
       - data-redis
       - openbao
       - secrets-broker
+      - searxng
       - ux-cms
   default:
     description: Complete development stack for orchestrator services.

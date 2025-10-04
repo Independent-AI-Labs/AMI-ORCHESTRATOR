@@ -95,6 +95,10 @@ def should_skip_word_in_line(word: str, lower_line: str) -> bool:
     if word in ("placeholder", "placeholders") and any(term in lower_line for term in ("sql", "query", "parameter", "$1", "$2")):
         return True
 
+    # Skip HTML/DOM attribute access (e.g., input_field.get("placeholder"), el.placeholder)
+    if word == "placeholder" and any(term in lower_line for term in ('.get("placeholder"', ".placeholder")):
+        return True
+
     # Skip template markers (e.g., {{MODULE_NAME}})
     return word in ("placeholder", "placeholders") and "{{" in lower_line and "}}" in lower_line
 
