@@ -11,18 +11,45 @@ from pathlib import Path
 
 
 def get_coauthored_commits(repo_path: Path) -> list[str]:
-    """Get commits with Co-Authored-By in a repository."""
+    """Get commits with Co-Authored-By TRAILERS (not subject mentions)."""
     try:
+        # Get all commits
         result = subprocess.run(
-            ["git", "log", "--all", "--grep=Co-Authored-By", "--oneline"],
+            ["git", "log", "--all", "--format=%H %s"],
             cwd=repo_path,
             capture_output=True,
             text=True,
             check=False,
         )
-        if result.returncode == 0 and result.stdout.strip():
-            return result.stdout.strip().split("\n")
-        return []
+        if result.returncode != 0 or not result.stdout.strip():
+            return []
+
+        commits_with_trailers = []
+        for line in result.stdout.strip().split("\n"):
+            if not line:
+                continue
+            parts = line.split(" ", 1)
+            commit_hash = parts[0]
+            subject = parts[1] if len(parts) > 1 else ""
+
+            # Check BODY for actual Co-Authored-By trailer
+            body_result = subprocess.run(
+                ["git", "log", "--format=%b", "-1", commit_hash],
+                cwd=repo_path,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            # Look for trailer pattern: starts with "Co-Authored-By:"
+            if body_result.returncode == 0:
+                for body_line in body_result.stdout.split("\n"):
+                    if body_line.strip().startswith("Co-Authored-By:"):
+                        # Found trailer, add commit
+                        commits_with_trailers.append(f"{commit_hash[:7]} {subject}")
+                        break
+
+        return commits_with_trailers
     except Exception as e:
         print(f"Error checking {repo_path}: {e}")
         return []
