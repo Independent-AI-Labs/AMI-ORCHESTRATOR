@@ -44,8 +44,3 @@
 	url = https://github.com/google-gemini/gemini-cli.git
 	branch = main
 	update = checkout
-[submodule "cli-agents/codex-cli"]
-	path = cli-agents/codex-cli
-	url = https://github.com/openai/codex.git
-	branch = main
-	update = checkout
