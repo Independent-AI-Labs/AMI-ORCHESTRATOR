@@ -4,6 +4,7 @@
 - Stay on `main` for the root repo and every submodule; if detached, return immediately. This scope covers the entire tree and its submodules.
 - Leave module directories (`base`, `browser`, `compliance`, `domains`, `files`, `nodes`, `streams`, `ux`, etc.) alone unless the user explicitly directs work there.
 - Ship production-ready changes only; absolutely forbid the words `fallback`, `backwards`, `compatibility`, `legacy`, `shim`, `stub`, `placeholder`. Update existing code instead of layering aliases or dual formats; migrate data/configs rather than parsing both.
+- NEVER add lint suppressions (`# noqa`, `# type: ignore`, `# pylint: disable`, `# ruff: noqa`, etc.) unless explicitly requested by the user. Fix the underlying issue instead of silencing warnings.
 - New dependencies must live in a new module; ask where to put it first. Never bolt fresh dependencies onto an existing module.
 - Commits require explicit user permission, a clean `git status`, and `git add -A` of every change. Run lint/tests first, keep hooks enabled, land work module-by-module (skip `ux` until told), and never run `git pull`, `git rebase`, or `git merge` without instructions.
 - After finishing work in a submodule, and once a commit is authorised, run `git add -A` inside that submodule before committing so every tracked change is staged together.

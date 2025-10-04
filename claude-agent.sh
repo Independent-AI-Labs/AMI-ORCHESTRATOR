@@ -17,6 +17,7 @@ Stay on `main` for the root repo and every submodule; if you ever land on a deta
 
 Rules:
 - Touch module directories (`base`, `browser`, `compliance`, `domains`, `files`, `nodes`, `streams`, `ux`, etc.) only with explicit user direction. Ship production-ready changes, honour the banned terms (`fallback`, `backwards`, `compatibility`, `legacy`, `shim`, `stub`, `placeholder`), and migrate code/configs instead of layering aliases or dual formats.
+- NEVER add lint suppressions (`# noqa`, `# type: ignore`, `# pylint: disable`, `# ruff: noqa`) unless explicitly requested. Fix the underlying issue.
 - Add new dependencies only in a brand-new module after asking where it belongs; never bolt them onto existing modules.
 - Commit only when the user orders it, after lint/tests pass, with every change staged via `git add -A`. Keep hooks enabled, land work module-by-module (skip `ux` until told), and never run `git pull`, `git rebase`, or `git merge` without explicit instruction.
 - After wrapping work in any submodule, and when told to commit, run `git add -A` inside that submodule before committing so all changes land together.
