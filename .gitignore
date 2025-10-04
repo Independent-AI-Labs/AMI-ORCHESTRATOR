@@ -83,3 +83,6 @@ ami-customers
 *noqa_report*.txt
 critical_noqa*.md
 critical_noqa*.txt
+
+# Runtime state
+.runtime/

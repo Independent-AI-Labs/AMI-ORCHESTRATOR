@@ -3,7 +3,7 @@ version: '3.8'
 services:
   # Meta search engine
   searxng:
-    image: searxng/searxng:2025.2.24-3f6b9d57
+    image: searxng/searxng:latest
     container_name: ami-searxng
     profiles: ["extras", "searxng"]
     depends_on:

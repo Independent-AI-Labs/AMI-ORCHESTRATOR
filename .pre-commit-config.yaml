@@ -40,7 +40,7 @@ repos:
     hooks:
       - id: launcher-validate
         name: launcher-validate
-        entry: python3 scripts/launch_services.py validate
+        entry: python3 nodes/scripts/launch_services.py validate
         language: system
         pass_filenames: false
         always_run: true
@@ -48,7 +48,7 @@ repos:
         require_serial: true
       - id: launcher-metrics
         name: launcher-metrics
-        entry: python3 scripts/launch_services.py metrics --format json
+        entry: python3 nodes/scripts/launch_services.py metrics --format json
         language: system
         pass_filenames: false
         always_run: true
@@ -56,7 +56,7 @@ repos:
         require_serial: true
       - id: pytest
         name: pytest
-        entry: bash -c "if [ -f scripts/run_tests.py ]; then python3 scripts/run_tests.py; else ./.venv/bin/python -m pytest -q; fi"
+        entry: bash scripts/run_tests_with_services.sh
         language: system
         pass_filenames: false
         always_run: true
