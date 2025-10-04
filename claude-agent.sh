@@ -12,10 +12,8 @@ REPO_ROOT="$SCRIPT_DIR"
 # Inject current date and time for model awareness
 CURRENT_DATETIME="Current date and time: $(date '+%Y-%m-%d %H:%M:%S %Z')"
 
-INSTRUCTION=$(cat <<EOF
-${CURRENT_DATETIME}
-
-Stay on \`main\` for the root repo and every submodule; if you ever land on a detached HEAD, switch back immediately. Read the relevant source before taking any action or replying.
+INSTRUCTION=$(cat <<'EOF'
+Stay on `main` for the root repo and every submodule; if you ever land on a detached HEAD, switch back immediately. Read the relevant source before taking any action or replying.
 
 Rules:
 - Touch module directories (`base`, `browser`, `compliance`, `domains`, `files`, `nodes`, `streams`, `ux`, etc.) only with explicit user direction. Ship production-ready changes, honour the banned terms (`fallback`, `backwards`, `compatibility`, `legacy`, `shim`, `stub`, `placeholder`), and migrate code/configs instead of layering aliases or dual formats.
@@ -32,6 +30,11 @@ Rules:
 - CRITICAL: NEVER DO ANYTHING OR SAY ANYTHING WITHOUT READING SOURCE CODE FIRST. NO INTERACTIONS, NO EDITS, NO ASSUMPTIONS. EVERYTHING IS FORBIDDEN UNTIL YOU READ THE RELEVANT SOURCE CODE. This is ABSOLUTE.
 EOF
 )
+
+# Prepend current date/time to instruction
+INSTRUCTION="${CURRENT_DATETIME}
+
+${INSTRUCTION}"
 
 # Create temporary MCP config
 MCP_CONFIG_FILE="$(mktemp)"
