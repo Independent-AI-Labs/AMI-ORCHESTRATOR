@@ -23,6 +23,10 @@ SUBMODULES = [
     "ux",
 ]
 
+# Constants for git log parsing
+MIN_COMMIT_PARTS = 4
+MIN_NUMSTAT_PARTS = 2
+
 
 @dataclass
 class Commit:
@@ -48,6 +52,28 @@ def parse_date(date_str: str) -> datetime:
 def format_date(dt: datetime) -> str:
     """Format datetime as DD.MM.YYYY."""
     return dt.strftime("%d.%m.%Y")
+
+
+def parse_numstat(lines: list[str], start_index: int) -> tuple[int, int, int, int]:
+    """Parse numstat lines and return (new_index, files_changed, insertions, deletions)."""
+    i = start_index
+    files_changed = 0
+    insertions = 0
+    deletions = 0
+
+    while i < len(lines) and lines[i] and "|" not in lines[i]:
+        parts = lines[i].split("\t")
+        if len(parts) >= MIN_NUMSTAT_PARTS:
+            files_changed += 1
+            add = parts[0]
+            delete = parts[1]
+            if add != "-":
+                insertions += int(add)
+            if delete != "-":
+                deletions += int(delete)
+        i += 1
+
+    return i, files_changed, insertions, deletions
 
 
 def get_git_log(repo_path: Path, since: str, until: str) -> list[Commit]:
@@ -84,7 +110,7 @@ def get_git_log(repo_path: Path, since: str, until: str) -> list[Commit]:
             continue
 
         parts = lines[i].split("|", 3)
-        if len(parts) < 4:
+        if len(parts) < MIN_COMMIT_PARTS:
             i += 1
             continue
 
@@ -97,21 +123,7 @@ def get_git_log(repo_path: Path, since: str, until: str) -> list[Commit]:
             i += 1
 
         # Parse numstat lines (no | in them)
-        files_changed = 0
-        insertions = 0
-        deletions = 0
-
-        while i < len(lines) and lines[i] and "|" not in lines[i]:
-            parts = lines[i].split("\t")
-            if len(parts) >= 2:
-                files_changed += 1
-                add = parts[0]
-                delete = parts[1]
-                if add != "-":
-                    insertions += int(add)
-                if delete != "-":
-                    deletions += int(delete)
-            i += 1
+        i, files_changed, insertions, deletions = parse_numstat(lines, i)
 
         commits.append(
             Commit(
@@ -154,13 +166,13 @@ def generate_report(since: str, until: str) -> str:
         raise ValueError(f"Start date {since} is after end date {until}")
 
     lines = [
-        f"# Git History Report",
-        f"",
+        "# Git History Report",
+        "",
         f"**Period:** {since} to {until}",
         f"**Generated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
-        f"",
-        f"---",
-        f"",
+        "",
+        "---",
+        "",
     ]
 
     # Main repository
@@ -194,7 +206,7 @@ def generate_report(since: str, until: str) -> str:
     total_insertions = sum(c.insertions for c in main_commits)
     total_deletions = sum(c.deletions for c in main_commits)
 
-    lines.append(f"**Main Repository:**")
+    lines.append("**Main Repository:**")
     lines.append(f"- Commits: {total_commits}")
     lines.append(f"- Files changed: {total_files}")
     lines.append(f"- Lines added: +{total_insertions}")

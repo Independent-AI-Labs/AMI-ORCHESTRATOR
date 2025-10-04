@@ -10,9 +10,9 @@ import argparse
 import sys
 from pathlib import Path
 
-from youtube_transcript_api import YouTubeTranscriptApi
-from youtube_transcript_api._transcripts import FetchedTranscript, Transcript, TranscriptList
-from youtube_transcript_api.formatters import Formatter, JSONFormatter, SRTFormatter, TextFormatter, WebVTTFormatter
+from youtube_transcript_api import YouTubeTranscriptApi  # type: ignore[import-not-found]
+from youtube_transcript_api._transcripts import FetchedTranscript, Transcript, TranscriptList  # type: ignore[import-not-found]
+from youtube_transcript_api.formatters import Formatter, JSONFormatter, SRTFormatter, TextFormatter, WebVTTFormatter  # type: ignore[import-not-found]
 
 
 def extract_video_id(url: str) -> str:
@@ -75,7 +75,7 @@ def format_transcript(transcript_data: FetchedTranscript, format_type: str) -> s
         msg = f"Unknown format: {format_type}"
         raise ValueError(msg)
 
-    return formatter.format_transcript(transcript_data)
+    return formatter.format_transcript(transcript_data)  # type: ignore[no-any-return]
 
 
 def download_transcript(video_id: str, output_path: Path | None = None, format_type: str = "json", prefer_auto: bool = False) -> None:
