@@ -9,7 +9,8 @@
 - After finishing work in a submodule, and once a commit is authorised, run `git add -A` inside that submodule before committing so every tracked change is staged together.
 - Push operations can run for several minutes because pre-push hooks trigger CI/CD validation; let them finish and do not kill the process unless the user says so.
 - Prefer uv-native and module-scoped tooling; no PATH/PYTHONPATH hacks or silent storage-mode fallbacks.
-- Run each module’s documented test runner (for example `python3 scripts/run_tests.py`); skip `domains/predict` entirely.
+- NEVER run inline Python scripts with `-c` flag or touch system Python. Always use module test runners or proper script files.
+- Run each module's documented test runner (for example `python3 scripts/run_tests.py`); skip `domains/predict` entirely.
 - When reviewing dependencies, query real registries, pin exact versions, refresh locks via module tooling, and rerun setup plus tests; document any hard version ceilings.
 - Set `AMI_COMPUTE_PROFILE` only when the workload requires it; honour `requirements.env.<profile>.txt`. Keep `.env` host overrides, SSH defaults, and auth stack secrets current.
 - Manage processes only through `python nodes/scripts/setup_service.py {start|stop|restart} <service>`; never touch `pkill`/`kill*`. Run `npm run dev` in a separate shell or background job.

@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import argparse
 import re
 import sys
 from pathlib import Path
@@ -20,6 +19,7 @@ IGNORED_DIRS = {
     ".pytest_cache",
     ".mypy_cache",
     ".venv",
+    ".venv-linux",
     "uv_cache",
     "cli-agents",  # explicitly excluded per user request
     ".next",  # Next.js build output
@@ -33,6 +33,7 @@ IGNORED_DIRS = {
     "out",
     "domains",  # Submodule with separate governance
     "stubs",  # Type hint files
+    "data",  # Runtime data directories (profiles, sessions, downloads)
 }
 
 # Individual files that should not be scanned (e.g., this tool itself).
@@ -60,6 +61,7 @@ DEFAULT_BANNED_WORDS = (
     "stubs",
     "placeholder",
     "placeholders",
+    "mock",
 )
 
 # Banned filename patterns (versioning, temporal markers)
@@ -131,37 +133,43 @@ def has_banned_filename_pattern(filename: str) -> str | None:
     return None
 
 
-def should_skip_word_in_line(word: str, lower_line: str) -> bool:
+def should_skip_word_in_line(word: str, lower_line: str, file_path: Path | None = None) -> bool:
     """Return True if the word should be skipped in this line due to exceptions."""
     # Skip if word appears as a keyword argument (e.g., placeholder="...")
     if f"{word}=" in lower_line:
         return True
 
-    # Skip package names (e.g., asyncpg-stubs in requirements)
-    if word in ("stub", "stubs") and "asyncpg-stubs" in lower_line:
+    # Skip stub-related exceptions
+    if word in ("stub", "stubs") and ("asyncpg-stubs" in lower_line or "dgraphclientstub" in lower_line):
         return True
 
-    # Skip external library classes (e.g., pydgraph.DgraphClientStub)
-    if word in ("stub", "stubs") and "dgraphclientstub" in lower_line:
-        return True
+    # Skip placeholder exceptions
+    if word in ("placeholder", "placeholders"):
+        sql_terms = ("sql", "query", "parameter", "$1", "$2")
+        dom_terms = ('.get("placeholder"', ".placeholder")
+        template_marker = "{{" in lower_line and "}}" in lower_line
+        sql_or_dom = any(term in lower_line for term in sql_terms) or any(term in lower_line for term in dom_terms)
+        if sql_or_dom or template_marker:
+            return True
 
-    # Skip SQL parameter placeholders ($1, $2, etc.)
-    if word in ("placeholder", "placeholders") and any(term in lower_line for term in ("sql", "query", "parameter", "$1", "$2")):
-        return True
+    # Skip mock-related exceptions (pytest-mock package or tests/unit/)
+    if word == "mock":
+        pytest_mock = any(term in lower_line for term in ("pytest-mock", "pytest_mock", "plugins:"))
+        in_unit_tests = file_path and "tests/unit/" in str(file_path).lower()
+        if pytest_mock or in_unit_tests:
+            return True
 
-    # Skip HTML/DOM attribute access (e.g., input_field.get("placeholder"), el.placeholder)
-    if word == "placeholder" and any(term in lower_line for term in ('.get("placeholder"', ".placeholder")):
-        return True
-
-    # Skip template markers (e.g., {{MODULE_NAME}})
-    return word in ("placeholder", "placeholders") and "{{" in lower_line and "}}" in lower_line
+    return False
 
 
-def scan_repo(banned_words: tuple[str, ...]) -> tuple[dict[str, list[tuple[Path, int, str]]], list[tuple[Path, str]]]:
+def scan_repo(banned_words: tuple[str, ...], module_path: Path | None = None) -> tuple[dict[str, list[tuple[Path, int, str]]], list[tuple[Path, str]]]:
     results: dict[str, list[tuple[Path, int, str]]] = {word: [] for word in banned_words}
     filename_violations: list[tuple[Path, str]] = []
 
-    for file_path in REPO_ROOT.rglob("*"):
+    # Determine scan root
+    scan_root = module_path if module_path else REPO_ROOT
+
+    for file_path in scan_root.rglob("*"):
         if not file_path.is_file():
             continue
 
@@ -186,45 +194,48 @@ def scan_repo(banned_words: tuple[str, ...]) -> tuple[dict[str, list[tuple[Path,
 
         for index, lower_line in enumerate(lower_lines, start=1):
             for word in banned_words:
-                if word in lower_line and not should_skip_word_in_line(word, lower_line):
+                if word in lower_line and not should_skip_word_in_line(word, lower_line, relative):
                     results[word].append((relative, index, lines[index - 1].strip()))
 
     return results, filename_violations
 
 
-def parse_args(argv: list[str]) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "--words",
-        nargs="*",
-        default=list(DEFAULT_BANNED_WORDS),
-        help="List of banned words to search for.",
-    )
-    return parser.parse_args(argv)
+def parse_module_path(argv: list[str]) -> Path | None:
+    """Parse optional module path from args."""
+    if not argv:
+        print("Scanning entire repository")
+        return None
+
+    module_arg = argv[0]
+    potential_path = REPO_ROOT / module_arg
+    if potential_path.exists() and potential_path.is_dir():
+        print(f"Scanning module: {module_arg}")
+        return potential_path
+
+    print(f"Error: Path '{module_arg}' not found or not a directory")
+    raise SystemExit(1)
 
 
-def main(argv: list[str]) -> int:
-    args = parse_args(argv)
-    words = tuple(word.lower() for word in args.words)
+def report_filename_violations(filename_violations: list[tuple[Path, str]]) -> None:
+    """Report filename pattern violations."""
+    print(f"BANNED FILENAME PATTERNS FOUND ({len(filename_violations)} file(s)):")
+    for relative, pattern in filename_violations:
+        print(f"  {relative} contains pattern '{pattern}'")
+    print()
+    print("Filenames must not contain versioning or temporal markers.")
+    print("Update existing files instead of creating v2, _old, _new, etc.")
+    print()
 
-    findings, filename_violations = scan_repo(words)
-    violations = False
 
-    # Report filename violations first
-    if filename_violations:
-        violations = True
-        print(f"BANNED FILENAME PATTERNS FOUND ({len(filename_violations)} file(s)):")
-        for relative, pattern in filename_violations:
-            print(f"  {relative} contains pattern '{pattern}'")
-        print()
-        print("Filenames must not contain versioning or temporal markers.")
-        print("Update existing files instead of creating v2, _old, _new, etc.")
-        print()
+def report_word_violations(findings: dict[str, list[tuple[Path, int, str]]]) -> None:
+    """Report banned word violations with summaries."""
+    doc_dirs = {"docs", "documentation"}
+    doc_exts = {".md", ".mdx", ".rst", ".txt", ".adoc"}
 
     for word, matches in findings.items():
         if not matches:
             continue
-        violations = True
+
         print(f"BANNED WORD '{word}' FOUND {len(matches)} time(s):")
         for relative, line_number, line in matches:
             print(f"  {relative}:{line_number}: {line}")
@@ -232,14 +243,10 @@ def main(argv: list[str]) -> int:
 
         # Aggregate summary by top-level directory and doc/code classification
         summaries: dict[str, dict[str, int]] = {}
-        doc_dirs = {"docs", "documentation"}
-        doc_exts = {".md", ".mdx", ".rst", ".txt", ".adoc"}
         for relative, *_ in matches:
             top_level = relative.parts[0] if relative.parts else "(repository root)"
-
             ext = relative.suffix.lower()
             classification = "docs" if (ext in doc_exts or any(part in doc_dirs for part in relative.parts)) else "code"
-
             module_summary = summaries.setdefault(top_level, {"docs": 0, "code": 0})
             module_summary[classification] += 1
 
@@ -252,11 +259,29 @@ def main(argv: list[str]) -> int:
             print(f"  {module:20} total={total:4d}  docs={doc_count:4d}  code={code_count:4d}")
         print()
 
+
+def main(argv: list[str]) -> int:
+    module_path = parse_module_path(argv)
+    words = DEFAULT_BANNED_WORDS
+    findings, filename_violations = scan_repo(words, module_path)
+
+    violations = bool(filename_violations) or any(findings.values())
+
+    if filename_violations:
+        report_filename_violations(filename_violations)
+
+    if any(findings.values()):
+        report_word_violations(findings)
+
+    scan_target = module_path.name if module_path else "repository"
+
     if violations:
+        total_violations = sum(len(matches) for matches in findings.values()) + len(filename_violations)
+        print(f"TOTAL: {total_violations} violations found in {scan_target}")
         print("Banned words or filename patterns detected. Please remove or rename them before committing.")
         return 1
 
-    print("No banned words or filename patterns detected.")
+    print(f"✓ No banned words or filename patterns detected in {scan_target}")
     return 0
 
 

@@ -22,7 +22,7 @@ Rules:
 - Commit only when the user orders it, after lint/tests pass, with every change staged via `git add -A`. Keep hooks enabled, land work module-by-module (skip `ux` until told), and never run `git pull`, `git rebase`, or `git merge` without explicit instruction.
 - After wrapping work in any submodule, and when told to commit, run `git add -A` inside that submodule before committing so all changes land together.
 - Push operations can run for several minutes because the hooks trigger CI/CD validation; let them finish.
-- Prefer uv-native, module-scoped tooling; no PATH/PYTHONPATH hacks or silent storage defaults. Run each module’s test runner (e.g. `python3 scripts/run_tests.py`) and skip `domains/predict`.
+- Prefer uv-native, module-scoped tooling; no PATH/PYTHONPATH hacks or silent storage defaults. NEVER run inline Python scripts with `-c` flag or touch system Python. Run each module's test runner (e.g. `python3 scripts/run_tests.py`) and skip `domains/predict`.
 - For dependency bumps, query real registries, pin exact versions, refresh locks through module tooling, rerun setup plus tests, and note any enforced ceilings.
 - Set `AMI_COMPUTE_PROFILE` only when necessary; keep `.env` hosts, SSH defaults, and auth stack secrets current.
 - Manage processes solely via `python nodes/scripts/setup_service.py {start|stop|restart} <service>`; never use `pkill`/`kill*`. Run `npm run dev` in another shell or background job.
@@ -39,8 +39,10 @@ ${INSTRUCTION}"
 
 # Create temporary MCP config
 MCP_CONFIG_FILE="$(mktemp)"
+# Create temporary settings file for hooks
+SETTINGS_FILE="$(mktemp)"
 cleanup() {
-  rm -f "$MCP_CONFIG_FILE"
+  rm -f "$MCP_CONFIG_FILE" "$SETTINGS_FILE"
 }
 trap cleanup EXIT
 
@@ -50,11 +52,34 @@ cat >"$MCP_CONFIG_FILE" <<JSON
     "browser": {
       "command": "python3",
       "args": [
-        "${REPO_ROOT}/browser/scripts/run_chrome.py"
+        "${REPO_ROOT}/browser/scripts/run_chrome.py",
+        "--data-root",
+        "${REPO_ROOT}/browser/data"
       ]
     }
   }
 }
 JSON
 
-exec claude --dangerously-skip-permissions --mcp-config "$MCP_CONFIG_FILE" -- "$INSTRUCTION"
+cat >"$SETTINGS_FILE" <<JSON
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${REPO_ROOT}/scripts/pre-tool-use-hook.sh"
+          }
+        ]
+      }
+    ]
+  }
+}
+JSON
+
+exec claude --dangerously-skip-permissions \
+  --mcp-config "$MCP_CONFIG_FILE" \
+  --settings "$SETTINGS_FILE" \
+  -- "$INSTRUCTION"

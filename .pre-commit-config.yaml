@@ -33,7 +33,7 @@ repos:
         entry: python3 scripts/check_banned_words.py
         language: system
         pass_filenames: false
-        stages: [ pre-commit ]
+        stages: [ pre-commit, pre-push ]
       - id: check-coauthored
         name: check-coauthored
         entry: python3 scripts/detect_coauthored_commits.py
