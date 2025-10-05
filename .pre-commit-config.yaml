@@ -34,6 +34,12 @@ repos:
         language: system
         pass_filenames: false
         stages: [ pre-commit, pre-push ]
+      - id: no-lint-suppressions
+        name: no-lint-suppressions
+        entry: python3 scripts/list_noqas.py
+        language: system
+        pass_filenames: false
+        stages: [ pre-commit ]
       - id: check-coauthored
         name: check-coauthored
         entry: python3 scripts/detect_coauthored_commits.py

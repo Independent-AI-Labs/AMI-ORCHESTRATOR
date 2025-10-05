@@ -128,7 +128,7 @@ def maybe_print_details(
             print(f"  {line}")
 
 
-def main() -> None:
+def main() -> int:
     """Entry point for the CLI utility."""
 
     repo_root = Path(__file__).parent.parent
@@ -136,11 +136,19 @@ def main() -> None:
 
     module_counts_dict = dict(module_counts)
     module_codes_dict = {module: dict(codes) for module, codes in module_codes.items()}
-    file_details_dict = {module: list(entries) for module, entries in file_details.items()}
 
-    print_summary(module_counts_dict, module_codes_dict)
-    maybe_print_details(module_counts_dict.keys(), file_details_dict)
+    total_noqas = sum(module_counts_dict.values())
+
+    if total_noqas > 0:
+        print_summary(module_counts_dict, module_codes_dict)
+        print("\nERROR: Lint suppressions (noqa comments) are not allowed!")
+        print("Fix the underlying issues instead of suppressing warnings.")
+        print("\nTo see file details, run: python3 scripts/list_noqas.py")
+        return 1
+
+    print("✓ No lint suppressions (noqa comments) found")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

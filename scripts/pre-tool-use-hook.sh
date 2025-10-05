@@ -6,14 +6,16 @@ set -euo pipefail
 # Read JSON input from stdin
 INPUT=$(cat)
 
-# Extract tool name and command using jq-like bash parsing
+# Extract tool name - use the entire input to search for patterns
 TOOL_NAME=$(echo "$INPUT" | grep -o '"tool_name"[[:space:]]*:[[:space:]]*"[^"]*"' | cut -d'"' -f4)
-COMMAND=$(echo "$INPUT" | grep -o '"command"[[:space:]]*:[[:space:]]*"[^"]*"' | cut -d'"' -f4)
 
 # Only check Bash commands
 if [[ "$TOOL_NAME" != "Bash" ]]; then
     exit 0
 fi
+
+# For command checking, use the ENTIRE JSON input to catch patterns anywhere
+COMMAND="$INPUT"
 
 # Patterns that are always denied
 DENY_PATTERNS=(
@@ -28,14 +30,13 @@ DENY_PATTERNS=(
     'pytest'
     'uv[[:space:]]+run'
     'noqa'
+    'git[[:space:]]+revert'
+    'git[[:space:]]+checkout'
 )
 
 # Patterns that require permission
 ASK_PATTERNS=(
-    'git[[:space:]]+rebase'
-    'git[[:space:]]+merge'
-    'git[[:space:]]+reset'
-    'git[[:space:]]+pull'
+    '^git[[:space:]]'
     'rm[[:space:]]+-rf'
     'rm[[:space:]]+-fr'
 )
