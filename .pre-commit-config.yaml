@@ -30,19 +30,19 @@ repos:
     hooks:
       - id: banned-words
         name: banned-words
-        entry: python3 scripts/check_banned_words.py
+        entry: .venv/bin/python scripts/check_banned_words.py
         language: system
         pass_filenames: false
         stages: [ pre-commit, pre-push ]
       - id: no-lint-suppressions
         name: no-lint-suppressions
-        entry: python3 scripts/list_noqas.py
+        entry: .venv/bin/python scripts/list_noqas.py
         language: system
         pass_filenames: false
         stages: [ pre-commit ]
       - id: check-coauthored
         name: check-coauthored
-        entry: python3 scripts/detect_coauthored_commits.py
+        entry: .venv/bin/python scripts/detect_coauthored_commits.py
         language: system
         pass_filenames: false
         always_run: true
@@ -54,7 +54,7 @@ repos:
     hooks:
       - id: launcher-validate
         name: launcher-validate
-        entry: python3 nodes/scripts/launch_services.py validate
+        entry: .venv/bin/python nodes/scripts/launch_services.py validate
         language: system
         pass_filenames: false
         always_run: true
@@ -62,7 +62,7 @@ repos:
         require_serial: true
       - id: launcher-metrics
         name: launcher-metrics
-        entry: python3 nodes/scripts/launch_services.py metrics --format json
+        entry: .venv/bin/python nodes/scripts/launch_services.py metrics --format json
         language: system
         pass_filenames: false
         always_run: true
