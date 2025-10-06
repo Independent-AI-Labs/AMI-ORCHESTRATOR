@@ -8,11 +8,13 @@ repos:
         args: [ --fix, --exit-non-zero-on-fix, backend, scripts, module_setup.py, conftest.py ]
         pass_filenames: false
         stages: [ pre-commit ]
+        require_serial: true
       # Formatting (replaces black)
       - id: ruff-format
         args: [ backend, scripts, module_setup.py, conftest.py ]
         pass_filenames: false
         stages: [ pre-commit ]
+        require_serial: true
 
   # Type checking
   - repo: local
@@ -34,12 +36,14 @@ repos:
         language: system
         pass_filenames: false
         stages: [ pre-commit, pre-push ]
+        require_serial: true
       - id: no-lint-suppressions
         name: no-lint-suppressions
         entry: .venv/bin/python scripts/list_noqas.py
         language: system
         pass_filenames: false
         stages: [ pre-commit ]
+        require_serial: true
       - id: check-coauthored
         name: check-coauthored
         entry: .venv/bin/python scripts/detect_coauthored_commits.py
@@ -83,10 +87,14 @@ repos:
     hooks:
       - id: check-yaml
         stages: [ pre-commit ]
+        require_serial: true
       - id: check-added-large-files
         args: ['--maxkb=100000']  # 100MB limit
         stages: [ pre-commit ]
+        require_serial: true
       - id: check-merge-conflict
         stages: [ pre-commit ]
+        require_serial: true
       - id: debug-statements
         stages: [ pre-commit ]
+        require_serial: true
