@@ -8,6 +8,7 @@ to all other submodules, ensuring consistent CI/CD validation across the repo.
 from __future__ import annotations
 
 import shutil
+import subprocess
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -56,6 +57,54 @@ def copy_ci_tests(target_module: str) -> bool:
         return False
 
 
+def reinstall_hooks(modules: list[str]) -> int:
+    """Reinstall pre-commit hooks in specified modules.
+
+    Returns:
+        Number of modules where hooks were successfully reinstalled
+    """
+    reinstalled_count = 0
+    print("Reinstalling pre-commit hooks in modules...")
+    print()
+
+    for module in modules:
+        module_path = REPO_ROOT / module
+        venv_precommit = module_path / ".venv" / "bin" / "pre-commit"
+
+        if not venv_precommit.exists():
+            print(f"  {module}: No .venv/bin/pre-commit found (skipping)")
+            continue
+
+        try:
+            # Uninstall existing hooks
+            subprocess.run(
+                [str(venv_precommit), "uninstall"],
+                cwd=str(module_path),
+                capture_output=True,
+                check=False,
+            )
+
+            # Reinstall hooks with new config
+            result = subprocess.run(
+                [str(venv_precommit), "install", "--install-hooks"],
+                cwd=str(module_path),
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            if result.returncode == 0:
+                print(f"✓ {module}: Hooks reinstalled")
+                reinstalled_count += 1
+            else:
+                print(f"✗ {module}: Failed to reinstall hooks - {result.stderr}")
+
+        except Exception as e:
+            print(f"✗ {module}: Error reinstalling hooks - {e}")
+
+    return reinstalled_count
+
+
 def main() -> int:
     """Propagate CI tests to all submodules."""
     print("Propagating CI/CD validation tests from base to all submodules...")
@@ -89,10 +138,17 @@ def main() -> int:
             fail_count += 1
         print()
 
+    # Reinstall hooks to pick up any config changes
+    print("=" * 60)
+    reinstalled_count = reinstall_hooks(TARGET_SUBMODULES)
+    print()
+
     # Summary
     print("=" * 60)
     if fail_count == 0:
         print(f"✓ Successfully propagated CI tests to {success_count} submodule(s)")
+        if reinstalled_count > 0:
+            print(f"✓ Reinstalled hooks in {reinstalled_count} module(s)")
         print()
         print("Next steps:")
         print("  1. Review changes: git diff")
