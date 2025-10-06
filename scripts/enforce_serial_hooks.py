@@ -126,30 +126,45 @@ def process_file(file_path: Path) -> bool:
         return False
 
 
-def main() -> int:
-    """Enforce require_serial on all pre-commit config files."""
-    print("Enforcing require_serial: true on all pre-commit hooks...")
-    print()
+def process_all_configs() -> int:
+    """Process all config files and return count of modified files."""
+    modified_count = 0
 
     # Process root config
     root_config = REPO_ROOT / ".pre-commit-config.yaml"
-    modified_count = 0
-
     if root_config.exists():
         if process_file(root_config):
             modified_count += 1
     else:
         print(f"✗ Root .pre-commit-config.yaml not found at {root_config}")
 
-    # Process submodule configs
+    # Process submodule configs (both platform-specific and generated)
     for submodule in SUBMODULES:
-        submodule_config = REPO_ROOT / submodule / ".pre-commit-config.yaml"
-
-        if submodule_config.exists():
-            if process_file(submodule_config):
+        for platform_config in [
+            REPO_ROOT / submodule / ".pre-commit-config.unix.yaml",
+            REPO_ROOT / submodule / ".pre-commit-config.win.yaml",
+            REPO_ROOT / submodule / ".pre-commit-config.yaml",
+        ]:
+            if platform_config.exists() and process_file(platform_config):
                 modified_count += 1
-        else:
-            print(f"  {submodule}/.pre-commit-config.yaml: Not found (skipping)")
+
+    # Process base config templates
+    for base_config in [
+        REPO_ROOT / "base" / "configs" / ".pre-commit-config.unix.yaml",
+        REPO_ROOT / "base" / "configs" / ".pre-commit-config.win.yaml",
+    ]:
+        if base_config.exists() and process_file(base_config):
+            modified_count += 1
+
+    return modified_count
+
+
+def main() -> int:
+    """Enforce require_serial on all pre-commit config files."""
+    print("Enforcing require_serial: true on all pre-commit hooks...")
+    print()
+
+    modified_count = process_all_configs()
 
     print()
     if modified_count > 0:
