@@ -11,6 +11,7 @@ This script ensures that all pre-commit hooks run serially to prevent:
 from __future__ import annotations
 
 import re
+import subprocess
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -159,6 +160,55 @@ def process_all_configs() -> int:
     return modified_count
 
 
+def reinstall_hooks() -> int:
+    """Reinstall pre-commit hooks in all submodules to pick up new config.
+
+    Returns:
+        Number of modules where hooks were successfully reinstalled
+    """
+    reinstalled_count = 0
+    print("Reinstalling pre-commit hooks to pick up new configuration...")
+    print()
+
+    # Reinstall hooks in each submodule
+    for submodule in SUBMODULES:
+        submodule_path = REPO_ROOT / submodule
+        venv_precommit = submodule_path / ".venv" / "bin" / "pre-commit"
+
+        if not venv_precommit.exists():
+            print(f"  {submodule}: No .venv/bin/pre-commit found (skipping)")
+            continue
+
+        try:
+            # Uninstall existing hooks
+            subprocess.run(
+                [str(venv_precommit), "uninstall"],
+                cwd=str(submodule_path),
+                capture_output=True,
+                check=False,
+            )
+
+            # Reinstall hooks with new config
+            result = subprocess.run(
+                [str(venv_precommit), "install", "--install-hooks"],
+                cwd=str(submodule_path),
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            if result.returncode == 0:
+                print(f"✓ {submodule}: Hooks reinstalled")
+                reinstalled_count += 1
+            else:
+                print(f"✗ {submodule}: Failed to reinstall hooks - {result.stderr}")
+
+        except Exception as e:
+            print(f"✗ {submodule}: Error reinstalling hooks - {e}")
+
+    return reinstalled_count
+
+
 def main() -> int:
     """Enforce require_serial on all pre-commit config files."""
     print("Enforcing require_serial: true on all pre-commit hooks...")
@@ -170,12 +220,30 @@ def main() -> int:
     if modified_count > 0:
         print(f"✓ Modified {modified_count} file(s)")
         print()
+
+        # Reinstall hooks to pick up new config
+        reinstalled_count = reinstall_hooks()
+        print()
+
+        if reinstalled_count > 0:
+            print(f"✓ Reinstalled hooks in {reinstalled_count} module(s)")
+            print()
+
         print("Next steps:")
         print("  1. Review changes: git diff")
         print("  2. Test hooks: git add -A && git commit -m 'test'")
         print("  3. Commit changes if satisfied")
         return 0
+
     print("✓ All files already compliant")
+
+    # Still reinstall hooks even if no config changes
+    print()
+    reinstalled_count = reinstall_hooks()
+    if reinstalled_count > 0:
+        print()
+        print(f"✓ Reinstalled hooks in {reinstalled_count} module(s)")
+
     return 0
 
 
