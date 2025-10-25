@@ -488,9 +488,9 @@ class ResponseScanner(HookValidator):
         """
         try:
             from .agent_cli import get_agent_cli
-            from .transcript import format_messages_for_prompt, get_messages_until_last_user
+            from .transcript import format_messages_for_prompt, get_messages_from_last_user_forward
 
-            return True, get_agent_cli, (format_messages_for_prompt, get_messages_until_last_user)
+            return True, get_agent_cli, (format_messages_for_prompt, get_messages_from_last_user_forward)
         except ImportError:
             self.logger.warning("completion_moderator_deps_missing")
             return False, None, None
@@ -569,6 +569,14 @@ class ResponseScanner(HookValidator):
         # Load conversation context
         try:
             conversation_context = self._load_conversation_context(transcript_path, get_messages_fn, format_fn)
+            # Log conversation context for debugging
+            context_preview_length = 500
+            self.logger.info(
+                "completion_moderator_input",
+                transcript_path=str(transcript_path),
+                context_size=len(conversation_context),
+                context_preview=conversation_context[-context_preview_length:] if len(conversation_context) > context_preview_length else conversation_context,
+            )
         except Exception as e:
             self.logger.error("completion_moderator_transcript_error", error=str(e))
             return HookResult.block(f"COMPLETION VALIDATION ERROR\n\nFailed to read conversation context: {e}\n\nCannot verify completion without context.")

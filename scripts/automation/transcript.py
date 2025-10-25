@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 
@@ -118,6 +119,52 @@ def get_messages_until_last_user(transcript_path: Path) -> list[dict[str, str | 
     return messages[: last_user_index + 1]
 
 
+def get_messages_from_last_user_forward(transcript_path: Path) -> list[dict[str, str | None]]:
+    """Get messages from first non-interruption user message through end of transcript.
+
+    Skips interruption messages like "[Request interrupted by user]" and finds the
+    first substantive user request by scanning in reverse from the end.
+
+    Args:
+        transcript_path: Path to Claude Code transcript file (JSONL format)
+
+    Returns:
+        List of messages from first non-interruption user message through latest message.
+        Includes all messages (user and assistant) after the substantive user request.
+        Empty list if no user messages found.
+
+    Raises:
+        FileNotFoundError: If transcript file doesn't exist
+    """
+    if not transcript_path.exists():
+        raise FileNotFoundError(f"Transcript not found: {transcript_path}")
+
+    messages: list[dict[str, str | None]] = []
+    user_indices: list[int] = []
+
+    for line in transcript_path.read_text(encoding="utf-8").splitlines():
+        msg = _parse_message_from_json(line)
+        if msg:
+            messages.append(msg)
+            if msg["type"] == "user":
+                user_indices.append(len(messages) - 1)
+
+    if not user_indices:
+        return []
+
+    # Find first non-interruption user message scanning in reverse
+    interruption_pattern = re.compile(r"^\[Request interrupted by user")
+    for i in range(len(user_indices) - 1, -1, -1):
+        user_index = user_indices[i]
+        message_text = messages[user_index].get("text") or ""
+        if not interruption_pattern.match(message_text):
+            # Found substantive user message - return from here to end
+            return messages[user_index:]
+
+    # All user messages are interruptions - return from first one
+    return messages[user_indices[0] :]
+
+
 def format_messages_for_prompt(messages: list[dict[str, str | None]]) -> str:
     """Format messages as readable text for LLM analysis.
 
@@ -148,5 +195,6 @@ def format_messages_for_prompt(messages: list[dict[str, str | None]]) -> str:
 __all__ = [
     "get_last_n_messages",
     "get_messages_until_last_user",
+    "get_messages_from_last_user_forward",
     "format_messages_for_prompt",
 ]
