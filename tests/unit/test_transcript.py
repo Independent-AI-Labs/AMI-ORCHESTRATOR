@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from ..transcript import (
+from scripts.automation.transcript import (
     format_messages_for_prompt,
     get_last_n_messages,
     get_messages_until_last_user,
@@ -247,8 +247,8 @@ class TestFormatMessagesForPrompt:
 
         result = format_messages_for_prompt(messages)
 
-        assert "=== USER MESSAGE" in result
-        assert "=== ASSISTANT MESSAGE" in result
+        assert '<message role="user"' in result
+        assert '<message role="assistant"' in result
         assert "Hello" in result
         assert "Hi there" in result
         assert "2025-01-01T12:00:00Z" in result

@@ -11,7 +11,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from ..hooks import HookInput, HookResult, ResponseScanner
+from scripts.automation.hooks import HookInput, HookResult, ResponseScanner
 
 
 class TestCompletionModeratorIntegration:

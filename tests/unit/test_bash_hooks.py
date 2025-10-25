@@ -11,7 +11,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from ..agent_cli import AgentConfigPresets, ClaudeAgentCLI
+from scripts.automation.agent_cli import AgentConfigPresets, ClaudeAgentCLI
 
 
 class TestBashHooksEnforcement:
