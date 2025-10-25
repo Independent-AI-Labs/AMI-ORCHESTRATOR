@@ -121,6 +121,68 @@ class TestParseMessageIncludesTools:
             temp_path.unlink()
 
 
+class TestSystemReminderStripping:
+    """Tests that system-reminder tags are stripped from transcript content."""
+
+    def test_strips_system_reminders_from_string_content(self) -> None:
+        """System-reminder tags are removed from user message string content."""
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as f:
+            user_msg = {
+                "type": "user",
+                "message": {
+                    "role": "user",
+                    "content": "Fix the bug<system-reminder>This is a reminder about something</system-reminder> please",
+                },
+                "timestamp": "2025-01-01T00:00:00Z",
+                "uuid": "test-uuid",
+                "sessionId": "test-session",
+            }
+            f.write(json.dumps(user_msg) + "\n")
+            temp_path = Path(f.name)
+
+        try:
+            from scripts.automation.transcript import get_last_n_messages
+
+            messages = get_last_n_messages(temp_path, 1)
+            assert len(messages) == 1
+            text = messages[0]["text"]
+            assert text is not None
+            assert "Fix the bug please" in text.strip()
+            assert "system-reminder" not in text
+            assert "This is a reminder" not in text
+        finally:
+            temp_path.unlink()
+
+    def test_strips_system_reminders_from_text_blocks(self) -> None:
+        """System-reminder tags are removed from assistant text blocks."""
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as f:
+            assistant_msg = {
+                "type": "assistant",
+                "message": {
+                    "role": "assistant",
+                    "content": [
+                        {"type": "text", "text": "Let me help<system-reminder>Use the tool properly</system-reminder> with that"},
+                    ],
+                },
+                "timestamp": "2025-01-01T00:00:01Z",
+            }
+            f.write(json.dumps(assistant_msg) + "\n")
+            temp_path = Path(f.name)
+
+        try:
+            from scripts.automation.transcript import get_last_n_messages
+
+            messages = get_last_n_messages(temp_path, 1)
+            assert len(messages) == 1
+            text = messages[0]["text"]
+            assert text is not None
+            assert "Let me help with that" in text.strip()
+            assert "system-reminder" not in text
+            assert "Use the tool properly" not in text
+        finally:
+            temp_path.unlink()
+
+
 class TestGetLastNMessages:
     """Tests for get_last_n_messages()."""
 

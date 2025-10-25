@@ -3,8 +3,22 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Any
+
+
+def _strip_system_reminders(text: str) -> str:
+    """Remove system-reminder tags and their content from text.
+
+    Args:
+        text: Text potentially containing <system-reminder> tags
+
+    Returns:
+        Text with all system-reminder blocks removed
+    """
+    # Remove <system-reminder>...</system-reminder> blocks
+    return re.sub(r"<system-reminder>.*?</system-reminder>", "", text, flags=re.DOTALL)
 
 
 def _parse_content_list(content: list[Any]) -> str | None:
@@ -25,7 +39,7 @@ def _parse_content_list(content: list[Any]) -> str | None:
             if item_type == "text":
                 text_value = content_item.get("text")
                 if isinstance(text_value, str):
-                    text_parts.append(text_value)
+                    text_parts.append(_strip_system_reminders(text_value))
 
             # Tool uses
             elif item_type == "tool_use":
@@ -73,7 +87,7 @@ def _parse_message_from_json(line: str) -> dict[str, str | None] | None:
     if isinstance(content, str):
         return {
             "type": msg_type,
-            "text": content,
+            "text": _strip_system_reminders(content),
             "timestamp": msg_data.get("timestamp"),
         }
 
