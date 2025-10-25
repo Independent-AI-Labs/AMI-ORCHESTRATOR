@@ -120,7 +120,7 @@ class TestCompletionModeratorIntegration:
         }.get(key, default)
         cast(Any, scanner.config).root = Path("/home/ami/Projects/AMI-ORCHESTRATOR")
 
-        with patch("scripts.automation.agent_cli.get_agent_cli") as mock_get_cli:
+        with patch("scripts.automation.hooks.get_agent_cli") as mock_get_cli:
             mock_cli = Mock()
             mock_cli.run_print.return_value = "ALLOW"
             mock_get_cli.return_value = mock_cli
@@ -141,7 +141,7 @@ class TestCompletionModeratorIntegration:
         }.get(key, default)
         cast(Any, scanner.config).root = Path("/home/ami/Projects/AMI-ORCHESTRATOR")
 
-        with patch("scripts.automation.agent_cli.get_agent_cli") as mock_get_cli:
+        with patch("scripts.automation.hooks.get_agent_cli") as mock_get_cli:
             mock_cli = Mock()
             mock_cli.run_print.return_value = "BLOCK: Tests are failing, bug still present"
             mock_get_cli.return_value = mock_cli
@@ -163,7 +163,7 @@ class TestCompletionModeratorIntegration:
         }.get(key, default)
         cast(Any, scanner.config).root = Path("/home/ami/Projects/AMI-ORCHESTRATOR")
 
-        with patch("scripts.automation.agent_cli.get_agent_cli") as mock_get_cli:
+        with patch("scripts.automation.hooks.get_agent_cli") as mock_get_cli:
             mock_cli = Mock()
             mock_cli.run_print.return_value = "Some unclear output with no decision"
             mock_get_cli.return_value = mock_cli
@@ -215,7 +215,7 @@ class TestCompletionModeratorIntegration:
         }.get(key, default)
         cast(Any, scanner.config).root = Path("/home/ami/Projects/AMI-ORCHESTRATOR")
 
-        with patch("scripts.automation.agent_cli.get_agent_cli") as mock_get_cli:
+        with patch("scripts.automation.hooks.get_agent_cli") as mock_get_cli:
             from scripts.automation.agent_cli import AgentTimeoutError
 
             mock_cli = Mock()
@@ -272,7 +272,7 @@ class TestCompletionModeratorIntegration:
         }.get(key, default)
         cast(Any, scanner.config).root = Path("/home/ami/Projects/AMI-ORCHESTRATOR")
 
-        with patch("scripts.automation.agent_cli.get_agent_cli") as mock_get_cli:
+        with patch("scripts.automation.hooks.get_agent_cli") as mock_get_cli:
             mock_cli = Mock()
             # Moderator output wrapped in code blocks
             mock_cli.run_print.return_value = "```\nALLOW\n```"

@@ -305,20 +305,31 @@ class TestResponseScanner:
         assert result.decision is None or result.decision == "allow"
 
     @pytest.mark.skipif(ResponseScanner is None, reason="ResponseScanner not implemented yet")
-    def test_scan_completion_marker_allows(self):
+    def test_scan_completion_marker_allows(self, mocker):
         """ResponseScanner allows 'WORK DONE' marker."""
         with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as f:
+            # Create user and assistant messages for context
+            user_msg = {
+                "type": "user",
+                "message": {"content": [{"type": "text", "text": "Do the task"}]},
+            }
             transcript_data = {
                 "type": "assistant",
                 "uuid": "test-123",
                 "message": {"content": [{"type": "text", "text": "I've completed the task. WORK DONE"}]},
             }
+            f.write(json.dumps(user_msg) + "\n")
             f.write(json.dumps(transcript_data) + "\n")
             temp_path = Path(f.name)
 
         try:
+            # Mock agent CLI to return ALLOW
+            mock_agent_cli = mocker.MagicMock()
+            mock_agent_cli.run_print.return_value = "ALLOW"
+            mocker.patch("scripts.automation.hooks.get_agent_cli", return_value=mock_agent_cli)
+
             validator = ResponseScanner()
-            hook_input = type("obj", (object,), {"transcript_path": temp_path})()
+            hook_input = type("obj", (object,), {"session_id": "test-session", "transcript_path": temp_path})()
 
             result = validator.validate(hook_input)
             assert result.decision is None or result.decision == "allow"
@@ -327,20 +338,31 @@ class TestResponseScanner:
                 temp_path.unlink()
 
     @pytest.mark.skipif(ResponseScanner is None, reason="ResponseScanner not implemented yet")
-    def test_scan_feedback_marker_allows(self):
+    def test_scan_feedback_marker_allows(self, mocker):
         """ResponseScanner allows 'FEEDBACK:' marker."""
         with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as f:
+            # Create user and assistant messages for context
+            user_msg = {
+                "type": "user",
+                "message": {"content": [{"type": "text", "text": "Do the task"}]},
+            }
             transcript_data = {
                 "type": "assistant",
                 "uuid": "test-123",
                 "message": {"content": [{"type": "text", "text": "I'm stuck. FEEDBACK: need help with X"}]},
             }
+            f.write(json.dumps(user_msg) + "\n")
             f.write(json.dumps(transcript_data) + "\n")
             temp_path = Path(f.name)
 
         try:
+            # Mock agent CLI to return ALLOW
+            mock_agent_cli = mocker.MagicMock()
+            mock_agent_cli.run_print.return_value = "ALLOW"
+            mocker.patch("scripts.automation.hooks.get_agent_cli", return_value=mock_agent_cli)
+
             validator = ResponseScanner()
-            hook_input = type("obj", (object,), {"transcript_path": temp_path})()
+            hook_input = type("obj", (object,), {"session_id": "test-session", "transcript_path": temp_path})()
 
             result = validator.validate(hook_input)
             assert result.decision is None or result.decision == "allow"
@@ -434,3 +456,472 @@ class TestHookValidatorBase:
         finally:
             sys.stdin = old_stdin
             sys.stdout = old_stdout
+
+
+class TestSessionIdLogging:
+    """Unit tests for session_id logging in hook events."""
+
+    @pytest.mark.skipif(HookValidator is None, reason="HookValidator not implemented yet")
+    def test_session_id_logged_in_hook_execution(self, mocker):
+        """HookValidator logs session_id in hook_execution event."""
+        # Mock the logger
+        mock_logger = mocker.MagicMock()
+
+        # Create a simple validator
+        class SimpleValidator(HookValidator):
+            def validate(self, hook_input):
+                return HookResult.allow()
+
+        validator = SimpleValidator()
+        validator.logger = mock_logger
+
+        # Mock stdin with session_id
+        old_stdin = sys.stdin
+        hook_data = {
+            "session_id": "test-session-123",
+            "hook_event_name": "PreToolUse",
+            "tool_name": "Bash",
+            "tool_input": {"command": "ls"},
+        }
+        sys.stdin = StringIO(json.dumps(hook_data))
+
+        # Capture stdout
+        old_stdout = sys.stdout
+        sys.stdout = StringIO()
+
+        try:
+            validator.run()
+
+            # Verify hook_execution was logged with session_id
+            hook_execution_calls = [call for call in mock_logger.info.call_args_list if call[0][0] == "hook_execution"]
+            assert len(hook_execution_calls) == 1
+
+            # Check that session_id was passed as keyword argument
+            _, kwargs = hook_execution_calls[0]
+            assert kwargs["session_id"] == "test-session-123"
+            assert kwargs["hook_name"] == "SimpleValidator"
+            assert kwargs["event"] == "PreToolUse"
+            assert kwargs["tool"] == "Bash"
+        finally:
+            sys.stdin = old_stdin
+            sys.stdout = old_stdout
+
+    @pytest.mark.skipif(HookValidator is None, reason="HookValidator not implemented yet")
+    def test_session_id_logged_in_hook_result(self, mocker):
+        """HookValidator logs session_id in hook_result event."""
+        mock_logger = mocker.MagicMock()
+
+        class SimpleValidator(HookValidator):
+            def validate(self, hook_input):
+                return HookResult.deny("test reason")
+
+        validator = SimpleValidator()
+        validator.logger = mock_logger
+
+        old_stdin = sys.stdin
+        hook_data = {
+            "session_id": "test-session-456",
+            "hook_event_name": "PreToolUse",
+        }
+        sys.stdin = StringIO(json.dumps(hook_data))
+
+        old_stdout = sys.stdout
+        sys.stdout = StringIO()
+
+        try:
+            validator.run()
+
+            # Verify hook_result was logged with session_id
+            hook_result_calls = [call for call in mock_logger.info.call_args_list if call[0][0] == "hook_result"]
+            assert len(hook_result_calls) == 1
+
+            _, kwargs = hook_result_calls[0]
+            assert kwargs["session_id"] == "test-session-456"
+            assert kwargs["decision"] == "deny"
+            assert kwargs["reason"] == "test reason"
+        finally:
+            sys.stdin = old_stdin
+            sys.stdout = old_stdout
+
+    @pytest.mark.skipif(HookValidator is None, reason="HookValidator not implemented yet")
+    def test_session_id_logged_in_hook_error_with_hook_input(self, mocker):
+        """HookValidator logs session_id in hook_error when hook_input available."""
+        mock_logger = mocker.MagicMock()
+
+        class FailingValidator(HookValidator):
+            def validate(self, hook_input):
+                raise RuntimeError("Validation failed")
+
+        validator = FailingValidator()
+        validator.logger = mock_logger
+
+        old_stdin = sys.stdin
+        hook_data = {
+            "session_id": "test-session-789",
+            "hook_event_name": "Stop",
+        }
+        sys.stdin = StringIO(json.dumps(hook_data))
+
+        old_stdout = sys.stdout
+        sys.stdout = StringIO()
+
+        try:
+            validator.run()
+
+            # Verify hook_error was logged with session_id
+            error_calls = [call for call in mock_logger.error.call_args_list if call[0][0] == "hook_error"]
+            assert len(error_calls) == 1
+
+            _, kwargs = error_calls[0]
+            assert kwargs["session_id"] == "test-session-789"
+            assert "Validation failed" in kwargs["error"]
+        finally:
+            sys.stdin = old_stdin
+            sys.stdout = old_stdout
+
+    @pytest.mark.skipif(HookValidator is None, reason="HookValidator not implemented yet")
+    def test_session_id_not_in_hook_error_without_hook_input(self, mocker):
+        """HookValidator omits session_id from hook_error when hook_input unavailable."""
+        mock_logger = mocker.MagicMock()
+
+        class SimpleValidator(HookValidator):
+            def validate(self, hook_input):
+                return HookResult.allow()
+
+        validator = SimpleValidator()
+        validator.logger = mock_logger
+
+        # Invalid JSON to trigger JSONDecodeError before hook_input is created
+        old_stdin = sys.stdin
+        sys.stdin = StringIO("invalid json{")
+
+        old_stdout = sys.stdout
+        sys.stdout = StringIO()
+
+        try:
+            validator.run()
+
+            # Verify error was logged without session_id
+            error_calls = [call for call in mock_logger.error.call_args_list if call[0][0] == "invalid_hook_input"]
+            assert len(error_calls) == 1
+
+            # Should have error but no session_id
+            _, kwargs = error_calls[0]
+            assert "error" in kwargs
+            assert "session_id" not in kwargs
+        finally:
+            sys.stdin = old_stdin
+            sys.stdout = old_stdout
+
+
+class TestResponseScannerSessionIdLogging:
+    """Unit tests for session_id logging in ResponseScanner moderator calls."""
+
+    @pytest.mark.skipif(ResponseScanner is None, reason="ResponseScanner not implemented yet")
+    def test_session_id_logged_in_moderator_input(self, mocker):
+        """ResponseScanner logs session_id in completion_moderator_input."""
+        # Create temporary transcript with completion marker
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as f:
+            # Create a transcript with user message and assistant response with WORK DONE
+            user_msg = {
+                "type": "user",
+                "message": {"content": [{"type": "text", "text": "Do the task"}]},
+            }
+            assistant_msg = {
+                "type": "assistant",
+                "message": {"content": [{"type": "text", "text": "Task completed. WORK DONE"}]},
+            }
+            f.write(json.dumps(user_msg) + "\n")
+            f.write(json.dumps(assistant_msg) + "\n")
+            temp_path = Path(f.name)
+
+        try:
+            # Mock the agent CLI to avoid actual agent execution
+            mock_agent_cli = mocker.MagicMock()
+            mock_agent_cli.run_print.return_value = "ALLOW"
+            mocker.patch("scripts.automation.hooks.get_agent_cli", return_value=mock_agent_cli)
+
+            # Mock the logger
+            mock_logger = mocker.MagicMock()
+
+            validator = ResponseScanner()
+            validator.logger = mock_logger
+
+            # Create hook input with session_id
+            hook_input = type(
+                "obj",
+                (object,),
+                {
+                    "session_id": "moderator-test-123",
+                    "transcript_path": temp_path,
+                },
+            )()
+
+            validator.validate(hook_input)
+
+            # Verify completion_moderator_input was logged with session_id
+            moderator_input_calls = [call for call in mock_logger.info.call_args_list if call[0][0] == "completion_moderator_input"]
+            assert len(moderator_input_calls) == 1
+
+            _, kwargs = moderator_input_calls[0]
+            assert kwargs["session_id"] == "moderator-test-123"
+            assert kwargs["transcript_path"] == str(temp_path)
+            assert "context_size" in kwargs
+        finally:
+            if temp_path.exists():
+                temp_path.unlink()
+
+    @pytest.mark.skipif(ResponseScanner is None, reason="ResponseScanner not implemented yet")
+    def test_session_id_logged_in_moderator_raw_output(self, mocker):
+        """ResponseScanner logs session_id in completion_moderator_raw_output."""
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as f:
+            user_msg = {
+                "type": "user",
+                "message": {"content": [{"type": "text", "text": "Do the task"}]},
+            }
+            assistant_msg = {
+                "type": "assistant",
+                "message": {"content": [{"type": "text", "text": "Task completed. WORK DONE"}]},
+            }
+            f.write(json.dumps(user_msg) + "\n")
+            f.write(json.dumps(assistant_msg) + "\n")
+            temp_path = Path(f.name)
+
+        try:
+            # Mock agent CLI
+            mock_agent_cli = mocker.MagicMock()
+            mock_agent_cli.run_print.return_value = "ALLOW"
+            mocker.patch("scripts.automation.hooks.get_agent_cli", return_value=mock_agent_cli)
+
+            mock_logger = mocker.MagicMock()
+
+            validator = ResponseScanner()
+            validator.logger = mock_logger
+
+            hook_input = type(
+                "obj",
+                (object,),
+                {
+                    "session_id": "moderator-test-456",
+                    "transcript_path": temp_path,
+                },
+            )()
+
+            validator.validate(hook_input)
+
+            # Verify completion_moderator_raw_output was logged with session_id
+            raw_output_calls = [call for call in mock_logger.info.call_args_list if call[0][0] == "completion_moderator_raw_output"]
+            assert len(raw_output_calls) == 1
+
+            _, kwargs = raw_output_calls[0]
+            assert kwargs["session_id"] == "moderator-test-456"
+            assert kwargs["output"] == "ALLOW"
+        finally:
+            if temp_path.exists():
+                temp_path.unlink()
+
+    @pytest.mark.skipif(ResponseScanner is None, reason="ResponseScanner not implemented yet")
+    def test_session_id_logged_in_moderator_allow(self, mocker):
+        """ResponseScanner logs session_id in completion_moderator_allow."""
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as f:
+            user_msg = {
+                "type": "user",
+                "message": {"content": [{"type": "text", "text": "Do the task"}]},
+            }
+            assistant_msg = {
+                "type": "assistant",
+                "message": {"content": [{"type": "text", "text": "Completed. WORK DONE"}]},
+            }
+            f.write(json.dumps(user_msg) + "\n")
+            f.write(json.dumps(assistant_msg) + "\n")
+            temp_path = Path(f.name)
+
+        try:
+            mock_agent_cli = mocker.MagicMock()
+            mock_agent_cli.run_print.return_value = "ALLOW"
+            mocker.patch("scripts.automation.hooks.get_agent_cli", return_value=mock_agent_cli)
+
+            mock_logger = mocker.MagicMock()
+
+            validator = ResponseScanner()
+            validator.logger = mock_logger
+
+            hook_input = type(
+                "obj",
+                (object,),
+                {
+                    "session_id": "moderator-test-789",
+                    "transcript_path": temp_path,
+                },
+            )()
+
+            result = validator.validate(hook_input)
+
+            # Verify decision is allow
+            assert result.decision is None or result.decision == "allow"
+
+            # Verify completion_moderator_allow was logged with session_id
+            allow_calls = [call for call in mock_logger.info.call_args_list if call[0][0] == "completion_moderator_allow"]
+            assert len(allow_calls) == 1
+
+            _, kwargs = allow_calls[0]
+            assert kwargs["session_id"] == "moderator-test-789"
+        finally:
+            if temp_path.exists():
+                temp_path.unlink()
+
+    @pytest.mark.skipif(ResponseScanner is None, reason="ResponseScanner not implemented yet")
+    def test_session_id_logged_in_moderator_block(self, mocker):
+        """ResponseScanner logs session_id in completion_moderator_block."""
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as f:
+            user_msg = {
+                "type": "user",
+                "message": {"content": [{"type": "text", "text": "Do the task"}]},
+            }
+            assistant_msg = {
+                "type": "assistant",
+                "message": {"content": [{"type": "text", "text": "Still working. WORK DONE"}]},
+            }
+            f.write(json.dumps(user_msg) + "\n")
+            f.write(json.dumps(assistant_msg) + "\n")
+            temp_path = Path(f.name)
+
+        try:
+            mock_agent_cli = mocker.MagicMock()
+            mock_agent_cli.run_print.return_value = "BLOCK: Work incomplete"
+            mocker.patch("scripts.automation.hooks.get_agent_cli", return_value=mock_agent_cli)
+
+            mock_logger = mocker.MagicMock()
+
+            validator = ResponseScanner()
+            validator.logger = mock_logger
+
+            hook_input = type(
+                "obj",
+                (object,),
+                {
+                    "session_id": "moderator-test-block",
+                    "transcript_path": temp_path,
+                },
+            )()
+
+            result = validator.validate(hook_input)
+
+            # Verify decision is block
+            assert result.decision == "block"
+
+            # Verify completion_moderator_block was logged with session_id
+            block_calls = [call for call in mock_logger.info.call_args_list if call[0][0] == "completion_moderator_block"]
+            assert len(block_calls) == 1
+
+            _, kwargs = block_calls[0]
+            assert kwargs["session_id"] == "moderator-test-block"
+            assert "Work incomplete" in kwargs["reason"]
+        finally:
+            if temp_path.exists():
+                temp_path.unlink()
+
+    @pytest.mark.skipif(ResponseScanner is None, reason="ResponseScanner not implemented yet")
+    def test_session_id_logged_in_moderator_error(self, mocker):
+        """ResponseScanner logs session_id in completion_moderator_error."""
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as f:
+            user_msg = {
+                "type": "user",
+                "message": {"content": [{"type": "text", "text": "Do the task"}]},
+            }
+            assistant_msg = {
+                "type": "assistant",
+                "message": {"content": [{"type": "text", "text": "Done. WORK DONE"}]},
+            }
+            f.write(json.dumps(user_msg) + "\n")
+            f.write(json.dumps(assistant_msg) + "\n")
+            temp_path = Path(f.name)
+
+        try:
+            # Mock agent CLI to raise an error
+            mock_agent_cli = mocker.MagicMock()
+            from scripts.automation.agent_cli import AgentError
+
+            mock_agent_cli.run_print.side_effect = AgentError("Agent failed")
+            mocker.patch("scripts.automation.hooks.get_agent_cli", return_value=mock_agent_cli)
+
+            mock_logger = mocker.MagicMock()
+
+            validator = ResponseScanner()
+            validator.logger = mock_logger
+
+            hook_input = type(
+                "obj",
+                (object,),
+                {
+                    "session_id": "moderator-test-error",
+                    "transcript_path": temp_path,
+                },
+            )()
+
+            result = validator.validate(hook_input)
+
+            # Verify decision is block (error causes block)
+            assert result.decision == "block"
+
+            # Verify completion_moderator_error was logged with session_id
+            error_calls = [call for call in mock_logger.error.call_args_list if call[0][0] == "completion_moderator_error"]
+            assert len(error_calls) == 1
+
+            _, kwargs = error_calls[0]
+            assert kwargs["session_id"] == "moderator-test-error"
+            assert "Agent failed" in kwargs["error"]
+        finally:
+            if temp_path.exists():
+                temp_path.unlink()
+
+    @pytest.mark.skipif(ResponseScanner is None, reason="ResponseScanner not implemented yet")
+    def test_session_id_logged_in_moderator_transcript_error(self, mocker):
+        """ResponseScanner logs session_id in completion_moderator_transcript_error."""
+        # Mock get_messages_from_last_user_forward to raise exception
+        mocker.patch("scripts.automation.hooks.get_messages_from_last_user_forward", side_effect=RuntimeError("Transcript read failed"))
+
+        mock_logger = mocker.MagicMock()
+
+        validator = ResponseScanner()
+        validator.logger = mock_logger
+
+        # Create a temp file so transcript_path.exists() returns True
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as f:
+            f.write("{}\n")
+            temp_path = Path(f.name)
+
+        try:
+            hook_input = type(
+                "obj",
+                (object,),
+                {
+                    "session_id": "moderator-test-transcript-error",
+                    "transcript_path": temp_path,
+                },
+            )()
+
+            # This should still pass through to _validate_completion which will error
+            # But first write WORK DONE to trigger validation
+            with temp_path.open("w") as f:
+                assistant_msg = {
+                    "type": "assistant",
+                    "message": {"content": [{"type": "text", "text": "Done. WORK DONE"}]},
+                }
+                f.write(json.dumps(assistant_msg) + "\n")
+
+            result = validator.validate(hook_input)
+
+            # Verify decision is block (error causes block)
+            assert result.decision == "block"
+
+            # Verify completion_moderator_transcript_error was logged with session_id
+            error_calls = [call for call in mock_logger.error.call_args_list if call[0][0] == "completion_moderator_transcript_error"]
+            assert len(error_calls) == 1
+
+            _, kwargs = error_calls[0]
+            assert kwargs["session_id"] == "moderator-test-transcript-error"
+            assert "Transcript read failed" in kwargs["error"]
+        finally:
+            if temp_path.exists():
+                temp_path.unlink()

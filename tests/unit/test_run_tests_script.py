@@ -105,7 +105,7 @@ class TestMain:
         # Create tests dir but no test files
         tests_dir = mock_orchestrator_root / "tests"
         tests_dir.mkdir()
-        (tests_dir / "not_a_test.py").write_text("# Not a test file")
+        (tests_dir / "helper.py").write_text("# Not a test file")
 
         with (
             patch.object(run_tests_module, "_ensure_repo_on_path", return_value=mock_orchestrator_root),

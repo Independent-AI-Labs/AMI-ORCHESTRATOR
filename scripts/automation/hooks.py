@@ -164,12 +164,14 @@ class HookValidator:
         Returns:
             Exit code (0=success)
         """
+        hook_input: HookInput | None = None
         try:
             hook_input = HookInput.from_stdin()
 
             # Log execution
             self.logger.info(
                 "hook_execution",
+                session_id=hook_input.session_id,
                 hook_name=self.__class__.__name__,
                 event=hook_input.hook_event_name,
                 tool=hook_input.tool_name,
@@ -187,6 +189,7 @@ class HookValidator:
             # Log result
             self.logger.info(
                 "hook_result",
+                session_id=hook_input.session_id,
                 decision=result.decision or "allow",
                 reason=result.reason,
             )
@@ -200,7 +203,10 @@ class HookValidator:
             return 0
 
         except Exception as e:
-            self.logger.error("hook_error", error=str(e))
+            error_log_args: dict[str, Any] = {"error": str(e)}
+            if hook_input:
+                error_log_args["session_id"] = hook_input.session_id
+            self.logger.error("hook_error", **error_log_args)
             # Fail open on error (safety)
             print(HookResult.allow().to_json())
             return 0
@@ -448,7 +454,7 @@ class ResponseScanner(HookValidator):
 
         if has_completion_marker:
             # Completion marker found - let moderator validate everything
-            return self._validate_completion(transcript_path)
+            return self._validate_completion(hook_input.session_id, transcript_path)
 
         # No completion markers - apply communication rules
         for pattern, description in self.PROHIBITED_PATTERNS:
@@ -471,10 +477,11 @@ class ResponseScanner(HookValidator):
             "Never stop without explicitly signaling completion status."
         )
 
-    def _parse_moderator_decision(self, output: str) -> HookResult:
+    def _parse_moderator_decision(self, session_id: str, output: str) -> HookResult:
         """Parse moderator output for ALLOW/BLOCK decision.
 
         Args:
+            session_id: Session ID for logging
             output: Raw moderator output
 
         Returns:
@@ -484,24 +491,25 @@ class ResponseScanner(HookValidator):
 
         # Check for ALLOW decision
         if re.search(r"\bALLOW\b", cleaned_output, re.IGNORECASE):
-            self.logger.info("completion_moderator_allow")
+            self.logger.info("completion_moderator_allow", session_id=session_id)
             return HookResult.allow()
 
         # Check for BLOCK decision
         block_match = re.search(r"\bBLOCK:\s*(.+)", cleaned_output, re.IGNORECASE | re.DOTALL)
         if block_match:
             reason = block_match.group(1).strip()
-            self.logger.info("completion_moderator_block", reason=reason[:100])
+            self.logger.info("completion_moderator_block", session_id=session_id, reason=reason[:100])
             return HookResult.block(f"❌ COMPLETION VALIDATION FAILED\n\n{reason}\n\nWork is not complete. Continue working or provide clarification.")
 
         # No clear decision - fail closed
-        self.logger.warning("completion_moderator_unclear", output=cleaned_output[:200])
+        self.logger.warning("completion_moderator_unclear", session_id=session_id, output=cleaned_output[:200])
         return HookResult.block(f"COMPLETION VALIDATION UNCLEAR\n\nModerator output:\n{output}\n\nCannot determine if work is complete.")
 
-    def _validate_completion(self, transcript_path: Path) -> HookResult:
+    def _validate_completion(self, session_id: str, transcript_path: Path) -> HookResult:
         """Validate completion marker using moderator agent.
 
         Args:
+            session_id: Session ID for logging
             transcript_path: Path to transcript file
 
         Returns:
@@ -522,12 +530,13 @@ class ResponseScanner(HookValidator):
             context_preview_length = 500
             self.logger.info(
                 "completion_moderator_input",
+                session_id=session_id,
                 transcript_path=str(transcript_path),
                 context_size=len(conversation_context),
                 context_preview=conversation_context[-context_preview_length:] if len(conversation_context) > context_preview_length else conversation_context,
             )
         except Exception as e:
-            self.logger.error("completion_moderator_transcript_error", error=str(e))
+            self.logger.error("completion_moderator_transcript_error", session_id=session_id, error=str(e))
             return HookResult.block(f"COMPLETION VALIDATION ERROR\n\nFailed to read conversation context: {e}\n\nCannot verify completion without context.")
 
         # Check moderator prompt exists
@@ -535,7 +544,7 @@ class ResponseScanner(HookValidator):
         moderator_prompt = prompts_dir / self.config.get("prompts.completion_moderator", "completion_moderator.txt")
 
         if not moderator_prompt.exists():
-            self.logger.error("completion_moderator_prompt_missing", path=str(moderator_prompt))
+            self.logger.error("completion_moderator_prompt_missing", session_id=session_id, path=str(moderator_prompt))
             return HookResult.block(
                 f"COMPLETION VALIDATION ERROR\n\nModerator prompt not found: {moderator_prompt}\n\nCannot validate completion without prompt."
             )
@@ -549,11 +558,11 @@ class ResponseScanner(HookValidator):
                 agent_config=AgentConfigPresets.completion_moderator(),
             )
             # Log full moderator output for debugging
-            self.logger.info("completion_moderator_raw_output", output=output)
-            return self._parse_moderator_decision(output)
+            self.logger.info("completion_moderator_raw_output", session_id=session_id, output=output)
+            return self._parse_moderator_decision(session_id, output)
 
         except Exception as e:
-            self.logger.error("completion_moderator_error", error=str(e))
+            self.logger.error("completion_moderator_error", session_id=session_id, error=str(e))
             if isinstance(e, AgentError):
                 return HookResult.block(f"❌ COMPLETION VALIDATION ERROR\n\n{e}\n\nCannot verify completion due to moderator failure.")
             raise

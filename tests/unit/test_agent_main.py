@@ -268,30 +268,37 @@ class TestModeInteractive:
             patch("scripts.automation.agent_main.get_config") as mock_get_config,
             patch("scripts.automation.agent_main.get_logger"),
             patch("scripts.automation.agent_main._create_mcp_config_file", return_value=None),
-            patch("scripts.automation.agent_main._create_settings_file"),
-            patch("scripts.automation.agent_main.get_agent_cli"),
+            patch("scripts.automation.agent_main._create_settings_file") as mock_create_settings,
+            patch("scripts.automation.agent_main.subprocess.run") as mock_subprocess,
         ):
+            # Mock settings file
+            mock_settings_file = Mock()
+            mock_settings_file.unlink = Mock()
+            mock_create_settings.return_value = mock_settings_file
+
             config = Mock()
             config.root = Path("/test/root")
-            config.get.side_effect = lambda key: {
+            config.get.side_effect = lambda key, default=None: {
                 "prompts.dir": "config/prompts",
                 "prompts.agent": "agent.txt",
-            }[key]
+                "claude_cli.command": "claude",
+            }.get(key, default)
 
             mock_get_config.return_value = config
 
-            # Mock agent file
+            # Mock agent file and debug log file
             agent_file_content = "Agent instruction with date: {date}"
+            mock_file = Mock()
+            mock_file.__enter__ = Mock(return_value=mock_file)
+            mock_file.__exit__ = Mock(return_value=False)
+            mock_file.write = Mock()
+
             with (
                 patch.object(Path, "read_text", return_value=agent_file_content),
-                patch("scripts.automation.agent_main.get_agent_cli") as mock_cli,
+                patch.object(Path, "open", return_value=mock_file),
             ):
-                mock_cli_instance = Mock()
-                mock_cli_instance.run_interactive.return_value = 0
-                mock_cli.return_value = mock_cli_instance
-
                 result = agent_main.mode_interactive()
 
-                # Should have read agent instruction
-                assert mock_cli_instance.run_interactive.called
+                # Should have called subprocess.run with claude command
+                assert mock_subprocess.called
                 assert result == 0
