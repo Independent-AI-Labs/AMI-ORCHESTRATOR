@@ -123,7 +123,8 @@ def get_messages_from_last_user_forward(transcript_path: Path) -> list[dict[str,
     """Get messages from first non-interruption user message through end of transcript.
 
     Skips interruption messages like "[Request interrupted by user]" and finds the
-    first substantive user request by scanning in reverse from the end.
+    first substantive user request by scanning in reverse from the end. Limits
+    lookback to most recent 10 user messages to avoid including ancient history.
 
     Args:
         transcript_path: Path to Claude Code transcript file (JSONL format)
@@ -131,6 +132,7 @@ def get_messages_from_last_user_forward(transcript_path: Path) -> list[dict[str,
     Returns:
         List of messages from first non-interruption user message through latest message.
         Includes all messages (user and assistant) after the substantive user request.
+        Limited to context from last 10 user messages max.
         Empty list if no user messages found.
 
     Raises:
@@ -153,16 +155,20 @@ def get_messages_from_last_user_forward(transcript_path: Path) -> list[dict[str,
         return []
 
     # Find first non-interruption user message scanning in reverse
+    # Only look back at most recent 10 user messages to avoid ancient history
+    max_lookback = 10
+    start_index = max(0, len(user_indices) - max_lookback)
     interruption_pattern = re.compile(r"^\[Request interrupted by user")
-    for i in range(len(user_indices) - 1, -1, -1):
+
+    for i in range(len(user_indices) - 1, start_index - 1, -1):
         user_index = user_indices[i]
         message_text = messages[user_index].get("text") or ""
         if not interruption_pattern.match(message_text):
             # Found substantive user message - return from here to end
             return messages[user_index:]
 
-    # All user messages are interruptions - return from first one
-    return messages[user_indices[0] :]
+    # All recent user messages are interruptions - return from oldest in lookback window
+    return messages[user_indices[start_index] :]
 
 
 def format_messages_for_prompt(messages: list[dict[str, str | None]]) -> str:
