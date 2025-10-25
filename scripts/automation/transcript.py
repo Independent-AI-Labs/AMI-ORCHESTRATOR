@@ -194,8 +194,14 @@ def _is_actual_user_message(line: str) -> bool:
 
     # Handle string content (newer transcript format)
     if isinstance(content, str):
-        # Filter out interruption markers and stop hook feedback
-        return not content.startswith(("[Request interrupted", "Stop hook feedback:"))
+        # Filter out interruption markers, stop hook feedback, and moderator prompts
+        return not content.startswith(
+            (
+                "[Request interrupted",
+                "Stop hook feedback:",
+                "# COMPLETION VALIDATION",
+            )
+        )
 
     # Handle array content (older format and some user messages)
     if isinstance(content, list):

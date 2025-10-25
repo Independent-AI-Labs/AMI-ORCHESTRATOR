@@ -508,6 +508,30 @@ class TestIsActualUserMessage:
 
         assert _is_actual_user_message(line) is False
 
+    def test_completion_moderator_prompt_returns_false(self) -> None:
+        """Completion moderator prompt messages return False."""
+        moderator_prompt = (
+            "# COMPLETION VALIDATION - ONE-SHOT DECISION\n\n"
+            "You are validating whether assistant work is complete and legitimate.\n\n"
+            "## OUTPUT FORMAT (CRITICAL)\n\n"
+            "Output EXACTLY one of:\n"
+            "- `ALLOW` - work complete, claims verified, no invalid FEEDBACK\n"
+        )
+        line = json.dumps(
+            {
+                "type": "user",
+                "message": {
+                    "role": "user",
+                    "content": moderator_prompt,
+                },
+                "uuid": "test-uuid",
+                "timestamp": "2025-10-25T21:00:00.000Z",
+                "sessionId": "test-session",
+            }
+        )
+
+        assert _is_actual_user_message(line) is False
+
     def test_assistant_message_returns_false(self) -> None:
         """Assistant messages return False (REAL Claude format)."""
         # Copied from real Claude Code transcript line 5 (assistant message)
