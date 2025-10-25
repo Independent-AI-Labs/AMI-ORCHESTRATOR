@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# ami-agent: Wrapper for scripts/automation/agent_main.py
+# Always uses root venv since automation/ is under scripts/
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(dirname "$SCRIPT_DIR")"
+
+# Force root venv for scripts/automation/agent_main.py - it requires root dependencies
+exec "$ROOT_DIR/.venv/bin/python" "$SCRIPT_DIR/automation/agent_main.py" "$@"

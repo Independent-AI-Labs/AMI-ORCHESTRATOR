@@ -26,7 +26,7 @@ def _ensure_repo_on_path() -> Path:
 def main() -> int:
     orchestrator_root = _ensure_repo_on_path()
 
-    from base.backend.utils.runner_bootstrap import ensure_module_venv  # noqa: PLC0415
+    from base.backend.utils.runner_bootstrap import ensure_module_venv
 
     ensure_module_venv(Path(__file__))
 
@@ -38,7 +38,7 @@ def main() -> int:
     if not test_files:
         print("No test files found. Nothing to test.")
         return 0
-    cmd = [sys.executable, "-m", "pytest", "-q"]
+    cmd = [sys.executable, "-m", "pytest"] + sys.argv[1:]
     return subprocess.run(cmd, cwd=str(orchestrator_root), check=False).returncode
 
 

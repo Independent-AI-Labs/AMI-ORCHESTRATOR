@@ -1,0 +1,2 @@
+{"type": "user", "uuid": "uuid-1", "message": {"content": [{"type": "text", "text": "I think there's a bug in line 10"}]}}
+{"type": "assistant", "uuid": "uuid-2", "message": {"content": [{"type": "text", "text": "You're absolutely right about that issue. I see the problem clearly."}]}}

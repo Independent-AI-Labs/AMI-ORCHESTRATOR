@@ -1,0 +1,27 @@
+# Hook Definitions
+# Ref: https://docs.claude.com/en/docs/claude-code/hooks.md
+
+version: "2.0.0"
+
+hooks:
+  # PreToolUse - Command Guard
+  - event: "PreToolUse"
+    matcher: "Bash"
+    command: "command-guard"
+    timeout: 10
+
+  # PreToolUse - Code Quality Guard
+  - event: "PreToolUse"
+    matcher: ["Edit", "Write"]
+    command: "code-quality"
+    timeout: 60
+
+  # Stop - Response Scanner
+  - event: "Stop"
+    command: "response-scanner"
+    timeout: 10
+
+  # SubagentStop - Response Scanner
+  - event: "SubagentStop"
+    command: "response-scanner"
+    timeout: 10

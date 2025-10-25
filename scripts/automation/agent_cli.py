@@ -1,0 +1,661 @@
+"""Agent CLI abstraction for interactive and non-interactive operations.
+
+AgentCLI defines the interface for agent interactions.
+ClaudeAgentCLI implements this interface using the Claude Code CLI.
+AgentConfig provides type-safe configuration.
+"""
+
+import json
+import os
+import subprocess
+import tempfile
+import time
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from datetime import datetime
+from pathlib import Path
+from typing import Any, TextIO
+
+import yaml
+
+from .config import get_config
+from .logger import get_logger
+
+
+# Custom exceptions for agent execution failures
+class AgentError(Exception):
+    """Base exception for all agent execution errors."""
+
+
+class AgentTimeoutError(AgentError):
+    """Agent execution exceeded timeout."""
+
+    def __init__(self, timeout: int, cmd: list[str], duration: float | None = None):
+        """Initialize timeout error.
+
+        Args:
+            timeout: Configured timeout in seconds
+            cmd: Command that timed out
+            duration: Actual duration before timeout (if known)
+        """
+        self.timeout = timeout
+        self.cmd = cmd
+        self.duration = duration
+        msg = f"Agent execution timeout after {timeout}s"
+        if duration:
+            msg += f" (actual: {duration:.1f}s)"
+        super().__init__(msg)
+
+
+class AgentCommandNotFoundError(AgentError):
+    """Agent command not found in PATH."""
+
+    def __init__(self, cmd: str):
+        """Initialize command not found error.
+
+        Args:
+            cmd: Command that was not found
+        """
+        self.cmd = cmd
+        super().__init__(f"Command not found: {cmd}")
+
+
+class AgentExecutionError(AgentError):
+    """Agent execution failed with non-zero exit code."""
+
+    def __init__(self, exit_code: int, stdout: str, stderr: str, cmd: list[str]):
+        """Initialize execution error.
+
+        Args:
+            exit_code: Process exit code
+            stdout: Standard output
+            stderr: Standard error
+            cmd: Command that failed
+        """
+        self.exit_code = exit_code
+        self.stdout = stdout
+        self.stderr = stderr
+        self.cmd = cmd
+        super().__init__(f"Agent execution failed with exit code {exit_code}")
+
+
+class AgentProcessKillError(AgentError):
+    """Failed to kill hung agent process."""
+
+    def __init__(self, pid: int, reason: str):
+        """Initialize process kill error.
+
+        Args:
+            pid: Process ID that couldn't be killed
+            reason: Why the kill failed
+        """
+        self.pid = pid
+        self.reason = reason
+        super().__init__(f"Failed to kill hung process {pid}: {reason}")
+
+
+@dataclass
+class AgentConfig:
+    """Configuration for an agent execution.
+
+    Defines tools, model, hooks, and timeout settings for an agent.
+
+    NOTE: disallowed_tools is NOT stored here - it's computed automatically
+    by ClaudeAgentCLI.compute_disallowed_tools() as the complement of allowed_tools.
+    """
+
+    model: str
+    allowed_tools: list[str] | None = None  # None = all tools allowed
+    enable_hooks: bool = True
+    timeout: int | None = 180  # None = no timeout (interactive)
+    mcp_servers: dict[str, Any] | None = None
+
+
+class AgentConfigPresets:
+    """Common agent configuration presets.
+
+    Identifies patterns behind audit agents, code quality agents, worker agents, etc.
+    """
+
+    @staticmethod
+    def audit() -> AgentConfig:
+        """Code audit agent: WebSearch/WebFetch only, hooks disabled, high-quality model.
+
+        Used for: Full file code audits, security analysis
+        """
+        return AgentConfig(
+            model="claude-sonnet-4-5",
+            allowed_tools=["WebSearch", "WebFetch"],
+            enable_hooks=False,
+            timeout=180,
+        )
+
+    @staticmethod
+    def audit_diff() -> AgentConfig:
+        """Diff audit agent: For PreToolUse hooks checking code quality.
+
+        Used for: Edit/Write validation, regression detection
+        """
+        return AgentConfig(
+            model="claude-sonnet-4-5",
+            allowed_tools=["WebSearch", "WebFetch"],
+            enable_hooks=False,
+            timeout=60,  # Fast for hooks
+        )
+
+    @staticmethod
+    def consolidate() -> AgentConfig:
+        """Pattern consolidation agent: Read/Write/Edit for updating consolidated reports.
+
+        Used for: Extracting patterns from failed audits
+        """
+        return AgentConfig(
+            model="claude-sonnet-4-5",
+            allowed_tools=["Read", "Write", "Edit", "WebSearch", "WebFetch"],
+            enable_hooks=False,
+            timeout=300,
+        )
+
+    @staticmethod
+    def worker() -> AgentConfig:
+        """General worker agent: All tools, hooks enabled.
+
+        Used for: General automation, --print mode with hooks
+        """
+        return AgentConfig(
+            model="claude-sonnet-4-5",
+            allowed_tools=None,  # All tools
+            enable_hooks=True,
+            timeout=180,
+        )
+
+    @staticmethod
+    def interactive(mcp_servers: dict[str, Any] | None = None) -> AgentConfig:
+        """Interactive agent: All tools, hooks enabled, MCP servers.
+
+        Used for: Interactive sessions with user
+        """
+        return AgentConfig(
+            model="claude-sonnet-4-5",
+            allowed_tools=None,
+            enable_hooks=True,
+            timeout=None,  # No timeout
+            mcp_servers=mcp_servers,
+        )
+
+    @staticmethod
+    def task_worker() -> AgentConfig:
+        """Task execution worker: All tools, hooks enabled, no timeout.
+
+        Used for: Executing .md task files with full capabilities
+        """
+        return AgentConfig(
+            model="claude-sonnet-4-5",
+            allowed_tools=None,  # All tools
+            enable_hooks=True,
+            timeout=None,  # Task-level timeout instead
+        )
+
+    @staticmethod
+    def task_moderator() -> AgentConfig:
+        """Task validation moderator: Read-only tools, no hooks, fast timeout.
+
+        Used for: Validating task completion after worker execution
+        """
+        return AgentConfig(
+            model="claude-sonnet-4-5",
+            allowed_tools=["Read", "Grep", "Glob", "WebSearch", "WebFetch"],
+            enable_hooks=False,
+            timeout=180,
+        )
+
+    @staticmethod
+    def sync_worker() -> AgentConfig:
+        """Git sync worker: All tools, hooks enabled, no timeout.
+
+        Used for: Executing git commit/push operations with full capabilities
+        """
+        return AgentConfig(
+            model="claude-sonnet-4-5",
+            allowed_tools=None,  # All tools
+            enable_hooks=True,
+            timeout=None,  # Sync-level timeout instead
+        )
+
+    @staticmethod
+    def sync_moderator() -> AgentConfig:
+        """Git sync moderator: Read-only + Bash tools, no hooks, fast timeout.
+
+        Used for: Checking git status and validating sync completion
+        """
+        return AgentConfig(
+            model="claude-sonnet-4-5",
+            allowed_tools=["Read", "Grep", "Glob", "Bash", "WebSearch", "WebFetch"],
+            enable_hooks=False,
+            timeout=180,
+        )
+
+    @staticmethod
+    def completion_moderator() -> AgentConfig:
+        """Completion validation moderator: Read/inspection tools + Bash, no hooks.
+
+        Used for: Validating WORK DONE and FEEDBACK: completion markers
+        """
+        return AgentConfig(
+            model="claude-sonnet-4-5",
+            allowed_tools=["Read", "Grep", "Glob", "Bash", "WebSearch", "WebFetch"],
+            enable_hooks=False,
+            timeout=120,
+        )
+
+
+class AgentCLI(ABC):
+    """Abstract interface for agent CLI operations."""
+
+    @abstractmethod
+    def run_interactive(
+        self,
+        instruction: str,
+        agent_config: AgentConfig,
+    ) -> int:
+        """Run agent in interactive mode.
+
+        Args:
+            instruction: Initial instruction/prompt for the agent
+            agent_config: Agent configuration (model, tools, hooks, MCP)
+
+        Returns:
+            Exit code (0=success, non-zero=failure)
+        """
+
+    @abstractmethod
+    def run_print(
+        self,
+        instruction: str | None = None,
+        instruction_file: Path | None = None,
+        stdin: str | TextIO | None = None,
+        agent_config: AgentConfig | None = None,
+        cwd: Path | None = None,
+    ) -> str:
+        """Run agent in non-interactive (print) mode.
+
+        Args:
+            instruction: Instruction text
+            instruction_file: Path to instruction file
+            stdin: Input data
+            agent_config: Agent configuration (defaults to worker preset)
+            cwd: Working directory for agent execution (defaults to current directory)
+
+        Returns:
+            Agent output
+
+        Raises:
+            AgentTimeoutError: Execution exceeded timeout
+            AgentCommandNotFoundError: Claude CLI not found
+            AgentExecutionError: Non-zero exit code
+            AgentProcessKillError: Failed to kill hung process
+        """
+
+
+class ClaudeAgentCLI(AgentCLI):
+    """Claude Code CLI implementation.
+
+    Manages Claude Code CLI tool restrictions by maintaining a canonical list
+    of all available tools and computing disallowed tools from allowed tools.
+    """
+
+    # Canonical list of ALL Claude Code tools (as of Claude Code v0.x)
+    # Source: https://docs.claude.com/en/docs/claude-code/tools.md
+    ALL_TOOLS = [
+        "Bash",
+        "BashOutput",
+        "Edit",
+        "ExitPlanMode",
+        "Glob",
+        "Grep",
+        "KillShell",
+        "NotebookEdit",
+        "Read",
+        "SlashCommand",
+        "Task",
+        "TodoWrite",
+        "WebFetch",
+        "WebSearch",
+        "Write",
+    ]
+
+    def __init__(self) -> None:
+        """Initialize Claude Agent CLI."""
+        self.config = get_config()
+        self.logger = get_logger("agent-cli")
+
+    @staticmethod
+    def compute_disallowed_tools(allowed_tools: list[str] | None) -> list[str]:
+        """Compute disallowed tools as complement of allowed tools.
+
+        Args:
+            allowed_tools: List of allowed tool names, or None for all tools
+
+        Returns:
+            List of disallowed tool names (empty if allowed_tools is None)
+
+        Raises:
+            ValueError: If unknown tools in allowed_tools
+
+        Example:
+            # Audit agent: only web tools
+            allowed = ["WebSearch", "WebFetch"]
+            disallowed = compute_disallowed_tools(allowed)
+            # Returns: ["Bash", "Read", "Write", ...]
+        """
+        if allowed_tools is None:
+            return []  # All tools allowed, nothing disallowed
+
+        allowed_set = set(allowed_tools)
+        all_set = set(ClaudeAgentCLI.ALL_TOOLS)
+
+        # Validate that allowed tools are in the canonical list
+        unknown = allowed_set - all_set
+        if unknown:
+            raise ValueError(f"Unknown tools in allowed_tools: {unknown}")
+
+        # Return complement
+        return sorted(all_set - allowed_set)
+
+    def run_interactive(
+        self,
+        instruction: str,
+        agent_config: AgentConfig,
+    ) -> int:
+        """Run Claude Code in interactive mode.
+
+        Args:
+            instruction: Initial instruction/prompt
+            agent_config: Agent configuration
+
+        Returns:
+            Exit code from claude process
+        """
+        # Implementation would go here
+        # For now, placeholder since we're focused on run_print for hooks
+        raise NotImplementedError("Interactive mode not yet implemented")
+
+    def _build_claude_command(
+        self,
+        instruction_text: str,
+        agent_config: AgentConfig,
+        settings_file: Path | None,
+    ) -> list[str]:
+        """Build Claude CLI command with all arguments.
+
+        Args:
+            instruction_text: Instruction for Claude
+            agent_config: Agent configuration
+            settings_file: Optional settings file path
+
+        Returns:
+            Command list ready for subprocess execution
+        """
+        claude_cmd = self.config.get("claude_cli.command", "claude")
+        cmd = [claude_cmd, "--print"]
+
+        # Model
+        cmd.extend(["--model", agent_config.model])
+
+        # Tool restrictions - ALWAYS provide both allowed and disallowed
+        if agent_config.allowed_tools is not None:
+            disallowed = self.compute_disallowed_tools(agent_config.allowed_tools)
+            cmd.extend(["--allowed-tools", " ".join(agent_config.allowed_tools)])
+            cmd.extend(["--disallowed-tools", " ".join(disallowed)])
+
+        cmd.append("--dangerously-skip-permissions")
+
+        # Settings file (hooks)
+        if settings_file:
+            cmd.extend(["--settings", str(settings_file)])
+
+        cmd.extend(["--", instruction_text])
+        return cmd
+
+    def _execute_with_timeout(
+        self,
+        cmd: list[str],
+        stdin_data: str | None,
+        agent_config: AgentConfig,
+        cwd: Path | None,
+    ) -> str:
+        """Execute command with timeout handling.
+
+        Args:
+            cmd: Command to execute
+            stdin_data: Optional stdin input
+            agent_config: Agent configuration for timeout
+            cwd: Working directory
+
+        Returns:
+            Command stdout
+
+        Raises:
+            AgentTimeoutError: Execution exceeded timeout
+            AgentCommandNotFoundError: Claude CLI not found
+            AgentExecutionError: Non-zero exit code
+            AgentProcessKillError: Failed to kill hung process
+        """
+        import signal
+
+        start_time = time.time()
+        process = None
+
+        try:
+            # Use Popen directly to get process handle for cleanup
+            process = subprocess.Popen(
+                cmd,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                cwd=cwd,
+                start_new_session=True,  # Create process group for forceful termination
+            )
+
+            # Communicate with timeout
+            stdout, stderr = process.communicate(
+                input=stdin_data,
+                timeout=agent_config.timeout,
+            )
+
+            duration = time.time() - start_time
+            self.logger.info(
+                "agent_print_complete",
+                exit_code=process.returncode,
+                duration=round(duration, 1),
+            )
+
+            # Raise exception on non-zero exit
+            if process.returncode != 0:
+                raise AgentExecutionError(
+                    exit_code=process.returncode,
+                    stdout=stdout,
+                    stderr=stderr,
+                    cmd=cmd,
+                )
+
+            return stdout
+
+        except subprocess.TimeoutExpired as timeout_err:
+            duration = time.time() - start_time
+            self.logger.error(
+                "agent_print_timeout",
+                timeout=agent_config.timeout,
+                duration=round(duration, 1),
+            )
+
+            # Force kill the process group since SIGTERM didn't work
+            if process and process.pid:
+                try:
+                    os.killpg(os.getpgid(process.pid), signal.SIGKILL)
+                    self.logger.info("agent_print_killed", pid=process.pid)
+                except ProcessLookupError:
+                    # Process already dead, that's fine
+                    self.logger.info("agent_print_already_dead", pid=process.pid)
+                except (PermissionError, OSError) as kill_err:
+                    # Failed to kill - escalate
+                    self.logger.error("agent_print_kill_failed", error=str(kill_err))
+                    raise AgentProcessKillError(
+                        pid=process.pid,
+                        reason=str(kill_err),
+                    ) from kill_err
+
+            # TimeoutExpired only raised when timeout is set
+            if agent_config.timeout is None:
+                raise RuntimeError("TimeoutExpired raised but timeout was None") from timeout_err
+
+            raise AgentTimeoutError(
+                timeout=agent_config.timeout,
+                cmd=cmd,
+                duration=duration,
+            ) from timeout_err
+
+        except FileNotFoundError as e:
+            self.logger.error("command_not_found", command=cmd[0])
+            raise AgentCommandNotFoundError(cmd=cmd[0]) from e
+
+    def run_print(
+        self,
+        instruction: str | None = None,
+        instruction_file: Path | None = None,
+        stdin: str | TextIO | None = None,
+        agent_config: AgentConfig | None = None,
+        cwd: Path | None = None,
+    ) -> str:
+        """Run Claude Code in --print mode (non-interactive).
+
+        Args:
+            instruction: Instruction text
+            instruction_file: Path to instruction file
+            stdin: Input data
+            agent_config: Agent configuration (defaults to worker preset)
+            cwd: Working directory for agent execution (defaults to current directory)
+
+        Returns:
+            Agent output (stdout)
+
+        Raises:
+            AgentTimeoutError: Execution exceeded timeout
+            AgentCommandNotFoundError: Claude CLI not found
+            AgentExecutionError: Non-zero exit code
+            AgentProcessKillError: Failed to kill hung process
+        """
+        # Default to worker preset if no config provided
+        if agent_config is None:
+            agent_config = AgentConfigPresets.worker()
+
+        # Load instruction
+        if instruction_file:
+            instruction_text = self._load_instruction(instruction_file)
+        elif instruction:
+            instruction_text = instruction
+        else:
+            raise ValueError("Either instruction or instruction_file required")
+
+        # Prepare stdin input
+        stdin_data = None
+        if stdin:
+            stdin_data = stdin if isinstance(stdin, str) else stdin.read()
+
+        # Create temp settings file when code quality/response scanner hooks should be disabled
+        # SECURITY: Bash command guard remains enabled via custom settings file
+        settings_file = None
+        if not agent_config.enable_hooks:
+            settings_file = self._create_bash_only_hooks_file()
+
+        # Build command from agent_config
+        cmd = self._build_claude_command(instruction_text, agent_config, settings_file)
+
+        # Execute
+        self.logger.info(
+            "agent_print_start",
+            model=agent_config.model,
+            hooks=agent_config.enable_hooks,
+            stdin_size=len(stdin_data) if stdin_data else 0,
+        )
+
+        try:
+            return self._execute_with_timeout(cmd, stdin_data, agent_config, cwd)
+        finally:
+            # Always cleanup temp files
+            if settings_file and settings_file.exists():
+                settings_file.unlink()
+
+    def _create_bash_only_hooks_file(self) -> Path:
+        """Create temp settings file with bash command guard only.
+
+        SECURITY: Bash command guard ALWAYS enabled for all agents regardless
+        of enable_hooks setting to prevent dangerous command execution.
+
+        Returns:
+            Path to temp settings file with bash guard hook
+
+        Raises:
+            RuntimeError: If hooks.yaml not found or invalid
+        """
+        hooks_yaml_path = self.config.root / self.config.get("hooks.file")
+        if not hooks_yaml_path.exists():
+            raise RuntimeError(f"hooks.yaml not found: {hooks_yaml_path}")
+
+        # Load hooks.yaml
+        with hooks_yaml_path.open("r") as f:
+            hooks_config = yaml.safe_load(f)
+
+        # Extract bash command guard hook
+        bash_hook = None
+        for hook in hooks_config.get("hooks", []):
+            if hook.get("event") == "PreToolUse" and hook.get("matcher") == "Bash":
+                bash_hook = hook
+                break
+
+        if not bash_hook:
+            raise RuntimeError("Bash command guard hook not found in hooks.yaml")
+
+        # Create temp settings file with bash hook only
+        settings_fd, settings_path = tempfile.mkstemp(suffix=".json")
+        settings_path_obj = Path(settings_path)
+
+        settings_path_obj.write_text(json.dumps({"hooks": {"PreToolUse": [bash_hook]}}))
+
+        os.close(settings_fd)
+
+        return settings_path_obj
+
+    def _load_instruction(self, instruction_file: Path) -> str:
+        """Load instruction from file with template substitution.
+
+        Args:
+            instruction_file: Path to instruction file
+
+        Returns:
+            Instruction text with templates substituted
+        """
+        content = instruction_file.read_text()
+
+        # Inject patterns if {PATTERNS} placeholder present
+        if "{PATTERNS}" in content:
+            patterns_file = instruction_file.parent / "patterns_core.txt"
+            if patterns_file.exists():
+                patterns_content = patterns_file.read_text()
+                content = content.replace("{PATTERNS}", patterns_content)
+
+        # Use str.replace() instead of .format() to avoid conflicts with code examples containing braces
+        return content.replace("{date}", datetime.now().strftime("%Y-%m-%d %H:%M:%S %Z"))
+
+
+def get_agent_cli() -> AgentCLI:
+    """Factory function to get agent CLI instance.
+
+    Returns ClaudeAgentCLI by default.
+    Future: Can return different implementations based on config.
+
+    Returns:
+        Agent CLI instance
+    """
+    return ClaudeAgentCLI()

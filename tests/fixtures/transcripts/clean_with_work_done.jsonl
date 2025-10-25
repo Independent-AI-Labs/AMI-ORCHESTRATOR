@@ -1,0 +1,2 @@
+{"type": "user", "uuid": "uuid-1", "message": {"content": [{"type": "text", "text": "Please analyze this code"}]}}
+{"type": "assistant", "uuid": "uuid-2", "message": {"content": [{"type": "text", "text": "I've analyzed the code and everything looks good. WORK DONE"}]}}

@@ -1,0 +1,10 @@
+{
+  "session_id": "test-session-456",
+  "hook_event_name": "PreToolUse",
+  "tool_name": "Bash",
+  "tool_input": {
+    "command": "python3 script.py",
+    "description": "Run Python script"
+  },
+  "transcript_path": null
+}

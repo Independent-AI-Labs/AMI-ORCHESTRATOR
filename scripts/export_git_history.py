@@ -10,7 +10,13 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(next(p for p in Path(__file__).resolve().parents if (p / "base").exists())))
+from base.scripts.env.paths import find_orchestrator_root
+
+_temp_root = find_orchestrator_root()
+if _temp_root is None:
+    raise RuntimeError("Unable to locate AMI orchestrator root")
+REPO_ROOT: Path = _temp_root
 
 SUBMODULES = [
     "base",

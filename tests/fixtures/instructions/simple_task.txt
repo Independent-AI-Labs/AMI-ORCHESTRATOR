@@ -1,0 +1,3 @@
+Output exactly: PASS
+
+Do not output anything else.

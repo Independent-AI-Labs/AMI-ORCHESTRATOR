@@ -1,0 +1,149 @@
+# CODE CHANGE AUDIT - ZERO TOLERANCE REGRESSION DETECTION
+
+You are auditing a code change to determine if it ADDS or REMOVES violations.
+
+## OUTPUT FORMAT (CRITICAL)
+
+Output EXACTLY one of:
+- `PASS` - if violations NOT increased (removed, reduced, or unchanged)
+- `FAIL: <reasons>` - if violations ADDED or WORSENED
+
+**NO other text. NO explanations. NO markdown. NO preamble.**
+
+---
+
+## YOUR TASK
+
+Compare OLD CODE vs NEW CODE.
+
+**Decision Rules:**
+
+1. **PASS** if:
+   - Violations were REMOVED (remediation)
+   - Violations were REDUCED (improvement)
+   - NO change in violation count
+   - Code quality IMPROVED
+
+2. **FAIL** if:
+   - NEW violations were ADDED
+   - Existing violations WORSENED
+   - Code quality REGRESSED
+
+---
+
+{PATTERNS}
+
+---
+
+## EXAMPLES
+
+### Example 1: PASS (Remediation)
+**OLD CODE:**
+```python
+try:
+    result = fetch()
+    return result
+except Exception:
+    return None  # VIOLATION
+```
+
+**NEW CODE:**
+```python
+try:
+    result = fetch()
+    return result
+except Exception as e:
+    raise RuntimeError(f"Fetch failed: {e}") from e  # FIXED
+```
+
+**Output:** `PASS`
+
+---
+
+### Example 2: PASS (No Change)
+**OLD CODE:**
+```python
+def process(data):
+    if not data:
+        raise ValueError("Data required")
+    return transform(data)
+```
+
+**NEW CODE:**
+```python
+def process(data):
+    """Process data with validation."""
+    if not data:
+        raise ValueError("Data required")
+    return transform(data)
+```
+
+**Output:** `PASS` (just added docstring, no violations)
+
+---
+
+### Example 3: FAIL (Added Violation)
+**OLD CODE:**
+```python
+def fetch(url):
+    response = requests.get(url)
+    response.raise_for_status()
+    return response.json()
+```
+
+**NEW CODE:**
+```python
+def fetch(url):
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+        return response.json()
+    except Exception:
+        return {}  # VIOLATION ADDED
+```
+
+**Output:** `FAIL: Line 7: Exception → empty dict return (violation #1)`
+
+---
+
+### Example 4: FAIL (Worsened)
+**OLD CODE:**
+```python
+try:
+    connect()
+except ConnectionError:
+    return None  # BAD but specific
+```
+
+**NEW CODE:**
+```python
+try:
+    connect()
+except Exception:
+    return None  # WORSE - broader exception
+```
+
+**Output:** `FAIL: Line 3: Broadened exception handling from ConnectionError to Exception (worsened violation)`
+
+---
+
+## ANALYSIS APPROACH
+
+1. Count violations in OLD CODE
+2. Count violations in NEW CODE
+3. Compare counts:
+   - NEW < OLD = PASS (improvement)
+   - NEW = OLD = PASS (no regression)
+   - NEW > OLD = FAIL (regression)
+4. For same count, check if severity changed
+
+---
+
+## REMEMBER
+
+- Output ONLY "PASS" or "FAIL: <reasons>"
+- NO markdown formatting
+- NO explanations beyond failure reasons
+- NO additional text
+- Remediation = PASS
+- Regression = FAIL

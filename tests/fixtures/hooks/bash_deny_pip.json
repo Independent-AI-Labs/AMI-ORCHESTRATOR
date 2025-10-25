@@ -1,0 +1,10 @@
+{
+  "session_id": "test-session-789",
+  "hook_event_name": "PreToolUse",
+  "tool_name": "Bash",
+  "tool_input": {
+    "command": "pip install requests",
+    "description": "Install package"
+  },
+  "transcript_path": null
+}

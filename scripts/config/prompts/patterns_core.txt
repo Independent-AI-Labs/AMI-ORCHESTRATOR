@@ -1,0 +1,487 @@
+## COMPREHENSIVE VIOLATION PATTERNS (67 TOTAL)
+
+ALL patterns below are STRICTLY FORBIDDEN with ZERO TOLERANCE.
+Patterns consolidated from comprehensive codebase audit of 217 Python files.
+
+---
+
+### CRITICAL SEVERITY
+
+#### SQL Injection via f-string Formatting
+- **Pattern**: `query = f"SELECT * FROM {table_name}"` or `cursor.execute(f"...")`
+- **Impact**: SQL injection vulnerability, arbitrary code execution, data exfiltration, database compromise
+
+#### Cascading Subprocess Fallbacks with RCE Risk
+- **Pattern**: `subprocess.run(untrusted_input)` with multiple fallback chains
+- **Impact**: Remote code execution, command injection, no input validation, PATH hijacking
+
+#### Authentication Downgrade Fallback
+- **Pattern**: `try: oauth_auth(); except: api_key_auth()` or multiple auth method fallbacks
+- **Impact**: Security downgrade, weaker authentication accepted on failure
+
+#### Missing Security Attribute → Default Allow/Deny
+- **Pattern**: `if not security_attr: return True/False` or `security_field: bool | None = None`
+- **Impact**: Security checks bypassed when attributes missing, authentication/authorization failures hidden, default allow creates vulnerabilities
+
+#### Sensitive Data as Plain Text
+- **Pattern**: `field: str` storing sensitive data without `SecretStr/classification`
+- **Impact**: Sensitive data exposure, credentials/tokens/error messages stored without protection, audit trail leaks
+
+#### Cryptographic Verification → Boolean Return
+- **Pattern**: `def verify_password/verify_signature(): decode(); compare(); return bool`
+- **Impact**: Security verification failures hidden, invalid input treated as failed verification, crypto errors masked
+
+#### Verification/Validation → False Return (No Exception)
+- **Pattern**: `def verify(): if not valid: return False` (should raise)
+- **Impact**: Security/cryptographic verification failures hidden, invalid data accepted, silent validation bypass
+
+#### Stub/No-Op Implementation
+- **Pattern**: `def method(): return True/False` or `def method(): logger.info(...)`
+- **Impact**: Security checks bypassed, critical functionality missing, false sense of security
+
+#### Rollback Failure Suppression
+- **Pattern**: `try: rollback(); except: pass/log`
+- **Impact**: Inconsistent state, data corruption, transaction integrity violated
+
+#### Uncaught DDL/Schema Operations
+- **Pattern**: `cursor.execute("CREATE TABLE/INDEX ...")` (no try/except wrapper)
+- **Impact**: Schema operation failures not caught, database inconsistencies, silent DDL failures
+
+#### 10b. Database Migration Logic in Application Code
+- **Pattern**: `ALTER TABLE ... ALTER COLUMN ... TYPE ...` or type checking like `if sql_type == "TIMESTAMPTZ" and data_type == "text": needs_migration = True`
+- **Impact**: Schema migrations in application code violate single responsibility, create race conditions, fail in production
+- **Allowed only in**: `migrations/*.sql`, `alembic/versions/*.py`, `scripts/*_migration.py`
+- **Forbidden in**: `*_create.py`, `*_update.py`, `*_dao.py`, `*_crud.py`
+- **Correct approach**: For dev/test: drop and recreate databases in test fixtures. For production: versioned migration scripts (Alembic/SQL files)
+
+#### Lint/Type/Coverage Suppression Markers Without Justification
+- **Pattern**: `# noqa`, `# type: ignore`, `# pylint: disable`, `# mypy: ignore-errors`, `# fmt: off`, `# ruff: noqa`, `# pragma: no cover` WITHOUT multi-line justification
+- **NOT A VIOLATION (standard patterns that are REQUIRED and CORRECT)**:
+  - `# noqa: E402` on import lines in `**/module_setup.py`, `**/run_tests.py`, `scripts/**/*.py` → **NOT A VIOLATION** (E402 = module level import not at top; these files MUST do path discovery before imports; `# noqa: E402` is the CORRECT way to mark these lines)
+  - `# type: ignore[<error-code>]  # <library-name>: <reason>` → **NOT A VIOLATION** (third-party type stub issue)
+- **IS A VIOLATION**: Suppression markers in OTHER files or for OTHER rules without multi-line justification
+- **Example NOT A VIOLATION**:
+  ```python
+  # In ux/module_setup.py (or any module_setup.py):
+  import sys  # noqa: E402  ← NOT A VIOLATION - this is standard and required
+  import os   # noqa: E402  ← NOT A VIOLATION - this is standard and required
+  ```
+- **Example IS A VIOLATION**:
+  ```python
+  # In src/main.py:
+  result = dangerous_call()  # type: ignore  ← VIOLATION - needs justification
+  ```
+- **IMPORTANT**: Do NOT confuse inline `# noqa: E402` markers (which are REQUIRED on specific import lines in module_setup.py) with file-level exemption configs. Both are used together: file-level config exempts the file, inline markers mark the specific lines that violate the rule.
+- **Impact**: Code quality issues hidden from static analysis, technical debt accumulation, violations allowed to persist
+
+#### Disabled Security Checks
+- **Pattern**: `def check_quota(): return True  # Always allow`
+- **Impact**: Security enforcement disabled, critical protection bypassed
+
+#### Code Quality Exemption Without Extensive Justification
+- **Pattern**: **ADDING** paths to exemption lists (code_check.py, ruff.toml, mypy.ini, .pre-commit-config.yaml) without multi-line comment explaining:
+  1. Why this specific file requires exemption
+  2. What specific patterns/rules it violates
+  3. Why the violation cannot be fixed (architectural constraint, external API, etc.)
+  4. When/how the exemption can be removed
+  5. What alternatives were considered and rejected
+- **IMPORTANT**: This pattern ONLY applies to ADDING exemption paths. REMOVING exemption paths (even those lacking justification) is always allowed and encouraged
+- **Example violation**:
+  ```python
+  Path("scripts/automation/agent_main.py"),  # NO - missing justification
+  ```
+- **Required format**:
+  ```python
+  # scripts/automation/agent_main.py: E402 (module level import not at top)
+  # Reason: Uses standard_imports pattern - must discover ORCHESTRATOR_ROOT before imports
+  # Cannot fix: Architectural requirement - all scripts need dynamic path discovery
+  # Removal: When base.scripts.env.paths is refactored to support static imports
+  # Alternatives considered: PYTHONPATH manipulation (rejected - fragile), __init__.py (rejected - not a package)
+  Path("scripts/automation/agent_main.py"),
+  ```
+- **Impact**: Exemption list grows without oversight from additions, violations accumulate unchecked, code quality degrades systematically, no accountability for new exemptions, technical debt hidden in configuration. Note: Removing exemptions is always safe and encouraged
+
+#### Assert for Runtime Validation in Production Code
+- **Pattern**: `assert condition, "error message"` used for runtime validation (input validation, type checking, preconditions, postconditions) in production code paths outside of test files
+- **Example violations**:
+  ```python
+  assert agent_config.timeout is not None, "Timeout must be set if TimeoutExpired raised"
+  assert user_input, "User input required"
+  assert result > 0, "Result must be positive"
+  ```
+- **Required fix**:
+  ```python
+  if agent_config.timeout is None:
+      raise ValueError("Timeout must be set if TimeoutExpired raised")
+  if not user_input:
+      raise ValueError("User input required")
+  if result <= 0:
+      raise ValueError("Result must be positive")
+  ```
+- **Impact**: Assertions disabled with `python -O` optimization flag, runtime validation silently skipped in production, security/correctness checks bypassed, silent failures, incorrect behavior in optimized mode
+- **ALLOWED**: Assertions in test files only (test_*.py, *_test.py, tests/**/*.py) for test validation, type checking hints for development (not runtime enforcement)
+- **Correct approach**: Use explicit `if not condition: raise ValueError/TypeError/RuntimeError()` for all production validation
+
+#### Missing Type Annotations in Production Code
+- **Pattern**: Functions/methods without type hints on parameters or return types; using `Any` instead of concrete types; untyped collections (`dict`, `list`) instead of generic types (`dict[str, int]`, `list[str]`)
+- **VIOLATION**: Using `Any` without inline comment justification explaining why concrete type cannot be determined
+- **NOT A VIOLATION**: `Any` with inline comment explaining third-party library dynamic typing or truly dynamic data
+- **Example VIOLATION**:
+  ```python
+  def process_data(config: Any, items: Any) -> Any:  # VIOLATION - no justification
+      return results
+  ```
+- **Example NOT A VIOLATION**:
+  ```python
+  # Any allowed with justification:
+  def process_response(data: Any) -> dict[str, Any]:  # Any: boto3 DynamoDB returns untyped nested dicts
+      return transform(data)
+  ```
+- **Required**: All functions/methods must have type hints. `Any` requires inline comment explaining why concrete type impossible.
+- **Impact**: Type checking disabled, runtime type errors not caught by mypy, incorrect types passed causing crashes, refactoring unsafe, IDE autocomplete broken, documentation missing, maintenance nightmare
+- **Correct approach**: Use concrete types; `dict[str, Any]` instead of bare `dict`; `from __future__ import annotations` for forward references; `TypeVar`, `Protocol`, `TypedDict` for complex types; inline comment justifying each `Any`
+
+---
+
+### HIGH SEVERITY
+
+#### Shell Continue on Exception
+- **Pattern**: `for x in ...; do cmd || continue; done`
+- **Impact**: Failures masked, loop continues without validation
+
+#### Exception Suppression via || Operator
+- **Pattern**: `command || fallback_command` or `command || true`
+- **Impact**: Failures converted to success, errors hidden
+
+#### Shell Pipeline Failure Masking
+- **Pattern**: `cmd1 | cmd2 | cmd3 || fallback`
+- **Impact**: Individual pipeline stage failures masked
+
+#### Import Failure Suppression
+- **Pattern**: `try: import X; except ImportError: logger.debug("failed"); continue`
+- **Impact**: Silent dependency failures, missing features at runtime, incomplete initialization
+
+#### Exception → Empty Collection Return
+- **Pattern**: `try: result = get_data(); except Exception: return {}/[]/None`
+- **Impact**: Silent failures, empty results treated as valid, missing data not detected
+
+#### Data Integrity Violation - Missing Related Objects Skipped
+- **Pattern**: `for id in ids: obj = find(id); if obj: use(obj)` (missing obj silently skipped)
+- **Impact**: Broken references ignored, data integrity violations hidden, incomplete datasets
+
+#### Exception Suppression via contextlib.suppress
+- **Pattern**: `with contextlib.suppress(ExceptionType): risky_operation()`
+- **Impact**: Exceptions silently suppressed, failures hidden, no error handling or recovery
+
+#### Invalid Input → Type-Appropriate Sentinel
+- **Pattern**: `if not valid_input: return [0.0] * N or "" or {} or []`
+- **Impact**: Invalid input masked as valid result, downstream processing assumes valid data
+
+#### Finally Block Unconditional Cleanup
+- **Pattern**: `try: transaction.commit(); finally: transaction.discard()`
+- **Impact**: Cleanup runs regardless of commit success, transaction outcomes masked, state inconsistency
+
+#### Exception → False Return
+- **Pattern**: `try: operation(); except Exception: return False`
+- **Impact**: Error conditions masked as boolean failure, exceptions hidden, no error propagation
+
+#### Partial Success Return (Count-Based)
+- **Pattern**: `def bulk_operation(): count = 0; for item in items: try: process(item); count += 1; except: pass; return count`
+- **Impact**: Partial failures hidden, caller cannot detect which operations failed, success count misleading
+
+#### Warning + Continue in Loop
+- **Pattern**: `for item in items: try: operation(); except Exception: logger.warning("error"); continue`
+- **Impact**: Operation failures hidden in iteration, partial completion masked, no exception propagation
+
+#### Missing Exception Handling
+- **Pattern**: `result = risky_operation()` (no try/except)
+- **Impact**: Uncaught exceptions propagate, no error recovery, application crashes
+
+#### Partial Success in Bulk Deletion
+- **Pattern**: `for item in items: delete(item)` (no failure tracking)
+- **Impact**: Some deletions succeed while others fail silently, inconsistent state, no error reporting
+
+#### Exception → Response Object/Tuple with Error Status
+- **Pattern**: `try: operation(); except Exception: return (500, "error")` or `return error_response_object`
+- **Impact**: Exceptions converted to HTTP-like responses, no exception propagation, breaks exception handling chain
+
+#### Validation Method → Boolean Instead of Exception
+- **Pattern**: `def is_valid(): return False` (should raise exception for invalid state)
+- **Impact**: Error conditions treated as normal flow, callers must check booleans instead of catching exceptions
+
+#### Stub/No-Op Implementation with Safe Default
+- **Pattern**: `def method(): return False/None/[]` (stub returning safe default instead of NotImplementedError)
+- **Impact**: Incomplete implementation masked as valid, missing functionality appears to work
+
+#### Exception Type Conversion Without Context
+- **Pattern**: `except SpecificError: raise DifferentError()` (original exception lost)
+- **Impact**: Exception context lost, stack trace broken, debugging impossible, root cause hidden
+
+#### Exception → String Sentinel Value
+- **Pattern**: `try: result = operation(); except Exception: return "[SENTINEL_STRING]"`
+- **Impact**: Exceptions converted to magic strings, caller must check for sentinel values
+
+#### Exception → Queued/Pending Status Return
+- **Pattern**: `try: operation(); except Exception: return "queued" or "pending"`
+- **Impact**: Failures masked as eventual consistency, caller assumes operation will complete, lost operations
+
+#### Missing Exception Class Import
+- **Pattern**: `raise CustomError()` (CustomError never imported)
+- **Impact**: NameError at runtime, exception handling fails, import statement missing
+
+#### Resource Not Found → Sentinel Return (Undocumented)
+- **Pattern**: `resource = find_by_id(id); if not resource: return None/False/[]` WHERE method signature does NOT include `| None` return type OR lacks docstring documenting None return
+- **Impact**: Missing resources treated as normal flow when None is not part of documented contract, caller cannot distinguish not-found from other failures
+- **ALLOWED**:
+  - Methods with explicit `-> T | None` return type implementing abstract interface requiring None
+  - Methods with docstring stating "Returns None if not found" or similar
+  - DAO read operations (find_by_id, find_one) returning None for not-found records (standard pattern)
+
+#### ImportError → RuntimeError Wrapper
+- **Pattern**: `try: import X; except ImportError: raise RuntimeError("...")`
+- **Impact**: Import failures wrapped in generic exception, breaks dependency detection
+
+#### Uncaught HTTP Exception
+- **Pattern**: `response.raise_for_status()` (no try/except wrapper)
+- **Impact**: HTTP errors propagate as library-specific exceptions, breaks abstraction layer
+
+#### User Input Without Validation
+- **Pattern**: `user_input = getpass.getpass(); use(user_input)` (no empty/format validation)
+- **Impact**: Empty or invalid user input accepted, downstream operations fail
+
+#### Exception → Error Collection in Results Dictionary
+- **Pattern**: `for item in items: try: process(item); except Exception: results["errors"].append(str(e))`
+- **Impact**: Exceptions collected instead of raised, partial results returned, failures hidden as "soft errors"
+
+#### Exception → logger.error() Without Raise
+- **Pattern**: `try: operation(); except Exception as e: logger.error(f"error: {e}")` (no raise)
+- **Impact**: Exceptions suppressed via logging only, failures hidden, execution continues after error
+
+#### Search Loop Without Required Result Exception
+- **Pattern**: `for item in collection: if condition: result = item; break; use(result or fallback)`
+- **Impact**: Required search results not found but execution continues with fallback
+
+#### Missing Timeout Exception Handling
+- **Pattern**: `result = operation_with_timeout()` (no try/except for timeout errors)
+- **Impact**: Timeout exceptions unhandled, blocking operations fail silently
+
+#### Subprocess Exit Code Ignored
+- **Pattern**: `subprocess.run(cmd, check=False)` or `subprocess.call(cmd)` (exit code not checked)
+- **Impact**: Subprocess failures ignored, exit codes unchecked, command failures masked
+
+#### Exception → None Return (Undocumented)
+- **Pattern**: `try: operation(); except Exception: return None` WHERE method signature does NOT include `| None` return type OR lacks docstring documenting None return
+- **Impact**: Exceptions converted to None sentinel when None is not part of documented contract, caller cannot distinguish failure from valid None result
+- **ALLOWED**:
+  - Methods with explicit `-> T | None` return type implementing abstract interface requiring None
+  - Methods with docstring stating "Returns None if not found" or similar
+  - DAO read operations (find_by_id, find_one) returning None for not-found records (standard pattern)
+
+#### Exception → Numeric Sentinel Return
+- **Pattern**: `try: operation(); except Exception: return 1 or return 0`
+- **Impact**: Exceptions converted to numeric exit codes/sentinels, error context lost
+
+#### Command Failure → Validation Failure Conversion
+- **Pattern**: `RESULT=$(command) || { convert_to_deny_message; exit 0; }`
+- **Impact**: Script execution errors masked as validation failures, broken tooling appears as code problems
+
+#### Command Failure → Default Output Substitution
+- **Pattern**: `result=$(command || echo "0")`
+- **Impact**: Command failures masked by default output value, exit codes ignored
+
+#### Exit Code → String Result via Output Suppression
+- **Pattern**: `if command >/dev/null 2>&1; then result="PASS"; else result="FAIL"; fi`
+- **Impact**: Exit codes converted to string results, stderr/stdout suppressed
+
+#### Error Suppression via Stderr Redirect
+- **Pattern**: `command 2>/dev/null` or `command 2>&1`
+- **Impact**: Error messages suppressed via output redirection, failures silent
+
+#### Uncaught KeyError on Environment Variable Access
+- **Pattern**: `value = os.environ["VAR"]` or `int(os.environ["VAR"])` (no try/except)
+- **Impact**: Missing environment variables cause KeyError at runtime, type conversion failures unhandled
+
+#### Uncaught JSON Parsing
+- **Pattern**: `data = json.loads(string)` (no try/except wrapper)
+- **Impact**: JSON decode errors unhandled, malformed input causes exceptions
+
+#### Assert-Only Validation Without Exception
+- **Pattern**: `assert condition` (test validation without raising proper exception)
+- **Impact**: Assertions bypassed in optimized mode, validation skipped in production
+
+#### Exception Message Inspection → Test Skip
+- **Pattern**: `try: operation(); except Exception as e: if "substring" in str(e): pytest.skip()`
+- **Impact**: Exceptions converted to test skips based on message content, failures masked as skipped tests
+
+#### Unvalidated Query Result Usage
+- **Pattern**: `result = execute_query(sql); use(result)` (no validation of result structure/type)
+- **Impact**: Malformed query results processed without validation, type assumptions fail
+
+---
+
+### MEDIUM SEVERITY
+
+#### Exit Code → Success Conversion
+- **Pattern**: Script continues after command failure without checking exit code
+- **Impact**: Silent failures, invalid state propagation
+
+#### Git Operation Exception Suppression
+- **Pattern**: `git command || git fallback || true`
+- **Impact**: VCS operation failures hidden, inconsistent repository state
+
+#### Exception → Original Input Return
+- **Pattern**: `try: result = process(input); except Exception: return input`
+- **Impact**: Silent failures, unprocessed data treated as valid
+
+#### Warning + Sentinel Return Instead of Exception
+- **Pattern**: `if invalid_state: logger.warning("problem"); return None/False`
+- **Impact**: Error conditions treated as normal flow, callers cannot distinguish failure from valid empty result
+
+#### Implicit Default via Truthiness Operator
+- **Pattern**: `value = param or default_value`
+- **Impact**: Treats falsy values (0, False, "", []) as missing, incorrect default substitution
+
+#### TODO/Production Comment Stubs
+- **Pattern**: `# In production, track old values...` or `# TODO: implement properly`
+- **Impact**: Incomplete implementation shipped to production, missing features
+
+#### Cleanup/Disconnect Failure Suppression
+- **Pattern**: `try: session.close(); except: pass` or `logger.debug("cleanup failed")`
+- **Impact**: Cleanup failures hidden, resource leaks undetected
+
+#### Placeholder Assignment Before NotImplementedError
+- **Pattern**: `_ = variable; raise NotImplementedError()`
+- **Impact**: Dead code, misleading intent, variable assignments that serve no purpose before exception
+
+#### Implicit Defaults in Optional Fields
+- **Pattern**: `field: Type | None = Field(default=value)`
+- **Impact**: Optional fields have hidden defaults, caller cannot detect if value was provided or defaulted
+
+#### Wrong Exception Type for Abstraction Layer
+- **Pattern**: `raise ValueError()` or `TypeError()` (should raise domain-specific exception)
+- **Impact**: Breaks abstraction layer consistency, leaks implementation details
+
+#### Dictionary .get() Silent None Return
+- **Pattern**: `value = data.get("key")` (returns None if missing, no exception)
+- **Impact**: Missing keys treated as None values, cannot distinguish between null value and missing key
+
+#### Implicit Defaults in Required Fields
+- **Pattern**: `field: Type = default_value`
+- **Impact**: Required fields have hidden defaults, caller assumes field is required but defaults silently
+
+#### Hardcoded Retry Logic Attributes
+- **Pattern**: `max_retries = 3` (hardcoded retry attempts)
+- **Impact**: No configuration flexibility, retry behavior inconsistent across codebase
+
+#### Non-Empty __init__.py Files
+- **Pattern**: `__init__.py` containing imports, `__all__`, re-exports, or any executable code (empty files with only comments/docstrings ARE ALLOWED and required for Python packages)
+- **Impact**: Implicit imports, namespace pollution, circular dependency risks, violates explicit import policy
+- **ALLOWED**: Empty `__init__.py` (blank file or only comments/docstrings) - required for Python package structure
+
+---
+
+### Additional Common Violations
+
+#### Environment Variable with Implicit Default
+- **Pattern**: `os.environ.get("REQUIRED_VAR", "")` or `os.environ.get("CONFIG", default_value)`
+- **Impact**: Required configuration missing masked as empty/default values
+
+#### Output Format Validation Fallback Chain
+- **Pattern**: `if result == "EXPECTED": exit 0; elif grep "EXPECTED"; exit 0; else: exit 1`
+- **Impact**: Unexpected output format not reported, cascading fallback checks hide format violations
+
+#### Test Exception Without Assertion
+- **Pattern**: `with pytest.raises(Exception): operation()` (no match= or assertion on exception details)
+- **Impact**: Tests pass for any exception of given type, wrong exception messages accepted
+
+#### Test Validates Stub Implementation
+- **Pattern**: `assert stub_method() == expected_sentinel`
+- **Impact**: Tests pass with unimplemented stubs, missing functionality shipped to production
+
+#### Type Checker Configuration Suppression
+- **Pattern**: `ignore_missing_imports = True` or `follow_imports = skip` or `exclude = pattern`
+- **Impact**: Type checking disabled via configuration, import errors hidden
+
+#### Continue/Skip on Error in Loop
+- **Pattern**: `for item in items: try: process(item); except Exception: continue`
+- **Impact**: Individual item failures hidden, partial completion masked
+
+#### Retry Logic (With or Without Backoff)
+- **Pattern**: `for attempt in range(max_retries): try: return operation(); except: sleep(backoff)`
+- **Impact**: Masks underlying failures, delays error detection, resource waste
+
+#### Fallback Chain
+- **Pattern**: `try: return primary(); except: try: return fallback(); except: return default()`
+- **Impact**: Multiple fallbacks hide root cause, degraded operation modes not reported
+
+#### Health Check → False
+- **Pattern**: `try: service.ping(); return True; except Exception: return False`
+- **Impact**: Connection/health check failures hidden, system appears operational when broken
+
+#### Distributed System → Local Fallback
+- **Pattern**: `try: return redis_cache.get(key); except RedisError: return local_cache.get(key)`
+- **Impact**: Degrades to unsafe fallback, loses distributed guarantees
+
+#### DateTime Parse Error → String Fallback
+- **Pattern**: `try: return datetime.fromisoformat(value); except ValueError: return value`
+- **Impact**: Invalid data types propagated, type errors deferred
+
+#### Attribute Access with `or` Operator Default
+- **Pattern**: `self.attr or default_value` or `value or default`
+- **Impact**: None/0/False values masked as missing, explicit values overridden by defaults
+
+#### Uncaught Type Conversion
+- **Pattern**: `value = float(input)` (should wrap in try/except and raise domain error)
+- **Impact**: Built-in exceptions leak through abstraction, inconsistent error handling
+
+#### Table/Resource Not Found → Empty
+- **Pattern**: `try: return db.query(table); except TableNotFoundError: return []`
+- **Impact**: Missing resources masked as empty/null results
+
+#### Rollback Failure in Exception Handler
+- **Pattern**: `except Exception: for op in completed: try: rollback(op); except: pass`
+- **Impact**: Rollback failures suppressed, cannot recover from partial transactions
+
+#### Partial Success Return Without Failure Tracking
+- **Pattern**: `return {"success": True, "results": results}` (if any results failed)
+- **Impact**: Caller cannot detect partial failures
+
+#### JSON Parse Error → Fallback
+- **Pattern**: `try: data = json.loads(text); except json.JSONDecodeError: data = {}`
+- **Impact**: Invalid JSON treated as empty object
+
+---
+
+## PERMITTED EXCEPTIONS (VERY LIMITED)
+
+### 1. Cleanup in Finally
+```python
+finally:
+    with contextlib.suppress(Exception):
+        resource.close()  # OK - cleanup only
+```
+
+### 2. Documented "Returns None if Not Found"
+```python
+def find_optional(path: Path) -> Config | None:
+    """Returns None if not found."""
+    try:
+        return load(path)
+    except FileNotFoundError:
+        return None  # OK - documented behavior
+```
+
+### 3. Test Fixtures
+```python
+@pytest.fixture
+def empty_list():
+    return []  # OK - test fixture
+```
+
+### 4. "Not a Git Repo" → None
+```python
+except subprocess.CalledProcessError as e:
+    if "not a git repository" in e.stderr:
+        return None  # OK - expected case
+    raise  # All other errors propagate
+```

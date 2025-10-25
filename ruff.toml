@@ -1,19 +1,5 @@
 line-length = 160
-target-version = "py312"
-
-# Exclude submodules and external data dirs from root-level checks; each module has its own hooks
-exclude = [
-    "dgraph/**",
-    "base/**",
-    "browser/**",
-    "compliance/**",
-    "cli-agents/**",
-    "domains/**",
-    "files/**",
-    "nodes/**",
-    "streams/**",
-    "ux/**",
-]
+target-version = "py311"
 
 [lint]
 # Comprehensive rule set replacing pylint + bandit
@@ -40,15 +26,6 @@ select = [
     "Q",   # flake8-quotes
 ]
 
-ignore = [
-    # Add any specific rules you want to ignore based on your codebase
-    "S101",  # Use of assert (if you use asserts in tests)
-    "T201",  # print() statements (if you want to keep some)
-    "S603",
-    "S607",
-    "A003",
-]
-
 [lint.mccabe]
 max-complexity = 10
 
@@ -57,6 +34,33 @@ max-args = 16
 max-locals = 64
 max-statements = 96
 max-branches = 16
+
+[lint.per-file-ignores]
+# Root-level test files
+"**/test_*.py" = ["S101", "PLR2004", "ARG002"]  # Asserts, magic values, and unused pytest fixtures
+"tests/**/*.py" = ["S101", "PLR2004", "S603", "S607", "ARG002", "E402", "PLC0415", "S108", "T201", "B007"]  # Tests require asserts, magic values, subprocess, unused fixtures, bootstrap imports, lazy imports, temp files, print statements, unused loop vars
+"tests/fixtures/**/*.py" = ["ALL"]  # Test fixtures intentionally contain violations
+"tests/conftest.py" = ["S603", "S607", "E402"]  # Docker/subprocess in test fixtures, bootstrap imports
+"tests/integration/**/*.py" = ["S603", "S607", "E402"]  # Subprocess in integration tests, bootstrap imports
+"conftest.py" = ["E402"]  # Bootstrap imports after path setup
+
+# Root-level scripts
+"scripts/**/*.py" = ["T201", "S603", "S607", "E402", "PLC0415"]  # CLI tools - print() required for user output, subprocess, bootstrap imports, lazy imports
+"scripts/automation/**/*.py" = ["T201", "S603", "S607", "PLC0415", "S108"]  # CLI automation tools - print, subprocess, lazy imports, temp files
+"scripts/automation/tests/**/*.py" = ["S101", "PLR2004", "S603", "S607", "ARG002", "E402", "PLC0415", "S108", "T201", "B007"]  # Test files
+"scripts/run_tests.py" = ["T201", "S603", "S607", "E402", "PLC0415"]  # Test runner - CLI output, subprocess, bootstrap imports, lazy imports
+"module_setup.py" = ["S603", "S607", "E402"]  # UV subprocess calls in setup script, bootstrap imports
+
+# Root backend code
+"backend/**/*.py" = ["E402"]  # Bootstrap imports after path setup
+
+# Documentation and learning examples
+"docs/**/*.py" = ["T201", "S603", "S607", "E402"]  # Example code may use print/subprocess
+"learning/**/*.py" = ["T201", "S603", "S607", "E402"]  # Learning examples may use print/subprocess
+
+# Root-level utility files
+"demo.py" = ["T201", "E402"]  # Demo script with print output
+"install.py" = ["T201", "S603", "S607", "E402"]  # Installation script with print and subprocess
 
 [format]
 line-ending = "auto"

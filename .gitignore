@@ -24,6 +24,8 @@ MANIFEST
 venv/
 ENV/
 .venv/
+# EXCEPT root .venv which is our bootstrap
+!/.venv/
 
 # Chrome/Selenium
 *.log
@@ -36,6 +38,8 @@ chromium-win/
 chromium/
 chrome-mac-arm64/
 chrome-*.zip
+*.zip
+*.tar.zst
 drivers/
 
 # Browser profiles and test data
@@ -73,6 +77,9 @@ htmlcov/
 .pytest_cache/
 package-lock.json
 
+# Local gcloud CLI installation
+.gcloud/
+
 nul
 
 .claude
@@ -86,3 +93,6 @@ critical_noqa*.txt
 
 # Runtime state
 .runtime/
+
+# Client-specific work (gitignored development area)
+/clients/

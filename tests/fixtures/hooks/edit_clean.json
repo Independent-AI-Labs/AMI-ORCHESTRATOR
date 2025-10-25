@@ -1,0 +1,11 @@
+{
+  "session_id": "test-session-edit1",
+  "hook_event_name": "PreToolUse",
+  "tool_name": "Edit",
+  "tool_input": {
+    "file_path": "test.py",
+    "old_string": "def foo(): pass",
+    "new_string": "def foo():\n    \"\"\"Do something.\"\"\"\n    return 42"
+  },
+  "transcript_path": null
+}
