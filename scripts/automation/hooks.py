@@ -6,13 +6,15 @@ Ref: https://docs.claude.com/en/docs/claude-code/hooks.md
 import json
 import re
 import sys
-from collections.abc import Callable, Iterator
+from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal, cast
 
-from .config import get_config
-from .logger import get_logger
+from scripts.automation.agent_cli import AgentConfigPresets, AgentError, get_agent_cli
+from scripts.automation.config import get_config
+from scripts.automation.logger import get_logger
+from scripts.automation.transcript import format_messages_for_prompt, get_messages_from_last_user_forward
 
 # Resource limits (DoS protection)
 MAX_HOOK_INPUT_SIZE = 10 * 1024 * 1024  # 10MB
@@ -357,13 +359,6 @@ class CodeQualityValidator(HookValidator):
 """
 
         # Run LLM-based diff audit
-        # Lazy import to avoid circular dependency
-        try:
-            from .agent_cli import AgentConfigPresets, get_agent_cli
-        except ImportError:
-            # agent_cli not implemented yet - allow for now
-            return HookResult.allow()
-
         cli = get_agent_cli()
         prompts_dir = self.config.root / self.config.get("prompts.dir")
         audit_diff_instruction = prompts_dir / self.config.get("prompts.audit_diff")
@@ -388,8 +383,6 @@ class CodeQualityValidator(HookValidator):
         except Exception as e:
             # On agent errors (timeout, execution failure), deny the edit
             # This ensures we fail-closed on infrastructure failures
-            from .agent_cli import AgentError
-
             if isinstance(e, AgentError):
                 return HookResult.deny(f"❌ CODE QUALITY CHECK ERROR\n\n{e}\n\nZero-tolerance policy: Cannot verify quality.")
             raise
@@ -478,47 +471,6 @@ class ResponseScanner(HookValidator):
             "Never stop without explicitly signaling completion status."
         )
 
-    def _check_moderator_dependencies(
-        self,
-    ) -> tuple[bool, Callable[[], Any] | None, tuple[Callable[..., str], Callable[..., list[Any]]] | None]:
-        """Check if moderator dependencies are available.
-
-        Returns:
-            Tuple of (deps_available, agent_cli, transcript_module) or (False, None, None)
-        """
-        try:
-            from .agent_cli import get_agent_cli
-            from .transcript import format_messages_for_prompt, get_messages_from_last_user_forward
-
-            return True, get_agent_cli, (format_messages_for_prompt, get_messages_from_last_user_forward)
-        except ImportError:
-            self.logger.warning("completion_moderator_deps_missing")
-            return False, None, None
-
-    def _load_conversation_context(
-        self,
-        transcript_path: Path,
-        get_messages_fn: Callable[[Path], list[Any]],
-        format_fn: Callable[[list[Any]], str],
-    ) -> str:
-        """Load and format conversation context from transcript.
-
-        Args:
-            transcript_path: Path to transcript file
-            get_messages_fn: Function to get messages from transcript
-            format_fn: Function to format messages for prompt
-
-        Returns:
-            Formatted conversation context string
-
-        Raises:
-            RuntimeError: If transcript cannot be read or parsed
-        """
-        messages = get_messages_fn(transcript_path)
-        if not messages:
-            raise RuntimeError("No messages found in transcript")
-        return format_fn(messages)
-
     def _parse_moderator_decision(self, output: str) -> HookResult:
         """Parse moderator output for ALLOW/BLOCK decision.
 
@@ -555,20 +507,17 @@ class ResponseScanner(HookValidator):
         Returns:
             Validation result (ALLOW if work complete, BLOCK if not)
         """
-        # Check if completion moderator is enabled
         if not self.config.get("response_scanner.completion_moderator_enabled", True):
             return HookResult.allow()
 
-        # Check dependencies
-        deps_ok, get_cli, transcript_fns = self._check_moderator_dependencies()
-        if not deps_ok or get_cli is None or transcript_fns is None:
-            return HookResult.allow()  # Fail open if deps missing
-
-        format_fn, get_messages_fn = transcript_fns
-
         # Load conversation context
         try:
-            conversation_context = self._load_conversation_context(transcript_path, get_messages_fn, format_fn)
+            messages = get_messages_from_last_user_forward(transcript_path)
+            if not messages:
+                # No messages yet - skip validation on initial startup
+                return HookResult.allow()
+
+            conversation_context = format_messages_for_prompt(messages)
             # Log conversation context for debugging
             context_preview_length = 500
             self.logger.info(
@@ -593,9 +542,7 @@ class ResponseScanner(HookValidator):
 
         # Run moderator agent and parse decision
         try:
-            from .agent_cli import AgentConfigPresets
-
-            cli = get_cli()
+            cli = get_agent_cli()
             output = cli.run_print(
                 instruction_file=moderator_prompt,
                 stdin=conversation_context,
@@ -606,8 +553,6 @@ class ResponseScanner(HookValidator):
             return self._parse_moderator_decision(output)
 
         except Exception as e:
-            from .agent_cli import AgentError
-
             self.logger.error("completion_moderator_error", error=str(e))
             if isinstance(e, AgentError):
                 return HookResult.block(f"❌ COMPLETION VALIDATION ERROR\n\n{e}\n\nCannot verify completion due to moderator failure.")
