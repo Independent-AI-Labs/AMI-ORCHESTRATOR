@@ -8,6 +8,12 @@ import pytest
 from scripts.automation.tasks import TaskExecutor
 
 
+@pytest.fixture(autouse=True)
+def mock_sudo_password(monkeypatch):
+    """Mock AMI_SUDO_PASSWORD environment variable for all tests."""
+    monkeypatch.setenv("AMI_SUDO_PASSWORD", "test_password")
+
+
 class TestTaskExecutorFindTaskFiles:
     """Tests for _find_task_files method."""
 
