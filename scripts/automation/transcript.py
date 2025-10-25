@@ -124,7 +124,7 @@ def get_messages_from_last_user_forward(transcript_path: Path) -> list[dict[str,
 
     Skips interruption messages like "[Request interrupted by user]" and finds the
     first substantive user request by scanning in reverse from the end. Limits
-    lookback to most recent 10 user messages to avoid including ancient history.
+    lookback to most recent 3 user messages to capture current task only.
 
     Args:
         transcript_path: Path to Claude Code transcript file (JSONL format)
@@ -132,7 +132,7 @@ def get_messages_from_last_user_forward(transcript_path: Path) -> list[dict[str,
     Returns:
         List of messages from first non-interruption user message through latest message.
         Includes all messages (user and assistant) after the substantive user request.
-        Limited to context from last 10 user messages max.
+        Limited to context from last 3 user messages max to avoid old FEEDBACK patterns.
         Empty list if no user messages found.
 
     Raises:
@@ -155,8 +155,8 @@ def get_messages_from_last_user_forward(transcript_path: Path) -> list[dict[str,
         return []
 
     # Find first non-interruption user message scanning in reverse
-    # Only look back at most recent 10 user messages to avoid ancient history
-    max_lookback = 10
+    # Only look back at most recent 3 user messages to capture current task only
+    max_lookback = 3
     start_index = max(0, len(user_indices) - max_lookback)
     interruption_pattern = re.compile(r"^\[Request interrupted by user")
 
