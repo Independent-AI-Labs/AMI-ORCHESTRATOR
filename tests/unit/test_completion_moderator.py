@@ -67,7 +67,7 @@ class TestCompletionModeratorIntegration:
             result = scanner.validate(hook_input)
 
             # Should have called _validate_completion
-            mock_validate.assert_called_once_with(test_transcript)
+            mock_validate.assert_called_once_with("test-session", test_transcript)
             assert result.decision is None  # allow() returns None decision
 
     def test_validate_blocks_without_completion_marker(self, scanner: ResponseScanner) -> None:
@@ -105,7 +105,7 @@ class TestCompletionModeratorIntegration:
         """Test that moderator is skipped when disabled in config."""
         cast(Mock, scanner.config.get).return_value = False  # disabled
 
-        result = scanner._validate_completion(test_transcript)
+        result = scanner._validate_completion("test-session", test_transcript)
 
         # Should allow without running moderator
         assert result.decision is None  # allow() returns None
@@ -125,11 +125,11 @@ class TestCompletionModeratorIntegration:
             mock_cli.run_print.return_value = "ALLOW"
             mock_get_cli.return_value = mock_cli
 
-            result = scanner._validate_completion(test_transcript)
+            result = scanner._validate_completion("test-session", test_transcript)
 
             # Should allow
             assert result.decision is None
-            cast(Mock, scanner.logger.info).assert_called_with("completion_moderator_allow")
+            cast(Mock, scanner.logger.info).assert_called_with("completion_moderator_allow", session_id="test-session")
 
     def test_validate_completion_block_decision(self, scanner: ResponseScanner, test_transcript: Path) -> None:
         """Test parsing BLOCK decision from moderator output."""
@@ -146,7 +146,7 @@ class TestCompletionModeratorIntegration:
             mock_cli.run_print.return_value = "BLOCK: Tests are failing, bug still present"
             mock_get_cli.return_value = mock_cli
 
-            result = scanner._validate_completion(test_transcript)
+            result = scanner._validate_completion("test-session", test_transcript)
 
             # Should block
             assert result.decision == "block"
@@ -168,7 +168,7 @@ class TestCompletionModeratorIntegration:
             mock_cli.run_print.return_value = "Some unclear output with no decision"
             mock_get_cli.return_value = mock_cli
 
-            result = scanner._validate_completion(test_transcript)
+            result = scanner._validate_completion("test-session", test_transcript)
 
             # Should fail-closed (block)
             assert result.decision == "block"
@@ -185,7 +185,7 @@ class TestCompletionModeratorIntegration:
         }.get(key, default)
         cast(Any, scanner.config).root = Path("/home/ami/Projects/AMI-ORCHESTRATOR")
 
-        result = scanner._validate_completion(test_transcript)
+        result = scanner._validate_completion("test-session", test_transcript)
 
         # Should fail-closed (block)
         assert result.decision == "block"
@@ -198,7 +198,7 @@ class TestCompletionModeratorIntegration:
         cast(Mock, scanner.config.get).return_value = True
 
         # Non-existent transcript
-        result = scanner._validate_completion(Path("/nonexistent/transcript.jsonl"))
+        result = scanner._validate_completion("test-session", Path("/nonexistent/transcript.jsonl"))
 
         # Should fail-closed (block)
         assert result.decision == "block"
@@ -222,7 +222,7 @@ class TestCompletionModeratorIntegration:
             mock_cli.run_print.side_effect = AgentTimeoutError(120, ["claude"], 120.0)
             mock_get_cli.return_value = mock_cli
 
-            result = scanner._validate_completion(test_transcript)
+            result = scanner._validate_completion("test-session", test_transcript)
 
             # Should fail-closed (block)
             assert result.decision == "block"
@@ -278,8 +278,8 @@ class TestCompletionModeratorIntegration:
             mock_cli.run_print.return_value = "```\nALLOW\n```"
             mock_get_cli.return_value = mock_cli
 
-            result = scanner._validate_completion(test_transcript)
+            result = scanner._validate_completion("test-session", test_transcript)
 
             # Should still parse ALLOW correctly
             assert result.decision is None  # allow() returns None
-            cast(Mock, scanner.logger.info).assert_called_with("completion_moderator_allow")
+            cast(Mock, scanner.logger.info).assert_called_with("completion_moderator_allow", session_id="test-session")
