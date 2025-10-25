@@ -120,17 +120,18 @@ def get_messages_until_last_user(transcript_path: Path) -> list[dict[str, str | 
 
 
 def get_messages_from_last_user_forward(transcript_path: Path) -> list[dict[str, str | None]]:
-    """Get messages from most recent non-interruption user message through end.
+    """Get messages from most recent task request through end.
 
-    Scans in reverse from end, skips ALL "[Request interrupted by user]" messages,
-    finds first real user message (including stop hook feedback), returns from there.
+    Scans in reverse from end, skips "[Request interrupted by user]" AND
+    "Stop hook feedback:" messages to find actual task request, returns from there.
 
     Args:
         transcript_path: Path to Claude Code transcript file (JSONL format)
 
     Returns:
-        List of messages from most recent non-interruption user message through end.
-        Includes all messages after that user message.
+        List of messages from most recent task request through end.
+        Includes task request, all assistant work, and completion marker.
+        Skips stop hook feedback loops to get actual task context.
         Empty list if no user messages found.
 
     Raises:
@@ -152,15 +153,19 @@ def get_messages_from_last_user_forward(transcript_path: Path) -> list[dict[str,
     if not user_indices:
         return []
 
-    # Scan in reverse, skip ALL interruptions, find first real user message
+    # Scan in reverse, skip interruptions and stop hook feedback, find real task
     interruption_pattern = re.compile(r"^\[Request interrupted by user")
+    stop_hook_pattern = re.compile(r"^Stop hook feedback:")
+
     for i in range(len(user_indices) - 1, -1, -1):
         user_index = user_indices[i]
         message_text = messages[user_index].get("text") or ""
-        if not interruption_pattern.match(message_text):
+
+        # Skip interruptions and stop hook feedback - find actual task request
+        if not interruption_pattern.match(message_text) and not stop_hook_pattern.match(message_text):
             return messages[user_index:]
 
-    # All user messages are interruptions - return from first one
+    # All user messages are interruptions/stop hooks - return from first one
     return messages[user_indices[0] :]
 
 
