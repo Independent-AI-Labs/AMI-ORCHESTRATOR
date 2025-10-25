@@ -1,4 +1,4 @@
-## COMPREHENSIVE VIOLATION PATTERNS (67 TOTAL)
+## COMPREHENSIVE VIOLATION PATTERNS (69 TOTAL)
 
 ALL patterns below are STRICTLY FORBIDDEN with ZERO TOLERANCE.
 Patterns consolidated from comprehensive codebase audit of 217 Python files.
@@ -160,6 +160,47 @@ Patterns consolidated from comprehensive codebase audit of 217 Python files.
 #### Import Failure Suppression
 - **Pattern**: `try: import X; except ImportError: logger.debug("failed"); continue`
 - **Impact**: Silent dependency failures, missing features at runtime, incomplete initialization
+
+#### Lazy Imports (Import Inside Function/Method)
+- **Pattern**: Import statements inside function or method bodies instead of module top-level
+- **Example violations**:
+  ```python
+  def process_data():
+      from pathlib import Path  # VIOLATION
+      from .config import get_config  # VIOLATION
+      return Path("/tmp")
+  ```
+- **Required fix**: Move all imports to module top-level (after module docstring, before code)
+  ```python
+  from pathlib import Path
+  from scripts.automation.config import get_config
+
+  def process_data():
+      return Path("/tmp")
+  ```
+- **Impact**: Dependencies hidden from static analysis, import errors occur at runtime instead of module load time, makes dependency tracking impossible, violates PEP 8, breaks IDE autocomplete, circular import issues masked
+- **ALLOWED**: Only in rare cases with extensive multi-line justification explaining why lazy import is architecturally required (circular dependency that cannot be refactored, optional heavy dependency that must be deferred)
+- **IMPORTANT**: REMOVING lazy imports (moving them to top-level) is ALWAYS allowed and encouraged, even if they have justification comments
+- **Correct approach**: All imports at module top-level; use `TYPE_CHECKING` guard for type-only imports; refactor circular dependencies instead of using lazy imports
+
+#### Relative Imports (Dot Notation)
+- **Pattern**: Import statements using relative dot notation (`from .module` or `from ..package.module`)
+- **Example violations**:
+  ```python
+  from .config import get_config  # VIOLATION
+  from .logger import get_logger  # VIOLATION
+  from ..utils import helper  # VIOLATION
+  ```
+- **Required fix**: Use absolute imports with full package paths
+  ```python
+  from scripts.automation.config import get_config
+  from scripts.automation.logger import get_logger
+  from scripts.utils import helper
+  ```
+- **Impact**: Makes imports fragile to package restructuring, breaks when files moved or module renamed, harder to grep/search for imports, confusing for new developers, breaks some tooling that expects absolute imports
+- **ALLOWED**: NEVER - all imports must be absolute
+- **IMPORTANT**: REMOVING relative imports (converting to absolute) is ALWAYS allowed and encouraged
+- **Correct approach**: Always use full absolute import paths from project root
 
 #### Exception → Empty Collection Return
 - **Pattern**: `try: result = get_data(); except Exception: return {}/[]/None`
