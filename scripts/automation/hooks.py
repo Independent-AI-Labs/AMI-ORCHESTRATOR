@@ -248,7 +248,7 @@ class CommandValidator(HookValidator):
         (r"\bkill\b", "Use KillShell tool for background process management"),
         (r"\bkillall\b", "Use KillShell tool for background process management"),
         (r"\bsudo\b", "Sudo commands not allowed (except in approved scripts)"),
-        (r"\bchmod\b", "File permission changes not allowed"),
+        (r"(?<!--)\bchmod\b", "File permission changes not allowed (git update-index --chmod is allowed)"),
         (r"\bchown\b", "File ownership changes not allowed"),
     ]
 
