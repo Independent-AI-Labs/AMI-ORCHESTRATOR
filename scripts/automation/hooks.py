@@ -229,6 +229,9 @@ class CommandValidator(HookValidator):
         (r"\bgit\b.*\brestore\b", "Git restore forbidden - modifies staging/working tree"),
         (r"\bgit\b.*\breset\b", "Git reset forbidden - modifies HEAD/staging/working tree"),
         (r"\bgit\b.*\bcheckout\b", "Git checkout forbidden - modifies working tree"),
+        (r"\bgit\b.*\bpull\b", "Git pull forbidden - modifies working tree"),
+        (r"\bgit\b.*\brebase\b", "Git rebase forbidden - rewrites history"),
+        (r"\bgit\b.*\bmerge\b", "Git merge forbidden - modifies working tree"),
         (r"\bgit\b.*\brm\b.*--cached", "Git rm --cached forbidden - removes files from git index"),
         # Check && before & to avoid false matches (second & in && would match &(?!&))
         (r"&&", "Use separate Bash calls instead of &&"),
