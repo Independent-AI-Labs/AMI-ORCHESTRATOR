@@ -2,21 +2,23 @@
 
 **THE OPEN-SOURCE HYPERSCALER**
 
-Enterprise-grade infrastructure for AI automation and governance. EU AI Act compliant by design. Run anywhere.
+Secure infrastructure for scalable enterprise automation and governance. ISO / NIST / EU AI Act compliant by design. Run anywhere.
 
-[![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![EU AI Act](https://img.shields.io/badge/EU_AI_Act-100%25_Architected-blue.svg)](compliance/)
+[![Python 3.12+](https://img.shields.io/badge/Python_-3.12+-blue.svg)](https://www.python.org/downloads/)
+[![License](https://img.shields.io/badge/License-MIT_-green.svg)](LICENSE)
+[![EU AI Act](https://img.shields.io/badge/EU_AI_Act_|_GDPR_-Compliant-blue.svg)](compliance/)
+[![ISO](https://img.shields.io/badge/ISO_9001_|_27001_|_42001_-Compliant-blue.svg)](compliance/)
+[![NIST](https://img.shields.io/badge/NIST_AI_CSF_|_RMF_-Compliant-blue.svg)](compliance/)
 
 ---
 
 ## Why AMI-ORCHESTRATOR
 
-**The only open-source platform architected for full EU AI Act compliance.**
+**The only digital platform architected for 100% industry-compliance with 0 vendor lock-in.**
 
 ### Production Ready ✅
 
-- **Multi-Storage DataOps**: Dgraph, PostgreSQL, PgVector, Redis, OpenBao, REST – single unified API
+- **Multi-Storage DataOps**: Dgraph, PostgreSQL, PgVector, Prometheus, Redis, OpenBao, REST – single unified API
 - **Comprehensive MCP Servers**: DataOps (7 tools), SSH (4 tools), Browser (11 tool families), Files (filesystem + Git + extraction)
 - **60+ Production Tests**: Chrome automation, session persistence, script validation, document processing
 - **Cryptographic Audit Trail**: UUID v7 provenance, immutable logging (EU AI Act Article 12)
@@ -28,9 +30,9 @@ Enterprise-grade infrastructure for AI automation and governance. EU AI Act comp
 
 ```
 Layer 4: GOVERNANCE    → Compliance Manifest, Risk Management, Human Oversight
-Layer 3: INTELLIGENCE  → Self-Evolution Engine, Proof Generators, ML Models
-Layer 2: OPERATIONAL   → Secure Process Nodes (SPNs), Cryptographic State Tokens (CSTs)
-Layer 1: FOUNDATION    → Layer 0 Axioms (immutable), Genesis Kernel, Process Theory
+Layer 3: INTELLIGENCE  → Verifiable Software Development & Evolution, Proof Generation, ML Models
+Layer 2: OPERATIONAL   → Secure Process Nodes (SPNs), Cryptographic State Tokens for Auditable Provenance (CSTs)
+Layer 1: FOUNDATION    → Immutable Code & Axioms, Process Theory, Safety Protocols
 ```
 
 | Standard | Coverage | Target |
