@@ -168,7 +168,7 @@ def get_messages_until_last_user(transcript_path: Path) -> list[dict[str, str | 
     return messages[: last_user_index + 1]
 
 
-def _is_actual_user_message(line: str) -> bool:
+def is_actual_user_message(line: str) -> bool:
     """Check if JSONL line is actual user input (not tool result or interruption).
 
     Args:
@@ -242,7 +242,7 @@ def get_messages_from_last_user_forward(transcript_path: Path, num_user_messages
         if msg:
             messages.append(msg)
             # Track only actual user messages (not tool results/interruptions)
-            if _is_actual_user_message(line):
+            if is_actual_user_message(line):
                 actual_user_indices.append(len(messages) - 1)
 
     if not actual_user_indices:
@@ -287,4 +287,5 @@ __all__ = [
     "get_messages_until_last_user",
     "get_messages_from_last_user_forward",
     "format_messages_for_prompt",
+    "is_actual_user_message",
 ]

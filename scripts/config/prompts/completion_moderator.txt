@@ -147,6 +147,34 @@ BLOCK: Invalid FEEDBACK. Assistant has tools to complete work but stopped to ask
 
 ---
 
+## INTELLIGENT CORRECTIONS (SPECIAL CASE)
+
+**ALLOW if assistant CORRECTED obvious user errors:**
+
+Signs of intelligent correction:
+- User requested non-existent path/command/tool
+- Assistant verified it doesn't exist (showed checking with which/ls/glob/etc.)
+- Assistant used correct alternative
+- Assistant explained the correction to user
+
+**Examples:**
+- User: "use /dones launcher" → Assistant: "(/dones not found, using /ami-run.sh)" → ALLOW
+- User: "run pythom" → Assistant: "(pythom is typo, using python3)" → ALLOW
+- User: "use xyz tool" → Assistant: "(xyz doesn't exist, using abc instead)" → ALLOW
+
+**Validation criteria:**
+1. Check conversation for verification steps (which, ls, glob, find, etc.)
+2. Check assistant explained the issue to user
+3. Verify user's intent was fulfilled with correct tool/path
+
+**BLOCK only if:**
+- No verification shown (assistant just guessed)
+- No explanation given to user
+- Different approach not justified
+- User explicitly requires exact tool (not a typo/error case)
+
+---
+
 ## DECISION RULES
 
 ### ALLOW if:
@@ -154,6 +182,7 @@ BLOCK: Invalid FEEDBACK. Assistant has tools to complete work but stopped to ask
 - All claims verified with tools
 - No invalid FEEDBACK patterns found
 - Work is actually complete
+- OR: Intelligent correction made (see above)
 
 ### BLOCK if:
 - ANY user requirement not met

@@ -14,7 +14,7 @@ from typing import Any, Literal, cast
 from scripts.automation.agent_cli import AgentConfigPresets, AgentError, get_agent_cli
 from scripts.automation.config import get_config
 from scripts.automation.logger import get_logger
-from scripts.automation.transcript import format_messages_for_prompt, get_messages_from_last_user_forward
+from scripts.automation.transcript import format_messages_for_prompt, get_messages_from_last_user_forward, is_actual_user_message
 
 # Resource limits (DoS protection)
 MAX_HOOK_INPUT_SIZE = 10 * 1024 * 1024  # 10MB
@@ -427,6 +427,50 @@ class ResponseScanner(HookValidator):
 
     COMPLETION_MARKERS = ["WORK DONE", "FEEDBACK:"]
 
+    def _is_greeting_exchange(self, transcript_path: Path, last_assistant_message: str) -> bool:
+        """Check if conversation is just a greeting/initialization with no work requested.
+
+        Args:
+            transcript_path: Path to transcript file
+            last_assistant_message: Last assistant message text
+
+        Returns:
+            True if this is a greeting exchange, False if work was requested
+        """
+        try:
+            lines = transcript_path.read_text(encoding="utf-8").splitlines()
+
+            # Count actual user messages (not tool results or hook feedback)
+            actual_user_count = 0
+            for line in lines:
+                if is_actual_user_message(line):
+                    actual_user_count += 1
+
+            # Greeting exchange criteria:
+            # 1. Very few user messages (≤1)
+            # 2. AND last assistant message is asking for work (contains greeting patterns)
+            if actual_user_count <= 1:
+                greeting_patterns = [
+                    r"what would you like",
+                    r"what can I help",
+                    r"ready to assist",
+                    r"ready to help",
+                    r"how can I help",
+                    r"what do you need",
+                    r"waiting for.*task",
+                    r"awaiting.*task",
+                ]
+                for pattern in greeting_patterns:
+                    if re.search(pattern, last_assistant_message, re.IGNORECASE):
+                        return True
+
+            return False
+
+        except Exception as e:
+            self.logger.warning("greeting_check_error", error=str(e))
+            # On error, assume not a greeting (safer to require completion markers)
+            return False
+
     def validate(self, hook_input: HookInput) -> HookResult:
         """Scan last assistant message.
 
@@ -436,17 +480,16 @@ class ResponseScanner(HookValidator):
         Returns:
             Validation result
         """
+        # Early allow conditions
         if not hook_input.transcript_path:
             return HookResult.allow()
 
         transcript_path = hook_input.transcript_path
-
         if not transcript_path.exists():
             return HookResult.allow()
 
-        # Read transcript
         last_message = self._get_last_assistant_message(transcript_path)
-        if not last_message:
+        if not last_message or self._is_greeting_exchange(transcript_path, last_message):
             return HookResult.allow()
 
         # Check for completion markers FIRST

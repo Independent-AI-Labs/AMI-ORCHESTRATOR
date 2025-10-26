@@ -9,11 +9,11 @@ from pathlib import Path
 import pytest
 
 from scripts.automation.transcript import (
-    _is_actual_user_message,
     format_messages_for_prompt,
     get_last_n_messages,
     get_messages_from_last_user_forward,
     get_messages_until_last_user,
+    is_actual_user_message,
 )
 
 
@@ -436,7 +436,7 @@ class TestFormatMessagesForPrompt:
 
 
 class TestIsActualUserMessage:
-    """Tests for _is_actual_user_message helper."""
+    """Tests for is_actual_user_message helper."""
 
     def test_actual_user_message_with_string_content(self) -> None:
         """Actual user message with string content returns True (REAL Claude format)."""
@@ -452,7 +452,7 @@ class TestIsActualUserMessage:
             }
         )
 
-        assert _is_actual_user_message(line) is True
+        assert is_actual_user_message(line) is True
 
     def test_tool_result_with_array_content_returns_false(self) -> None:
         """Tool result messages with array content return False (REAL Claude format)."""
@@ -470,7 +470,7 @@ class TestIsActualUserMessage:
             }
         )
 
-        assert _is_actual_user_message(line) is False
+        assert is_actual_user_message(line) is False
 
     def test_interruption_marker_returns_false(self) -> None:
         """Interruption marker messages return False."""
@@ -481,7 +481,7 @@ class TestIsActualUserMessage:
             }
         )
 
-        assert _is_actual_user_message(line) is False
+        assert is_actual_user_message(line) is False
 
     def test_stop_hook_feedback_returns_false(self) -> None:
         """Stop hook feedback messages return False (REAL Claude format)."""
@@ -506,7 +506,7 @@ class TestIsActualUserMessage:
             }
         )
 
-        assert _is_actual_user_message(line) is False
+        assert is_actual_user_message(line) is False
 
     def test_completion_moderator_prompt_returns_false(self) -> None:
         """Completion moderator prompt messages return False."""
@@ -530,7 +530,7 @@ class TestIsActualUserMessage:
             }
         )
 
-        assert _is_actual_user_message(line) is False
+        assert is_actual_user_message(line) is False
 
     def test_assistant_message_returns_false(self) -> None:
         """Assistant messages return False (REAL Claude format)."""
@@ -547,16 +547,16 @@ class TestIsActualUserMessage:
             }
         )
 
-        assert _is_actual_user_message(line) is False
+        assert is_actual_user_message(line) is False
 
     def test_empty_line_returns_false(self) -> None:
         """Empty lines return False."""
-        assert _is_actual_user_message("") is False
-        assert _is_actual_user_message("   ") is False
+        assert is_actual_user_message("") is False
+        assert is_actual_user_message("   ") is False
 
     def test_invalid_json_returns_false(self) -> None:
         """Invalid JSON returns False."""
-        assert _is_actual_user_message("not json{") is False
+        assert is_actual_user_message("not json{") is False
 
 
 class TestGetMessagesFromLastUserForward:
