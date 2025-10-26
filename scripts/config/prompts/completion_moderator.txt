@@ -175,6 +175,57 @@ Signs of intelligent correction:
 
 ---
 
+## PREMATURE COMPLETION CORRECTIONS (SPECIAL CASE)
+
+**ALLOW if assistant initially claimed completion prematurely BUT THEN FIXED IT:**
+
+This handles the common pattern where:
+1. Assistant claims "WORK DONE" prematurely
+2. Stop hook correctly identifies work is incomplete
+3. Assistant acknowledges the issue and continues working
+4. Assistant completes the remaining work
+5. Assistant claims "WORK DONE" again (legitimately this time)
+
+**Key indicators this pattern applies:**
+- Multiple "WORK DONE" claims in conversation history
+- Earlier claims were blocked by stop hook with valid reasons
+- Assistant acknowledged the incompleteness and continued working
+- FINAL state shows work is actually complete
+- All requirements now met (verified via tools)
+
+**How to validate:**
+1. Identify all "WORK DONE" markers in conversation
+2. Check if earlier ones were correctly blocked (incomplete work, missing permissions, etc.)
+3. Verify assistant continued working after being blocked
+4. Check FINAL state using verification tools (git status, file reads, test results)
+5. If FINAL state is complete → ALLOW (ignore earlier false starts)
+
+**Examples:**
+
+**Example A: ALLOW (Premature claim corrected)**
+```
+User: Create executable scripts
+Assistant: Created scripts. WORK DONE
+Stop hook: Scripts not executable (-rw-rw-r--)
+Assistant: Fixed permissions (mode 755). Scripts now executable. WORK DONE
+Verification: ls -la shows -rwxr-xr-x, ./script.sh works
+Output: ALLOW
+```
+
+**Example B: BLOCK (Still incomplete after multiple attempts)**
+```
+User: Fix 10 test failures
+Assistant: Fixed 3 tests. WORK DONE
+Stop hook: Only 3/10 tests fixed
+Assistant: Fixed 2 more tests. WORK DONE
+Verification: pytest shows 5 failures remaining
+Output: BLOCK: Only 5/10 tests fixed. Work incomplete.
+```
+
+**CRITICAL:** Judge based on FINAL STATE, not the journey. If assistant made mistakes but corrected them, that's acceptable completion.
+
+---
+
 ## DECISION RULES
 
 ### ALLOW if:
@@ -183,12 +234,13 @@ Signs of intelligent correction:
 - No invalid FEEDBACK patterns found
 - Work is actually complete
 - OR: Intelligent correction made (see above)
+- OR: Premature completion corrected (see above)
 
 ### BLOCK if:
 - ANY user requirement not met
 - Claims don't match verification (git status, file reads, etc.)
 - Invalid FEEDBACK detected (skip/cheat/progress patterns)
-- Work incomplete
+- Work incomplete (even after corrections)
 - Cannot verify claims
 
 ---
