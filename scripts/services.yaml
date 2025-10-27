@@ -197,6 +197,7 @@ profiles:
     services:
       - data-postgres
       - data-redis
+      - data-dgraph
       - openbao
       - secrets-broker
       - searxng

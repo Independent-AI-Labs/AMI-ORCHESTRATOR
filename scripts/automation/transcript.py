@@ -211,50 +211,6 @@ def is_actual_user_message(line: str) -> bool:
     return False
 
 
-def get_messages_from_last_user_forward(transcript_path: Path, num_user_messages: int = 3) -> list[dict[str, str | None]]:
-    """Get messages from Nth-last actual user request through end.
-
-    Finds actual human user input (not tool results or interruptions),
-    goes back N user messages, returns from there through end of transcript.
-    This ensures moderator receives full context including original request.
-
-    Args:
-        transcript_path: Path to Claude Code transcript file (JSONL format)
-        num_user_messages: Number of actual user messages to go back (default 3)
-
-    Returns:
-        List of messages from Nth-last actual user request through end.
-        Includes original request, all assistant work, and completion marker.
-        Empty list if insufficient user messages found.
-
-    Raises:
-        FileNotFoundError: If transcript file doesn't exist
-    """
-    if not transcript_path.exists():
-        raise FileNotFoundError(f"Transcript not found: {transcript_path}")
-
-    lines = transcript_path.read_text(encoding="utf-8").splitlines()
-    messages: list[dict[str, str | None]] = []
-    actual_user_indices: list[int] = []
-
-    for line in lines:
-        msg = _parse_message_from_json(line)
-        if msg:
-            messages.append(msg)
-            # Track only actual user messages (not tool results/interruptions)
-            if is_actual_user_message(line):
-                actual_user_indices.append(len(messages) - 1)
-
-    if not actual_user_indices:
-        return []
-
-    # Go back N actual user messages from end
-    target_index = max(0, len(actual_user_indices) - num_user_messages)
-    start_message_index = actual_user_indices[target_index]
-
-    return messages[start_message_index:]
-
-
 def format_messages_for_prompt(messages: list[dict[str, str | None]]) -> str:
     """Format messages as readable text for LLM analysis.
 
@@ -285,7 +241,6 @@ def format_messages_for_prompt(messages: list[dict[str, str | None]]) -> str:
 __all__ = [
     "get_last_n_messages",
     "get_messages_until_last_user",
-    "get_messages_from_last_user_forward",
     "format_messages_for_prompt",
     "is_actual_user_message",
 ]

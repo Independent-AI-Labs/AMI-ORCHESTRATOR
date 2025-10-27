@@ -37,13 +37,18 @@ class JSONFormatter(logging.Formatter):
 class StructuredLogger:
     """Structured logger wrapper."""
 
-    def __init__(self, name: str):
+    def __init__(self, name: str, session_id: str | None = None):
         """Initialize structured logger.
 
         Args:
             name: Logger name
+            session_id: Optional session ID for per-session log files
         """
-        self.logger = logging.getLogger(name)
+        self.name = name
+        self.session_id = session_id
+        # Create unique logger instance per session to avoid handler conflicts
+        logger_key = f"{name}:{session_id}" if session_id else name
+        self.logger = logging.getLogger(logger_key)
         self._setup()
 
     def _setup(self) -> None:
@@ -62,11 +67,14 @@ class StructuredLogger:
 
         # File handler (JSON, with rotation)
         try:
-            log_dir = config.root / config.get("paths.logs") / self.logger.name
+            log_dir = config.root / config.get("paths.logs") / self.name
             log_dir.mkdir(parents=True, exist_ok=True)
 
-            log_file = log_dir / f"{datetime.now():%Y-%m-%d}.log"
+            # Use session-specific log file (session_id required)
+            if not self.session_id:
+                raise ValueError(f"session_id required for logger '{self.name}' - daily log files are forbidden")
 
+            log_file = log_dir / f"{self.session_id}.log"
             file_handler = logging.FileHandler(log_file)
             file_handler.setFormatter(JSONFormatter())
             self.logger.addHandler(file_handler)
@@ -123,13 +131,14 @@ class StructuredLogger:
         self.logger.handle(record)
 
 
-def get_logger(name: str) -> StructuredLogger:
+def get_logger(name: str, session_id: str | None = None) -> StructuredLogger:
     """Get or create structured logger.
 
     Args:
         name: Logger name
+        session_id: Optional session ID for per-session log files
 
     Returns:
         StructuredLogger instance
     """
-    return StructuredLogger(name)
+    return StructuredLogger(name, session_id)

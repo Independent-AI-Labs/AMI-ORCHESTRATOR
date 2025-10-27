@@ -1,49 +1,75 @@
 # Open AMI
 
-Research framework for building AI systems with formal safety guarantees and compliance-by-design.
+**Theoretical framework for building AI systems with formal safety guarantees and compliance-by-design.**
+
+> **⚠️ STATUS**: OpenAMI is a research framework describing future capabilities. The production [AMI-ORCHESTRATOR](../../README.md) platform implements foundational infrastructure (DataOps, MCP servers, compliance mapping), but advanced OpenAMI features (SPNs, CSTs, self-evolution) remain in research phase (target Q4 2025 - Q2 2026).
 
 ## What This Is
 
-Open AMI is the theoretical framework and implementation roadmap for self-evolving AI systems that can prove their own safety. The core idea: AI that improves itself through formally verified steps, with cryptographic proof it won't violate constraints.
+Open AMI is a theoretical framework and long-term roadmap for self-evolving AI systems that can prove their own safety. Core concept: AI that improves itself through formally verified steps, with cryptographic proof it won't violate safety constraints.
 
 ## Current Status
 
-**Theory and design complete:**
-- Four Pillars architecture (Compliance, Integrity, Abstraction, Dynamics)
-- Bootstrapping approach for safe self-evolution
+**Theoretical work complete:**
+- Four Pillars architecture (Compliance, Integrity, Abstraction, Dynamics) - [specifications](../../compliance/docs/research/OpenAMI/)
+- Bootstrapping approaches for safe self-evolution - [learning/](../../learning/)
 - Never-Jettison principle for constraint preservation
-- Compliance framework mapping to EU AI Act, ISO, NIST
+- Compliance mapping: EU AI Act, ISO 42001, ISO 27001, NIST - [research docs](../../compliance/docs/research/)
 
-**Infrastructure implemented:**
-- Multi-storage DataOps layer
-- MCP servers for AI integration
-- Document processing and browser automation
-- See [AMI-ORCHESTRATOR](../../README.md) for working code
+**Production infrastructure (AMI-ORCHESTRATOR):**
+- ✅ Multi-storage DataOps (Dgraph, PostgreSQL, PgVector, Redis, OpenBao, REST)
+- ✅ MCP servers: DataOps (10 tools), SSH (4 tools), Browser (11 families), Files (27 tools)
+- ✅ Cryptographic audit trails (UUID v7, immutable logging)
+- ✅ 60+ integration tests, production-ready automation
+- See [main README](../../README.md) for complete capabilities
 
-**In development:**
+**Research phase (Q4 2025 - Q2 2026):**
 - Secure Process Nodes (SPN) abstraction
-- Cryptographic State Tokens (CST)
-- Formal verification integration
+- Cryptographic State Tokens (CST) implementation
+- Formal verification integration (Lean/Coq)
 - Self-evolution engine (AAL/AADL compilers)
+- Compliance MCP server with governance tools
 
 ## Documentation
 
-Most documentation describes the target architecture, not current implementation:
+**⚠️ Important**: OpenAMI documentation describes **theoretical/target architecture**, not current production code. For working capabilities, see [main README](../../README.md).
 
-- [What is Open AMI?](./overview/what-is-openami.md) - Core concepts
-- [Executive Summary](./overview/executive-summary.md) - Vision and goals
-- [Implementation Status](./IMPLEMENTATION-STATUS.md) - What exists vs. what's planned
-- [Quick Start](./guides/quickstart.md) - Getting started guide
+- [What is Open AMI?](./overview/what-is-openami.md) - Theoretical framework overview
+- [Executive Summary](./overview/executive-summary.md) - Vision for decision makers
+- [System Architecture](./architecture/system-architecture.md) - Four-layer design (aspirational)
+- [Quick Start (ARCHIVED)](../archive/quickstart-openami-aspirational.md) - Aspirational examples (not yet implemented)
 
 ## Research Foundation
 
-The theoretical work is complete:
-- [Bootstrapping approaches](../../learning/) - DSE-AI and formal verification methods
-- [Open AMI paper](../../compliance/docs/research/) - Complete framework specification
-- [Synthesis](../../learning/SYNTHESIS-OPENAMI-BOOTSTRAP.md) - Integration of approaches
+Complete theoretical specifications and research:
+
+**Bootstrapping Approaches** ([learning/](../../learning/)):
+- [SYNTHESIS-OPENAMI-BOOTSTRAP.md](../../learning/SYNTHESIS-OPENAMI-BOOTSTRAP.md) - Unified framework
+- [bootstrap.md](../../learning/bootstrap.md) - Gemini DSE-AI (deterministic self-evolution)
+- [incremental.md](../../learning/incremental.md) - Claude formal verification approach
+- [SECURITY-MODEL.md](../../learning/SECURITY-MODEL.md) - Threat model and protections
+
+**OpenAMI Specifications** ([compliance/docs/research/OpenAMI/](../../compliance/docs/research/OpenAMI/)):
+- [Architecture pillars](../../compliance/docs/research/OpenAMI/architecture/pillars.md) - Four Pillars detailed design
+- [Compliance manifest](../../compliance/docs/research/OpenAMI/systems/compliance_manifest.md) - Formal specification system
+- [OAMI protocol](../../compliance/docs/research/OpenAMI/systems/oami_protocol.md) - Communication protocol
+- [Governance alignment](../../compliance/docs/research/OpenAMI/compliance/governance_alignment.md) - Standards mapping
+
+**Implementation Planning**:
+- [OPENAMI-COMPLIANCE-MAPPING.md](../../compliance/docs/research/OPENAMI-COMPLIANCE-MAPPING.md) - Standards integration
+- [EXECUTIVE_ACTION_PLAN.md](../../compliance/docs/research/EXECUTIVE_ACTION_PLAN.md) - Implementation roadmap and timeline
 
 ## Getting Started
 
-See the main [AMI-ORCHESTRATOR README](../../README.md) for setup instructions and current capabilities.
+**For production infrastructure:**
+See [AMI-ORCHESTRATOR README](../../README.md) for:
+- Installation and setup instructions
+- MCP server documentation and examples
+- Current production capabilities (DataOps, SSH, Browser, Files)
+- Integration tests and quality gates
 
-For the OpenAMI vision and roadmap, start with [What is Open AMI?](./overview/what-is-openami.md).
+**For OpenAMI research and vision:**
+Start with [What is Open AMI?](./overview/what-is-openami.md) to understand the theoretical framework, then explore:
+- [Executive Summary](./overview/executive-summary.md) - Business case and value proposition
+- [System Architecture](./architecture/system-architecture.md) - Technical design (aspirational)
+- [Research specifications](../../compliance/docs/research/OpenAMI/) - Complete framework docs

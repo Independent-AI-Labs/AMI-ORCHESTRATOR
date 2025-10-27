@@ -9,6 +9,7 @@ Ensures git modules are fully committed and pushed upstream with zero tolerance 
 """
 
 import time
+import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -45,7 +46,8 @@ class SyncExecutor:
     def __init__(self) -> None:
         """Initialize sync executor."""
         self.config = get_config()
-        self.logger = get_logger("sync")
+        self.session_id = str(uuid.uuid4())
+        self.logger = get_logger("sync", session_id=self.session_id)
         self.cli = get_agent_cli()
 
     def sync_module(self, module_path: Path) -> SyncResult:
@@ -106,12 +108,14 @@ Signal completion:
 {additional_context}
 """
 
-            # Execute worker
+            # Execute worker with streaming enabled
             worker_prompt = prompts_dir / "sync_worker.txt"
+            worker_config = AgentConfigPresets.sync_worker(self.session_id)
+            worker_config.enable_streaming = True
             worker_output = self.cli.run_print(
                 instruction_file=worker_prompt,
                 stdin=worker_instruction,
-                agent_config=AgentConfigPresets.sync_worker(),
+                agent_config=worker_config,
             )
 
             # Parse completion marker
@@ -139,10 +143,12 @@ WORKER OUTPUT:
 WORKER STATUS: {worker_status}
 """
 
+            moderator_config = AgentConfigPresets.sync_moderator(self.session_id)
+            moderator_config.enable_streaming = True
             moderator_output = self.cli.run_print(
                 instruction_file=moderator_prompt,
                 stdin=validation_context,
-                agent_config=AgentConfigPresets.sync_moderator(),
+                agent_config=moderator_config,
             )
 
             # Record attempt

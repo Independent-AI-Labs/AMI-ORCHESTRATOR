@@ -4,6 +4,8 @@
 **Reading Time**: 30-45 minutes
 **Prerequisites**: [What is Open AMI?](../overview/what-is-openami.md)
 
+> **⚠️ CRITICAL NOTE**: This document describes the **TARGET ARCHITECTURE** for Open AMI, not the current production state of AMI-ORCHESTRATOR. Most components described here are in **research/specification phase** (Q4 2025 - Q2 2026). For actual production capabilities, see the [main README](../../../README.md) and [Current Implementation Status](#current-implementation-status) at the end of this document.
+
 ---
 
 ## Learning Objectives
@@ -94,10 +96,13 @@ The Foundation Layer establishes the **immutable bedrock** of the entire system.
 
 #### 1. Layer 0 Axioms (Never Jettison)
 
+> **📋 SPECIFICATION ONLY** - Not yet implemented. Target: Q4 2025.
+
 Formal safety axioms that **can never be violated**, regardless of AI evolution:
 
 ```lean
--- Simplified representation (actual implementation in Lean/Coq)
+-- ILLUSTRATIVE SPECIFICATION (not actual code)
+-- Proposed formalization in Lean 4 for future implementation
 structure Layer0Axioms where
   -- Safety axioms (non-negotiable)
   no_deception : ∀ (action : Action), ¬ involves_deception(action)
@@ -117,13 +122,16 @@ structure Layer0Axioms where
     verifies(proof, claim)
 ```
 
-**Critical Property**: These axioms are **loaded from immutable storage** during every verification. The AI cannot modify, reinterpret, or weaken them.
+**Critical Property**: These axioms would be **loaded from immutable storage** during every verification. The AI cannot modify, reinterpret, or weaken them.
 
 #### 2. Genesis Kernel
+
+> **📋 SPECIFICATION ONLY** - Not yet implemented. Target: Q4 2025.
 
 Core execution principles from Gemini's DSE-AI approach:
 
 ```python
+# ILLUSTRATIVE SPECIFICATION (not actual code)
 class GenesisKernel:
     """
     Immutable foundation defining how AI executes and evolves.
@@ -164,13 +172,17 @@ Formal mathematical models for goals, processes, and learning:
 - **Learning Theory**: Formal models of knowledge acquisition
 - **Cognitive Maps**: Multi-level abstraction structures
 
-**Implementation Location**: `/compliance/docs/research/Open AMI Chapters I-IV.tex` (theoretical foundation)
+**Theoretical Foundation**: `/compliance/docs/research/Open AMI Chapters I-IV.tex` (research paper, not code)
 
 #### 4. OAMI Protocol Specification
+
+> **🟡 PARTIAL** - Basic MCP response model exists. Full OAMI protocol: Target Q1 2026.
 
 Defines secure communication between components:
 
 ```python
+# ILLUSTRATIVE SPECIFICATION (not actual code)
+# Current: MCPResponse in base/backend/mcp/core/response.py (basic only)
 class OAMIMessage:
     """Base message in OAMI protocol"""
 
@@ -190,7 +202,7 @@ class OAMIMessage:
     audit_metadata: AuditMetadata          # For audit trail
 ```
 
-**Current Implementation**: `/base/backend/mcp/core/response.py` (MCP as OAMI precursor)
+**Current Implementation**: `/base/backend/mcp/core/response.py` - Basic `MCPResponse` model (success/error/data fields only). Full OAMI protocol not yet implemented.
 
 ---
 
@@ -232,10 +244,14 @@ The Secure Distributed System (SDS) provides **verifiable, isolated execution** 
 
 #### 1. Secure Process Nodes (SPNs)
 
+> **🟡 IMPLICIT ONLY** - Currently realized through module isolation (base/, browser/, files/, nodes/). Explicit SPN abstraction layer: Target Q4 2025.
+
 **Definition**: Isolated execution environments that run AI operations with integrity guarantees.
 
-**Implementation**:
+**Proposed Implementation**:
 ```python
+# ILLUSTRATIVE SPECIFICATION (not actual code)
+# Current: Modules (base/, browser/, etc.) provide implicit isolation
 class SecureProcessNode:
     """
     Enhanced SPN combining execution, verification, and compliance.
@@ -381,15 +397,18 @@ class SecureProcessNode:
         )
 ```
 
-**Current Implementation**: Container-based execution via existing modules (`/base`, `/browser`, etc.). SPNs are implicitly realized through module isolation.
+**Current Reality**: Module-level isolation via separate Python packages (`/base`, `/browser`, `/files`, `/nodes`, etc.). NO explicit SPN abstraction exists yet.
 
-**Future Enhancement**: Dedicated SPN abstraction layer wrapping existing modules.
+**Planned Enhancement (Q4 2025)**: Dedicated SPN abstraction layer wrapping existing modules with verification, compliance checking, and CST generation.
 
 #### 2. Meta-Processes
+
+> **📋 SPECIFICATION ONLY** - Not yet implemented. Target: Q1 2026.
 
 **Definition**: Coordination layer managing groups of SPNs for complex workflows.
 
 ```python
+# ILLUSTRATIVE SPECIFICATION (not actual code)
 class MetaProcess:
     """
     Coordinates distributed operations across multiple SPNs.
@@ -473,15 +492,18 @@ class MetaProcess:
         return ActivationSuccess(new_version=proposal.version + 1)
 ```
 
-**Current Implementation**: Not yet implemented. Current system has module-level coordination.
+**Current Reality**: No Meta-Process implementation exists. Current system has ad-hoc module-level coordination.
 
-**Next Steps**: Create Meta-Process abstraction for coordinating base, browser, compliance modules.
+**Planned (Q1 2026)**: Create Meta-Process abstraction for coordinating base, browser, compliance modules with Byzantine consensus.
 
 #### 3. Cryptographic State Tokens (CSTs)
+
+> **📋 SPECIFICATION ONLY** - Not yet implemented. Target: Q1 2026.
 
 **Definition**: Signed snapshots of SPN state enabling rollback and audit.
 
 ```python
+# ILLUSTRATIVE SPECIFICATION (not actual code)
 class CryptographicStateToken:
     """
     Tamper-evident state snapshot.
@@ -568,18 +590,21 @@ class CSTManager:
         return True  # Chain verified back to genesis
 ```
 
-**Current Implementation**: Not yet implemented. DataOps layer has state management via `/base/backend/dataops/core/unified_crud.py` but lacks cryptographic signing.
+**Current Reality**: CSTs do NOT exist. DataOps layer has basic state persistence via `/base/backend/dataops/core/unified_crud.py` but lacks cryptographic signing, provenance chains, or tamper detection.
 
-**Next Steps**: Implement CST layer on top of UnifiedCRUD.
+**Planned (Q1 2026)**: Implement CST layer on top of UnifiedCRUD with HSM integration for signing.
 
 #### 4. DataOps Layer
+
+> **✅ OPERATIONAL** - Fully implemented and production-ready.
 
 **Purpose**: Persistent storage with multi-backend support.
 
 **Current Implementation**: `/base/backend/dataops/`
 
 ```python
-# From unified_crud.py
+# ACTUAL IMPLEMENTATION (verified)
+# From base/backend/dataops/core/unified_crud.py
 class UnifiedCRUD:
     """
     Unified CRUD operations for StorageModel instances.
@@ -599,7 +624,7 @@ class UnifiedCRUD:
         dao = await self._get_dao(model_class, config_index)
         return await dao.find_by_id(uid)
 
-# Storage backends (from storage_types.py)
+# Storage backends (ACTUAL implementation from base/backend/dataops/core/storage_types.py)
 class StorageType(Enum):
     RELATIONAL = "postgres"    # PostgreSQL via asyncpg/SQLAlchemy
     DOCUMENT = "mongodb"       # MongoDB via motor
@@ -612,7 +637,7 @@ class StorageType(Enum):
     VAULT = "vault"            # Secure Vault for secrets
 ```
 
-**Integration with SPNs**: Each SPN uses UnifiedCRUD for persistent state, wrapping it with CST signing.
+**Future Integration with SPNs**: Once SPNs and CSTs are implemented, each SPN will use UnifiedCRUD for persistent state, wrapping operations with CST signing for provenance.
 
 ---
 
@@ -650,12 +675,15 @@ The Intelligence Layer hosts all AI/ML capabilities and the self-evolution engin
 
 ### Core Components
 
+> **📋 LAYER 3 STATUS**: All Intelligence Layer components are in specification phase. No implementation exists. Target: Q1-Q2 2026.
+
 #### 1. Self-Evolution Engine
 
 **Components**:
 
 **Meta-Compiler** (from Gemini DSE-AI):
 ```python
+# ILLUSTRATIVE SPECIFICATION (not actual code)
 class MetaCompiler:
     """
     Compiles high-level AI architecture descriptions (AADL) to
@@ -715,6 +743,7 @@ ARCHITECTURE ImageClassifier_v2 {
 
 **Proof Generator** (from Claude Formal Bootstrap):
 ```python
+# ILLUSTRATIVE SPECIFICATION (not actual code)
 class ProofGenerator:
     """
     Generates formal safety proofs for AI improvements.
@@ -768,9 +797,12 @@ class ProofGenerator:
 
 #### 2. ARUs (Atomic Reasoning Units)
 
+> **📋 SPECIFICATION ONLY** - Not yet implemented. Target: Q2 2026.
+
 **Definition**: Smallest verifiable units of reasoning/computation.
 
 ```python
+# ILLUSTRATIVE SPECIFICATION (not actual code)
 class AtomicReasoningUnit:
     """
     Atomic unit of reasoning with provable properties.
@@ -822,7 +854,7 @@ sentiment_aru = AtomicReasoningUnit(
 )
 ```
 
-**Current Status**: Conceptual. No explicit ARU implementation yet. Modules implicitly act as coarse-grained ARUs.
+**Current Reality**: ARUs do NOT exist in the codebase. Modules (base/, browser/, etc.) are too coarse-grained to qualify as ARUs.
 
 #### 3. Knowledge Graphs & Cognitive Maps
 
@@ -832,7 +864,7 @@ From Open AMI's Abstraction pillar - multi-level knowledge representation:
 - **Mid-level**: Feature representations, embeddings
 - **High-level**: Concepts, relationships, reasoning chains
 
-**Current Implementation**: Basic support via Dgraph graph database in DataOps layer.
+**Current Infrastructure**: Dgraph graph database available via DataOps layer, but no knowledge graph schema or cognitive map implementation exists yet.
 
 ---
 
@@ -874,11 +906,16 @@ The Governance Layer provides **human oversight and policy enforcement**.
 
 ### Core Components
 
+> **📋 LAYER 4 STATUS**: Governance layer components are in research/specification phase. Compliance module has NO backend implementation. Target: Q1 2026.
+
 #### 1. Compliance Manifest ($\mathcal{CM}$)
+
+> **📋 SPECIFICATION ONLY** - No implementation exists. compliance/ module has docs/research only, NO backend/ directory.
 
 **Definition**: Formal specification of ALL system requirements and constraints.
 
 ```python
+# ILLUSTRATIVE SPECIFICATION (not actual code)
 class ComplianceManifest:
     """
     Central specification combining Layer 0 axioms, Genesis Kernel,
@@ -981,13 +1018,16 @@ example_cm = ComplianceManifest(
 )
 ```
 
-**Current Status**: Not yet implemented. Specifications exist in `/compliance` module.
+**Current Reality**: Compliance Manifest does NOT exist. `/compliance` module contains ONLY research documents and specifications, NO backend code.
 
-**Next Steps**: Formalize CM schema and integrate with SPN enforcement.
+**Planned (Q1 2026)**: Formalize CM schema, implement backend, integrate with SPN enforcement layer.
 
 #### 2. Risk Management & Oversight
 
+> **📋 SPECIFICATION ONLY** - Not yet implemented. Target: Q1 2026.
+
 ```python
+# ILLUSTRATIVE SPECIFICATION (not actual code)
 class RiskMonitor:
     """
     Continuous risk assessment during AI operations.
@@ -1038,9 +1078,12 @@ class RiskMonitor:
 
 #### 3. Audit Query System
 
+> **🟡 PARTIAL** - Basic audit trail exists at base/backend/dataops/security/audit_trail.py. Full provenance query system: Target Q1 2026.
+
 Provides complete transparency into system decisions:
 
 ```python
+# ILLUSTRATIVE SPECIFICATION (not actual code)
 class AuditQuerySystem:
     """
     Query interface for audit trail.
@@ -1145,9 +1188,11 @@ Bringing it all together: the 8-step protocol combining all three approaches.
 
 ### Complete Workflow
 
+> **⚠️ ASPIRATIONAL PROTOCOL** - This 8-step protocol describes the TARGET evolution process. NONE of these steps are currently implemented. This is the long-term vision for safe AI self-improvement.
+
 ```
 ┌───────────────────────────────────────────────────────────┐
-│ STEP 1: ANALYZE (Intelligence Layer)                     │
+│ STEP 1: ANALYZE (Intelligence Layer) [NOT IMPLEMENTED]   │
 │ • Monitor performance metrics                             │
 │ • Check against evolutionary directives (from CM)         │
 │ • Identify improvement trigger                            │
@@ -1231,8 +1276,9 @@ At Step 5 (Proof Generation) and Step 6 (Verification), the system MUST:
 3. Generate/verify proof against ORIGINAL constraints
 4. Never use "current AI's version" of axioms
 
-**Code enforcement**:
+**Proposed enforcement mechanism**:
 ```python
+# ILLUSTRATIVE SPECIFICATION (not actual code)
 def verify_never_jettison(ai_version: int, proof: Proof) -> bool:
     """
     Ensure proof validates against ORIGINAL axioms, not current AI's interpretation.
@@ -1266,21 +1312,24 @@ This guarantees that even AI_v1000000 must prove it satisfies the SAME axioms th
 
 ### Current Implementation Status
 
-| Component | Theory (Paper/Synthesis) | Implementation (AMI-ORCHESTRATOR) | Status |
-|-----------|-------------------------|-----------------------------------|--------|
-| **Layer 0 Axioms** | Formal safety axioms (Lean/Coq) | Not yet implemented | 📋 Spec only |
-| **Genesis Kernel** | Core principles + AAL primitives | Not yet implemented | 📋 Spec only |
-| **SPNs** | Secure execution nodes | Module isolation (base/, browser/, etc.) | 🟡 Partial |
-| **Meta-Processes** | Coordination layer | Not yet implemented | ⭕ Planned |
-| **CSTs** | Cryptographic state tokens | Not yet implemented | 📋 Spec only |
-| **UnifiedCRUD** | Persistent storage | Fully implemented | ✅ Complete |
-| **Storage Backends** | Multi-backend support | 9 backends supported | ✅ Complete |
-| **Compliance Manifest** | Formal specification | Partial (compliance module) | 🟡 Partial |
-| **Meta-Compiler** | AADL → AAL → Model | Not yet implemented | 📋 Spec only |
-| **Proof Generator** | Lean/Coq proofs | Not yet implemented | 📋 Spec only |
-| **Distributed Verification** | BFT consensus | Not yet implemented | 📋 Spec only |
-| **OAMI Protocol** | Secure communication | MCP as precursor | 🟡 Partial |
-| **Audit Ledger** | Immutable provenance | Basic logging | 🟡 Partial |
+**IMPORTANT**: Code examples throughout this document are **ILLUSTRATIVE SPECIFICATIONS**, not actual implementation. Treat all Python code blocks as design proposals unless explicitly marked as implemented.
+
+| Component | Theory (Paper/Synthesis) | Implementation (AMI-ORCHESTRATOR) | Status | Location (if exists) |
+|-----------|-------------------------|-----------------------------------|--------|---------------------|
+| **Layer 0 Axioms** | Formal safety axioms (Lean/Coq) | Not yet implemented | 📋 Spec only | N/A |
+| **Genesis Kernel** | Core principles + AAL primitives | Not yet implemented | 📋 Spec only | N/A |
+| **SPNs** | Secure execution nodes | Module isolation (base/, browser/, etc.) | 🟡 Implicit only | Modules: base/, browser/, files/, nodes/ |
+| **Meta-Processes** | Coordination layer | Not yet implemented | 📋 Spec only | N/A |
+| **CSTs** | Cryptographic state tokens | Not yet implemented | 📋 Spec only | N/A |
+| **UnifiedCRUD** | Persistent storage | Fully implemented | ✅ Complete | base/backend/dataops/core/unified_crud.py |
+| **Storage Backends** | Multi-backend support | 9 backends supported | ✅ Complete | base/backend/dataops/core/storage_types.py |
+| **Compliance Manifest** | Formal specification | Research/spec docs only (NO backend code) | 📋 Spec only | compliance/docs/research/ |
+| **Meta-Compiler** | AADL → AAL → Model | Not yet implemented | 📋 Spec only | N/A |
+| **Proof Generator** | Lean/Coq proofs | Not yet implemented | 📋 Spec only | N/A |
+| **Distributed Verification** | BFT consensus | Not yet implemented | 📋 Spec only | N/A |
+| **OAMI Protocol** | Secure communication | MCP as precursor (basic response model only) | 🟡 Foundation only | base/backend/mcp/core/response.py |
+| **Audit Ledger** | Immutable provenance | Basic audit trail | 🟡 Basic | base/backend/dataops/security/audit_trail.py |
+| **ARUs** | Atomic Reasoning Units | Not yet implemented | 📋 Spec only | N/A |
 
 ### Implementation Roadmap
 
@@ -1412,6 +1461,35 @@ The architecture defends against:
 
 ---
 
-**Last Updated**: 2025-10-02
-**Version**: 1.0.0-rc1
+## Implementation Reality Check
+
+**What EXISTS today (AMI-ORCHESTRATOR production)**:
+- ✅ UnifiedCRUD with 9 storage backends (Postgres, Dgraph, MongoDB, Redis, Vault, etc.)
+- ✅ MCP servers: DataOps, SSH, Browser, Files (50+ tools total)
+- ✅ Basic audit trail (base/backend/dataops/security/audit_trail.py)
+- ✅ Module-level isolation (base/, browser/, files/, nodes/)
+- ✅ 60+ integration tests, production automation
+
+**What DOES NOT exist (research/specification phase)**:
+- ❌ Layer 0 Axioms in Lean/Coq
+- ❌ Genesis Kernel implementation
+- ❌ SPNs (Secure Process Nodes) abstraction
+- ❌ Meta-Processes coordination layer
+- ❌ CSTs (Cryptographic State Tokens)
+- ❌ Compliance Manifest backend
+- ❌ Meta-Compiler (AADL/AAL)
+- ❌ Proof Generator/Verifier
+- ❌ Self-Evolution Engine
+- ❌ ARUs (Atomic Reasoning Units)
+- ❌ Full OAMI Protocol (only basic MCP response model)
+- ❌ Byzantine consensus verification
+- ❌ Complete provenance chain
+
+**For actual production capabilities**, see [AMI-ORCHESTRATOR README](../../../README.md).
+
+---
+
+**Last Updated**: 2025-10-27
+**Version**: 1.1.0 (Updated to reflect implementation reality)
 **Authors**: Architecture Team, based on Open AMI paper + Gemini DSE-AI + Claude Formal Bootstrap
+**Status**: TARGET ARCHITECTURE - Most components in research phase (Q4 2025 - Q2 2026)

@@ -33,12 +33,12 @@ class TestBashHooksEnforcement:
     def test_all_moderator_presets_have_enable_hooks_false(self) -> None:
         """Verify all moderator presets have enable_hooks=False."""
         moderator_presets = [
-            AgentConfigPresets.audit(),
-            AgentConfigPresets.audit_diff(),
-            AgentConfigPresets.consolidate(),
-            AgentConfigPresets.task_moderator(),
-            AgentConfigPresets.sync_moderator(),
-            AgentConfigPresets.completion_moderator(),
+            AgentConfigPresets.audit(session_id="test-session"),
+            AgentConfigPresets.audit_diff(session_id="test-session"),
+            AgentConfigPresets.consolidate(session_id="test-session"),
+            AgentConfigPresets.task_moderator(session_id="test-session"),
+            AgentConfigPresets.sync_moderator(session_id="test-session"),
+            AgentConfigPresets.completion_moderator(session_id="test-session"),
         ]
 
         for preset in moderator_presets:
@@ -99,7 +99,7 @@ class TestBashHooksEnforcement:
 
     def test_run_print_creates_bash_only_settings(self, agent_cli: ClaudeAgentCLI) -> None:
         """Test that run_print() creates bash-only settings when enable_hooks=False."""
-        agent_config = AgentConfigPresets.completion_moderator()
+        agent_config = AgentConfigPresets.completion_moderator(session_id="test-session")
         assert agent_config.enable_hooks is False
 
         with patch.object(agent_cli, "_create_bash_only_hooks_file") as mock_create_hooks, patch("subprocess.Popen") as mock_popen:
@@ -132,19 +132,19 @@ class TestBashHooksEnforcement:
                 pass
 
     def test_bash_guard_in_completion_moderator(self) -> None:
-        """Test that completion_moderator preset will have bash guard."""
-        preset = AgentConfigPresets.completion_moderator()
+        """Test that completion_moderator preset does NOT have Bash (read-only analysis)."""
+        preset = AgentConfigPresets.completion_moderator(session_id="test-session")
 
-        # Should have Bash in allowed tools
+        # Should NOT have Bash (read-only analysis agent - analyzes conversation data only)
         assert preset.allowed_tools is not None
-        assert "Bash" in preset.allowed_tools
+        assert "Bash" not in preset.allowed_tools
 
-        # Should have enable_hooks=False (will use bash-only settings)
+        # Should have enable_hooks=False
         assert preset.enable_hooks is False
 
     def test_bash_guard_in_task_moderator(self) -> None:
         """Test that task_moderator does NOT have Bash (read-only)."""
-        preset = AgentConfigPresets.task_moderator()
+        preset = AgentConfigPresets.task_moderator(session_id="test-session")
 
         # Should NOT have Bash (read-only moderator)
         assert preset.allowed_tools is not None
@@ -155,7 +155,7 @@ class TestBashHooksEnforcement:
 
     def test_bash_guard_in_sync_moderator(self) -> None:
         """Test that sync_moderator has Bash with guard enabled."""
-        preset = AgentConfigPresets.sync_moderator()
+        preset = AgentConfigPresets.sync_moderator(session_id="test-session")
 
         # Should have Bash for git commands
         assert preset.allowed_tools is not None
@@ -166,14 +166,14 @@ class TestBashHooksEnforcement:
 
     def test_worker_preset_has_full_hooks(self) -> None:
         """Test that worker preset has ALL hooks enabled (not bash-only)."""
-        preset = AgentConfigPresets.worker()
+        preset = AgentConfigPresets.worker(session_id="test-session")
 
         # Should have enable_hooks=True (full hooks, not selective)
         assert preset.enable_hooks is True
 
     def test_interactive_preset_has_full_hooks(self) -> None:
         """Test that interactive preset has ALL hooks enabled."""
-        preset = AgentConfigPresets.interactive()
+        preset = AgentConfigPresets.interactive(session_id="test-session")
 
         # Should have enable_hooks=True
         assert preset.enable_hooks is True

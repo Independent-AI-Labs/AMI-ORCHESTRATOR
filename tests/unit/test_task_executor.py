@@ -232,7 +232,7 @@ FAIL: Multiple issues:
         result = executor._parse_moderator_result(output)
 
         assert result["status"] == "fail"
-        assert result["reason"] == "Moderator output unclear"
+        assert result["reason"] == "Moderator validation unclear - no explicit PASS or FAIL in output"
 
     def test_pass_case_sensitive(self):
         """PASS is case sensitive."""

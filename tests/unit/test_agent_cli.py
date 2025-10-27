@@ -26,7 +26,7 @@ class TestAgentConfig:
     @pytest.mark.skipif(AgentConfig is None, reason="AgentConfig not implemented yet")
     def test_create_basic_config(self):
         """AgentConfig creates with required fields."""
-        config = AgentConfig(model="claude-sonnet-4-5")
+        config = AgentConfig(model="claude-sonnet-4-5", session_id="test-session")
 
         assert config.model == "claude-sonnet-4-5"
         assert config.allowed_tools is None
@@ -36,21 +36,21 @@ class TestAgentConfig:
     @pytest.mark.skipif(AgentConfig is None, reason="AgentConfig not implemented yet")
     def test_default_allowed_tools(self):
         """AgentConfig defaults allowed_tools to None."""
-        config = AgentConfig(model="test-model")
+        config = AgentConfig(model="test-model", session_id="test-session")
 
         assert config.allowed_tools is None  # All tools allowed
 
     @pytest.mark.skipif(AgentConfig is None, reason="AgentConfig not implemented yet")
     def test_default_enable_hooks(self):
         """AgentConfig defaults enable_hooks to True."""
-        config = AgentConfig(model="test-model")
+        config = AgentConfig(model="test-model", session_id="test-session")
 
         assert config.enable_hooks is True
 
     @pytest.mark.skipif(AgentConfig is None, reason="AgentConfig not implemented yet")
     def test_default_timeout(self):
         """AgentConfig defaults timeout to 180."""
-        config = AgentConfig(model="test-model")
+        config = AgentConfig(model="test-model", session_id="test-session")
 
         assert config.timeout == 180
 
@@ -61,7 +61,7 @@ class TestAgentConfigPresets:
     @pytest.mark.skipif(AgentConfigPresets is None, reason="AgentConfigPresets not implemented yet")
     def test_audit_preset(self):
         """audit() preset has correct config."""
-        config = AgentConfigPresets.audit()
+        config = AgentConfigPresets.audit(session_id="test-session")
 
         assert config.model == "claude-sonnet-4-5"
         assert "WebSearch" in config.allowed_tools
@@ -72,7 +72,7 @@ class TestAgentConfigPresets:
     @pytest.mark.skipif(AgentConfigPresets is None, reason="AgentConfigPresets not implemented yet")
     def test_audit_diff_preset(self):
         """audit_diff() preset has correct config."""
-        config = AgentConfigPresets.audit_diff()
+        config = AgentConfigPresets.audit_diff(session_id="test-session")
 
         assert config.model == "claude-sonnet-4-5"
         assert "WebSearch" in config.allowed_tools
@@ -83,7 +83,7 @@ class TestAgentConfigPresets:
     @pytest.mark.skipif(AgentConfigPresets is None, reason="AgentConfigPresets not implemented yet")
     def test_consolidate_preset(self):
         """consolidate() preset has correct config."""
-        config = AgentConfigPresets.consolidate()
+        config = AgentConfigPresets.consolidate(session_id="test-session")
 
         assert config.model == "claude-sonnet-4-5"
         assert "Read" in config.allowed_tools
@@ -95,7 +95,7 @@ class TestAgentConfigPresets:
     @pytest.mark.skipif(AgentConfigPresets is None, reason="AgentConfigPresets not implemented yet")
     def test_worker_preset(self):
         """worker() preset has correct config."""
-        config = AgentConfigPresets.worker()
+        config = AgentConfigPresets.worker(session_id="test-session")
 
         assert config.model == "claude-sonnet-4-5"
         assert config.allowed_tools is None  # All tools
@@ -105,7 +105,7 @@ class TestAgentConfigPresets:
     @pytest.mark.skipif(AgentConfigPresets is None, reason="AgentConfigPresets not implemented yet")
     def test_interactive_preset(self):
         """interactive() preset has correct config."""
-        config = AgentConfigPresets.interactive()
+        config = AgentConfigPresets.interactive(session_id="test-session")
 
         assert config.model == "claude-sonnet-4-5"
         assert config.allowed_tools is None

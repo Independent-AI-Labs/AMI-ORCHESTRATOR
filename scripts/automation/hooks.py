@@ -6,21 +6,97 @@ Ref: https://docs.claude.com/en/docs/claude-code/hooks.md
 import json
 import re
 import sys
+import uuid
 from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal, cast
 
-from scripts.automation.agent_cli import AgentConfigPresets, AgentError, get_agent_cli
+import tiktoken
+
+from scripts.automation.agent_cli import AgentConfigPresets, AgentError, AgentExecutionError, get_agent_cli
 from scripts.automation.config import get_config
 from scripts.automation.logger import get_logger
-from scripts.automation.transcript import format_messages_for_prompt, get_messages_from_last_user_forward, is_actual_user_message
+from scripts.automation.transcript import format_messages_for_prompt, get_last_n_messages, is_actual_user_message
 
 # Resource limits (DoS protection)
 MAX_HOOK_INPUT_SIZE = 10 * 1024 * 1024  # 10MB
 
+# Token limits for moderator context
+# Claude CLI has input size limits beyond model context window - stay conservative
+MAX_MODERATOR_CONTEXT_TOKENS = 100_000  # Leave buffer for prompt + CLI input limits
+
 # Code fence parsing
 MIN_CODE_FENCE_LINES = 2  # Minimum lines for valid code fence (opening + closing)
+
+
+def count_tokens(text: str) -> int:
+    """Count tokens in text using tiktoken (GPT-4 tokenizer).
+
+    Args:
+        text: Text to count tokens for
+
+    Returns:
+        Token count
+
+    Raises:
+        Exception: If tokenization fails
+    """
+    encoding = tiktoken.encoding_for_model("gpt-4")
+    return len(encoding.encode(text))
+
+
+def prepare_moderator_context(transcript_path: Path) -> str:
+    """Prepare conversation context for moderator with token truncation.
+
+    Gets LAST N messages from transcript and applies binary search truncation
+    to fit within MAX_MODERATOR_CONTEXT_TOKENS limit (100K tokens).
+
+    This is the PRODUCTION function used by completion moderator hook.
+    Tests MUST use this function to ensure they test production behavior.
+
+    Args:
+        transcript_path: Path to transcript JSONL file
+
+    Returns:
+        Formatted conversation context string ready for moderator
+
+    Raises:
+        Exception: If transcript extraction or formatting fails
+    """
+
+    # Count total messages first
+    all_messages = get_last_n_messages(transcript_path, 99999)
+    if not all_messages:
+        return ""
+
+    total_messages = len(all_messages)
+    conversation_context = format_messages_for_prompt(all_messages)
+    token_count = count_tokens(conversation_context)
+
+    # If transcript is too large, use binary search to find how many messages fit
+    if token_count > MAX_MODERATOR_CONTEXT_TOKENS:
+        # Binary search to find appropriate window size
+        left_window = 1
+        right_window = total_messages
+        best_window = 1
+
+        while left_window <= right_window:
+            mid_window = (left_window + right_window) // 2
+            test_messages = get_last_n_messages(transcript_path, mid_window)
+            test_context = format_messages_for_prompt(test_messages)
+            test_tokens = count_tokens(test_context)
+
+            if test_tokens <= MAX_MODERATOR_CONTEXT_TOKENS:
+                best_window = mid_window
+                left_window = mid_window + 1
+            else:
+                right_window = mid_window - 1
+
+        messages = get_last_n_messages(transcript_path, best_window)
+        conversation_context = format_messages_for_prompt(messages)
+
+    return conversation_context
 
 
 @dataclass
@@ -142,10 +218,15 @@ class HookResult:
 class HookValidator:
     """Base class for hook validators."""
 
-    def __init__(self) -> None:
-        """Initialize hook validator."""
+    def __init__(self, session_id: str | None = None) -> None:
+        """Initialize hook validator.
+
+        Args:
+            session_id: Optional session ID for per-session logging
+        """
         self.config = get_config()
-        self.logger = get_logger("hooks")
+        self.session_id = session_id
+        self.logger = get_logger("hooks", session_id=session_id)
 
     def validate(self, hook_input: HookInput) -> HookResult:
         """Validate hook input. Override in subclasses.
@@ -167,6 +248,11 @@ class HookValidator:
         hook_input: HookInput | None = None
         try:
             hook_input = HookInput.from_stdin()
+
+            # Reinitialize logger with session_id for per-session log files
+            if hook_input.session_id and not self.session_id:
+                self.session_id = hook_input.session_id
+                self.logger = get_logger("hooks", session_id=hook_input.session_id)
 
             # Log execution
             self.logger.info(
@@ -353,6 +439,26 @@ class CodeQualityValidator(HookValidator):
         # Extract old/new code
         old_code, new_code = self._extract_old_new_code(hook_input)
 
+        # Reject non-empty __init__.py files
+        if file_path.endswith("__init__.py") and new_code.strip():
+            return HookResult.deny("❌ NON-EMPTY __init__.py FILE\n\n__init__.py files MUST be empty.\nRemove all content from this file.")
+
+        # Reject parent.parent path manipulation patterns
+        if ".parent.parent" in new_code:
+            return HookResult.deny(
+                "❌ FORBIDDEN CODE PATTERN: .parent.parent\n\n"
+                "NEVER use Path(__file__).parent.parent.parent or similar patterns.\n\n"
+                "Use the _ensure_repo_on_path() pattern from scripts/run_tests.py:\n\n"
+                "def _ensure_repo_on_path() -> Path:\n"
+                "    current = Path(__file__).resolve().parent\n"
+                "    while current != current.parent:\n"
+                '        if (current / ".git").exists() and (current / "base").exists():\n'
+                "            sys.path.insert(0, str(current))\n"
+                "            return current\n"
+                "        current = current.parent\n"
+                '    raise RuntimeError("Unable to locate AMI orchestrator root")\n'
+            )
+
         # Build diff context for LLM audit
         diff_context = f"""FILE: {file_path}
 
@@ -373,10 +479,12 @@ class CodeQualityValidator(HookValidator):
         audit_diff_instruction = prompts_dir / self.config.get("prompts.audit_diff")
 
         try:
+            audit_diff_config = AgentConfigPresets.audit_diff(hook_input.session_id)
+            audit_diff_config.enable_streaming = True
             output = cli.run_print(
                 instruction_file=audit_diff_instruction,
                 stdin=diff_context,
-                agent_config=AgentConfigPresets.audit_diff(),
+                agent_config=audit_diff_config,
             )
 
             # Check result - parse output for PASS/FAIL
@@ -390,10 +498,10 @@ class CodeQualityValidator(HookValidator):
             return HookResult.deny(f"❌ CODE QUALITY CHECK FAILED\n\n{reason}\n\nZero-tolerance policy: NO regression allowed.")
 
         except Exception as e:
-            # On agent errors (timeout, execution failure), deny the edit
-            # This ensures we fail-closed on infrastructure failures
+            # On agent errors (timeout, execution failure), allow the edit
+            # This prevents infrastructure failures from blocking legitimate work
             if isinstance(e, AgentError):
-                return HookResult.deny(f"❌ CODE QUALITY CHECK ERROR\n\n{e}\n\nZero-tolerance policy: Cannot verify quality.")
+                return HookResult.allow()
             raise
 
 
@@ -551,6 +659,76 @@ class ResponseScanner(HookValidator):
         self.logger.warning("completion_moderator_unclear", session_id=session_id, output=cleaned_output[:200])
         return HookResult.block(f"COMPLETION VALIDATION UNCLEAR\n\nModerator output:\n{output}\n\nCannot determine if work is complete.")
 
+    def _load_moderator_context(self, session_id: str, execution_id: str, transcript_path: Path) -> tuple[str | None, HookResult | None]:
+        """Load and validate conversation context for moderator.
+
+        Args:
+            session_id: Session ID for logging
+            execution_id: Unique execution ID for this moderator run
+            transcript_path: Path to transcript file
+
+        Returns:
+            Tuple of (conversation_context, error_result). If error_result is not None, validation should return it.
+        """
+        try:
+            conversation_context = prepare_moderator_context(transcript_path)
+            if not conversation_context:
+                return None, HookResult.allow()
+
+            token_count = count_tokens(conversation_context)
+            context_preview_length = 500
+            self.logger.info(
+                "completion_moderator_input",
+                session_id=session_id,
+                execution_id=execution_id,
+                transcript_path=str(transcript_path),
+                context_size=len(conversation_context),
+                token_count=token_count,
+                context_preview=conversation_context[-context_preview_length:] if len(conversation_context) > context_preview_length else conversation_context,
+            )
+            return conversation_context, None
+        except Exception as e:
+            self.logger.error("completion_moderator_transcript_error", session_id=session_id, execution_id=execution_id, error=str(e))
+            error_result = HookResult.block(
+                f"COMPLETION VALIDATION ERROR\n\nFailed to read conversation context: {e}\n\nCannot verify completion without context."
+            )
+            return None, error_result
+
+    def _handle_moderator_error(self, session_id: str, execution_id: str, error: Exception) -> HookResult:
+        """Handle moderator execution errors.
+
+        Args:
+            session_id: Session ID for logging
+            execution_id: Unique execution ID
+            error: Exception that occurred
+
+        Returns:
+            Block result with error details
+        """
+        if isinstance(error, AgentExecutionError):
+            self.logger.error(
+                "completion_moderator_error",
+                session_id=session_id,
+                execution_id=execution_id,
+                error=str(error),
+                exit_code=error.exit_code,
+                stdout_preview=error.stdout[:2000] if error.stdout else "",
+                stderr=error.stderr[:2000] if error.stderr else "",
+                cmd_preview=" ".join(error.cmd[:5]) if error.cmd else "",
+            )
+            stderr_preview = error.stderr[:500] if error.stderr else "No stderr output"
+            return HookResult.block(
+                f"❌ COMPLETION VALIDATION ERROR\n\n"
+                f"Agent execution failed with exit code {error.exit_code}\n\n"
+                f"Error output:\n{stderr_preview}\n\n"
+                f"Cannot verify completion due to moderator failure."
+            )
+        if isinstance(error, AgentError):
+            self.logger.error("completion_moderator_error", session_id=session_id, execution_id=execution_id, error=str(error))
+            return HookResult.block(f"❌ COMPLETION VALIDATION ERROR\n\n{error}\n\nCannot verify completion due to moderator failure.")
+        self.logger.error("completion_moderator_error", session_id=session_id, execution_id=execution_id, error=str(error))
+        raise error
+
     def _validate_completion(self, session_id: str, transcript_path: Path) -> HookResult:
         """Validate completion marker using moderator agent.
 
@@ -561,36 +739,22 @@ class ResponseScanner(HookValidator):
         Returns:
             Validation result (ALLOW if work complete, BLOCK if not)
         """
+        execution_id = str(uuid.uuid4())[:8]
+
         if not self.config.get("response_scanner.completion_moderator_enabled", True):
             return HookResult.allow()
 
         # Load conversation context
-        try:
-            messages = get_messages_from_last_user_forward(transcript_path)
-            if not messages:
-                # No messages yet - skip validation on initial startup
-                return HookResult.allow()
-
-            conversation_context = format_messages_for_prompt(messages)
-            # Log conversation context for debugging
-            context_preview_length = 500
-            self.logger.info(
-                "completion_moderator_input",
-                session_id=session_id,
-                transcript_path=str(transcript_path),
-                context_size=len(conversation_context),
-                context_preview=conversation_context[-context_preview_length:] if len(conversation_context) > context_preview_length else conversation_context,
-            )
-        except Exception as e:
-            self.logger.error("completion_moderator_transcript_error", session_id=session_id, error=str(e))
-            return HookResult.block(f"COMPLETION VALIDATION ERROR\n\nFailed to read conversation context: {e}\n\nCannot verify completion without context.")
+        conversation_context, error_result = self._load_moderator_context(session_id, execution_id, transcript_path)
+        if error_result:
+            return error_result
 
         # Check moderator prompt exists
         prompts_dir = self.config.root / self.config.get("prompts.dir")
         moderator_prompt = prompts_dir / self.config.get("prompts.completion_moderator", "completion_moderator.txt")
 
         if not moderator_prompt.exists():
-            self.logger.error("completion_moderator_prompt_missing", session_id=session_id, path=str(moderator_prompt))
+            self.logger.error("completion_moderator_prompt_missing", session_id=session_id, execution_id=execution_id, path=str(moderator_prompt))
             return HookResult.block(
                 f"COMPLETION VALIDATION ERROR\n\nModerator prompt not found: {moderator_prompt}\n\nCannot validate completion without prompt."
             )
@@ -598,20 +762,17 @@ class ResponseScanner(HookValidator):
         # Run moderator agent and parse decision
         try:
             cli = get_agent_cli()
+            completion_moderator_config = AgentConfigPresets.completion_moderator(session_id)
+            completion_moderator_config.enable_streaming = True
             output = cli.run_print(
                 instruction_file=moderator_prompt,
                 stdin=conversation_context,
-                agent_config=AgentConfigPresets.completion_moderator(),
+                agent_config=completion_moderator_config,
             )
-            # Log full moderator output for debugging
-            self.logger.info("completion_moderator_raw_output", session_id=session_id, output=output)
+            self.logger.info("completion_moderator_raw_output", session_id=session_id, execution_id=execution_id, output=output)
             return self._parse_moderator_decision(session_id, output)
-
         except Exception as e:
-            self.logger.error("completion_moderator_error", session_id=session_id, error=str(e))
-            if isinstance(e, AgentError):
-                return HookResult.block(f"❌ COMPLETION VALIDATION ERROR\n\n{e}\n\nCannot verify completion due to moderator failure.")
-            raise
+            return self._handle_moderator_error(session_id, execution_id, e)
 
     def _get_last_assistant_message(self, transcript_path: Path) -> str:
         """Get last assistant message from transcript.

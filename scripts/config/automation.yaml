@@ -61,6 +61,8 @@ prompts:
   task_moderator: "task_moderator.txt"
   sync_worker: "sync_worker.txt"
   sync_moderator: "sync_moderator.txt"
+  docs_worker: "docs_worker.txt"
+  docs_moderator: "docs_moderator.txt"
   completion_moderator: "completion_moderator.txt"
 
 # Response Scanner
@@ -127,3 +129,33 @@ tasks:
 sync:
   timeout: 1800  # 30 minutes max per module
   moderator_enabled: true  # Validate with moderator after worker completion
+
+# Documentation Maintenance
+docs:
+  parallel: false  # Sequential by default (async when true)
+  workers: 4  # Parallel worker count (when parallel=true)
+  timeout_per_doc: 600  # 10 minutes max per doc
+  moderator_enabled: true  # Validate with moderator after worker completion
+
+  include_patterns:
+    - "**/*.md"
+
+  exclude_patterns:
+    - "**/CLAUDE.md"      # Agent instructions
+    - "**/AGENTS.md"      # Agent documentation
+    - "**/archive/**"     # Already archived docs
+    - "**/feedback-*.md"  # Task feedback files
+    - "**/progress-*.md"  # Task progress files
+    - "**/node_modules/**"
+    - "**/.git/**"
+    - "**/.venv/**"
+    - "**/venv/**"
+    - "**/__pycache__/**"
+    - "**/*.egg-info/**"
+    - "**/.cache/**"
+    - "**/.pytest_cache/**"
+    - "**/.mypy_cache/**"
+    - "**/.ruff_cache/**"
+    - "**/dist/**"
+    - "**/build/**"
+    - "**/ux/ui-concept/**"

@@ -132,13 +132,13 @@ class TestCreateSettingsFile:
         hooks_config = {
             "hooks": [
                 {
-                    "event": "before_tool_execution",
+                    "event": "PreToolUse",
                     "command": "bash-guard",
                     "matcher": ["Bash"],
                     "timeout": 30000,
                 },
                 {
-                    "event": "after_response",
+                    "event": "Stop",
                     "command": "response-scanner",
                 },
             ],
@@ -165,8 +165,8 @@ class TestCreateSettingsFile:
             settings = json.load(f)
 
         assert "hooks" in settings
-        assert "before_tool_execution" in settings["hooks"]
-        assert "after_response" in settings["hooks"]
+        assert "PreToolUse" in settings["hooks"]
+        assert "Stop" in settings["hooks"]
 
         result.unlink()
 
@@ -184,7 +184,7 @@ class TestCreateSettingsFile:
             settings = json.load(f)
 
         # List matcher ["Bash"] should become "Bash"
-        hook_entry = settings["hooks"]["before_tool_execution"][0]
+        hook_entry = settings["hooks"]["PreToolUse"][0]
         assert hook_entry["matcher"] == "Bash"
 
         result.unlink()
@@ -195,7 +195,10 @@ class TestCreateSettingsFile:
         config.root = Path("/test/root")
         config.get.return_value = "nonexistent/hooks.yaml"
 
-        with pytest.raises(RuntimeError, match="Hooks file not found"):
+        with (
+            patch("scripts.automation.agent_cli.get_config", return_value=config),
+            pytest.raises(RuntimeError, match="Hooks file not found"),
+        ):
             agent_main._create_settings_file(config)
 
     def test_includes_hook_command_timeout(self, tmp_path: Path) -> None:
@@ -203,7 +206,7 @@ class TestCreateSettingsFile:
         hooks_config = {
             "hooks": [
                 {
-                    "event": "before_tool_execution",
+                    "event": "PreToolUse",
                     "command": "test-hook",
                     "timeout": 60000,
                 },
@@ -218,12 +221,13 @@ class TestCreateSettingsFile:
         config.root = tmp_path
         config.get.return_value = "hooks.yaml"
 
-        result = agent_main._create_settings_file(config)
+        with patch("scripts.automation.agent_cli.get_config", return_value=config):
+            result = agent_main._create_settings_file(config)
 
         with result.open() as f:
             settings = json.load(f)
 
-        hook_command = settings["hooks"]["before_tool_execution"][0]["hooks"][0]
+        hook_command = settings["hooks"]["PreToolUse"][0]["hooks"][0]
         assert hook_command["timeout"] == 60000
 
         result.unlink()
@@ -233,7 +237,7 @@ class TestCreateSettingsFile:
         hooks_config = {
             "hooks": [
                 {
-                    "event": "before_tool_execution",
+                    "event": "PreToolUse",
                     "command": "multi-guard",
                     "matcher": ["Edit", "Write", "Delete"],
                 },
@@ -248,12 +252,13 @@ class TestCreateSettingsFile:
         config.root = tmp_path
         config.get.return_value = "hooks.yaml"
 
-        result = agent_main._create_settings_file(config)
+        with patch("scripts.automation.agent_cli.get_config", return_value=config):
+            result = agent_main._create_settings_file(config)
 
         with result.open() as f:
             settings = json.load(f)
 
-        hook_entry = settings["hooks"]["before_tool_execution"][0]
+        hook_entry = settings["hooks"]["PreToolUse"][0]
         assert hook_entry["matcher"] == "Edit|Write|Delete"
 
         result.unlink()

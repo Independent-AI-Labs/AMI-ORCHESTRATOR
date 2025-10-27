@@ -99,7 +99,7 @@ def find_gcloud() -> str | None:
         Path to gcloud binary or None if not found
     """
     # Check for local installation first
-    script_dir = Path(__file__).parent.parent
+    script_dir = Path(__file__).resolve().parents[1]
     local_gcloud = script_dir / ".gcloud" / "google-cloud-sdk" / "bin" / "gcloud"
 
     if local_gcloud.exists():
@@ -619,7 +619,7 @@ async def run_backup(keep_local: bool) -> str:
         BackupError: If any step fails
     """
     # Find root directory
-    root_dir = Path(__file__).parent.parent
+    root_dir = Path(__file__).resolve().parents[1]
 
     # Load configuration
     config = BackupConfig.load(root_dir)

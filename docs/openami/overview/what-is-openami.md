@@ -4,19 +4,21 @@
 **Reading Time**: 15 minutes
 **Prerequisites**: Basic understanding of AI/ML concepts
 
+> **⚠️ STATUS**: This document describes **target architecture and research vision**, not current production capabilities. Most advanced features (self-evolution, formal verification, SPNs/CSTs) are in research/specification phase (Q4 2025 - Q2 2026). For operational capabilities, see [AMI-ORCHESTRATOR README](../../../README.md).
+
 ---
 
 ## The 30-Second Answer
 
-**Open AMI** (Advanced Machine Intelligence) is an enterprise framework for building AI systems that are:
+**Open AMI** (Advanced Machine Intelligence) is a **research framework** and long-term roadmap for building AI systems that will be:
 
-- **Self-Evolving**: AI improves itself through formal, verifiable steps (like compilers)
-- **Provably Safe**: Mathematical proofs guarantee safety constraints are never violated
-- **Fully Accountable**: Every decision traces back to human-specified rules
-- **Compliance-Ready**: Architecture designed for EU AI Act, ISO/IEC, NIST standards
-- **Cryptographically Verified**: Tamper-evident audit trail for all operations
+- **Self-Evolving**: AI improves itself through formal, verifiable steps (like compilers) [TARGET]
+- **Provably Safe**: Mathematical proofs guarantee safety constraints are never violated [TARGET]
+- **Fully Accountable**: Every decision traces back to human-specified rules [PARTIAL]
+- **Compliance-Ready**: Architecture designed for EU AI Act, ISO/IEC, NIST standards [MAPPED]
+- **Cryptographically Verified**: Tamper-evident audit trail for all operations [PARTIAL]
 
-**In other words**: Open AMI makes trustworthy, self-improving AI possible.
+**Current Reality**: Production infrastructure (DataOps, MCP servers, audit logging) provides foundation. Advanced capabilities are theoretical targets.
 
 ---
 
@@ -74,7 +76,7 @@ Traditional AI Development:
 
 ## The Solution: Open AMI's Approach
 
-Open AMI solves these problems through three integrated innovations:
+Open AMI **proposes solutions** to these problems through three integrated innovations (currently in research phase):
 
 ### Innovation 1: Four Pillars Architecture
 
@@ -168,59 +170,61 @@ No matter how many generations, ALWAYS proves against ORIGINAL axioms!
 
 ---
 
-## How It Works: The Unified Protocol
+## How It Works: The Unified Protocol [RESEARCH PHASE]
 
-Every Open AMI evolution follows this 8-step protocol:
+The **proposed** Open AMI evolution protocol combines two research approaches ([Gemini DSE-AI](../../../learning/bootstrap.md) and [Claude Formal Bootstrap](../../../learning/incremental.md)) into an 8-step process:
+
+> **⚠️ IMPLEMENTATION STATUS**: This protocol is **theoretical** and documented in [SYNTHESIS-OPENAMI-BOOTSTRAP.md](../../../learning/SYNTHESIS-OPENAMI-BOOTSTRAP.md). None of these steps are currently operational in AMI-ORCHESTRATOR.
 
 ```
-1. ANALYZE (Gemini DSE-AI)
+1. ANALYZE (Gemini DSE-AI approach)
    ├─ Check performance vs goals
    ├─ Identify improvement triggers
    └─ Formulate hypothesis
 
-2. DESIGN (Gemini DSE-AI)
-   ├─ Write change in AADL (high-level language)
+2. DESIGN (Gemini DSE-AI approach)
+   ├─ Write change in AADL (high-level language) [NOT IMPLEMENTED]
    └─ Describe expected outcome
 
-3. COMPILE (Gemini DSE-AI)
-   ├─ AADL → AAL (low-level instructions)
-   ├─ AAL → Model binary
-   └─ Execute in secure SPN
+3. COMPILE (Gemini DSE-AI approach)
+   ├─ AADL → AAL (low-level instructions) [NOT IMPLEMENTED]
+   ├─ AAL → Model binary [NOT IMPLEMENTED]
+   └─ Execute in secure SPN [NOT IMPLEMENTED]
 
-4. TEST (Gemini DSE-AI)
+4. TEST (Gemini DSE-AI approach)
    ├─ Run deterministic test suite
    ├─ Compare with hypothesis
    └─ Empirical validation
 
-5. PROVE (Claude Formal Bootstrap)
-   ├─ Generate formal safety proof
-   ├─ Prove Layer 0 axioms satisfied
-   └─ Prove properties preserved
+5. PROVE (Claude Formal Bootstrap approach)
+   ├─ Generate formal safety proof [NOT IMPLEMENTED]
+   ├─ Prove Layer 0 axioms satisfied [NOT IMPLEMENTED]
+   └─ Prove properties preserved [NOT IMPLEMENTED]
 
-6. VERIFY (Claude + Open AMI)
-   ├─ Distributed proof checking (5 SPNs)
-   ├─ Byzantine fault tolerance (4/5 consensus)
-   └─ HSM cryptographic signing
+6. VERIFY (Combined approach)
+   ├─ Distributed proof checking (5 SPNs) [NOT IMPLEMENTED]
+   ├─ Byzantine fault tolerance (4/5 consensus) [NOT IMPLEMENTED]
+   └─ HSM cryptographic signing [NOT IMPLEMENTED]
 
-7. LOG (All Three)
-   ├─ Justification triad (hypothesis/trigger/results)
-   ├─ Formal proof (hash + signatures)
-   ├─ CST state snapshot
-   └─ Append to immutable audit ledger
+7. LOG (Audit trail)
+   ├─ Justification triad (hypothesis/trigger/results) [NOT IMPLEMENTED]
+   ├─ Formal proof (hash + signatures) [NOT IMPLEMENTED]
+   ├─ CST state snapshot [NOT IMPLEMENTED]
+   └─ Append to immutable audit ledger [PARTIAL: base/backend/dataops/security/audit_trail.py]
 
-8. ACTIVATE (Open AMI SDS)
-   ├─ Governance layer approval
-   ├─ SDS coordinates deployment
-   └─ New version live (old kept for rollback)
+8. ACTIVATE (SDS coordination)
+   ├─ Governance layer approval [NOT IMPLEMENTED]
+   ├─ SDS coordinates deployment [NOT IMPLEMENTED]
+   └─ New version live (old kept for rollback) [NOT IMPLEMENTED]
 ```
 
-Every single improvement must pass ALL 8 steps. No exceptions.
+**Target Implementation**: Q4 2025 - Q2 2026 (see [EXECUTIVE_ACTION_PLAN.md](../../../compliance/docs/research/EXECUTIVE_ACTION_PLAN.md))
 
 ---
 
-## Architecture: The Four Layers
+## Architecture: The Four Layers [TARGET DESIGN]
 
-Open AMI is organized into four interconnected layers:
+The **proposed** Open AMI architecture organizes into four interconnected layers (see [system-architecture.md](../architecture/system-architecture.md) for details):
 
 ```
 ┌─────────────────────────────────────────────────────────┐
@@ -258,125 +262,137 @@ Open AMI is organized into four interconnected layers:
 └─────────────────────────────────────────────────────────┘
 ```
 
-### Key Components
+### Key Components [RESEARCH PHASE]
 
-**Secure Process Nodes (SPNs)**
+> **⚠️ NOTE**: All components below are **theoretical constructs** defined in research specifications under [compliance/docs/research/OpenAMI/](../../../compliance/docs/research/OpenAMI/). None are currently implemented in AMI-ORCHESTRATOR.
+
+**Secure Process Nodes (SPNs)** [NOT IMPLEMENTED]
 - Isolated execution environments (containers/TEEs)
 - Local compliance checks
 - Integrity verification
 - Cryptographic operations
+- Defined in: [process_theory.md](../../../compliance/docs/research/OpenAMI/architecture/process_theory.md)
 
-**Meta-Processes**
+**Meta-Processes** [NOT IMPLEMENTED]
 - Coordinate groups of SPNs
 - Enforce system-wide policies
 - Aggregate verification results
 - Interface to governance layer
 
-**Compliance Manifest ($\mathcal{CM}$)**
+**Compliance Manifest ($\mathcal{CM}$)** [NOT IMPLEMENTED]
 - Formal specification of all requirements
 - Includes Layer 0 axioms
 - Includes Genesis Kernel principles
 - Cryptographically signed
+- Defined in: [compliance_manifest.md](../../../compliance/docs/research/OpenAMI/systems/compliance_manifest.md)
 
-**Cryptographic State Tokens (CSTs)**
+**Cryptographic State Tokens (CSTs)** [NOT IMPLEMENTED]
 - Signed snapshots of SPN states
 - Enable rollback
 - Provide audit trail
 - Ensure non-repudiation
 
-**OAMI Protocol**
+**OAMI Protocol** [PARTIAL]
 - Secure communication between components
 - Request/response patterns
 - Authentication via mTLS
 - Integrity via signatures
+- Defined in: [oami_protocol.md](../../../compliance/docs/research/OpenAMI/systems/oami_protocol.md)
+- Current: MCP servers use stdio/HTTP transport (see [README.md](../../../README.md#mcp-integration))
 
 ---
 
-## What Makes Open AMI Different?
+## What Makes Open AMI Different? [TARGET VISION]
+
+> **Note**: Comparisons below describe **target capabilities**, not current implementation. See [README.md](../../../README.md) for actual production features.
 
 ### vs. Traditional MLOps
 
-| Traditional MLOps | Open AMI |
+| Traditional MLOps | Open AMI (Target) |
 |------------------|----------|
-| Post-hoc compliance checks | Compliance by design |
-| Empirical testing only | Formal proofs + testing |
-| Manual model updates | Automated safe evolution |
-| No provenance guarantees | Cryptographic provenance |
-| Black box models | Multi-abstraction transparency |
+| Post-hoc compliance checks | Compliance by design [TARGET] |
+| Empirical testing only | Formal proofs + testing [TARGET] |
+| Manual model updates | Automated safe evolution [TARGET] |
+| No provenance guarantees | Cryptographic provenance [PARTIAL] |
+| Black box models | Multi-abstraction transparency [TARGET] |
 
 ### vs. LLM + Tools Paradigm
 
-| LLM + Tools | Open AMI |
+| LLM + Tools | Open AMI (Target) |
 |-------------|----------|
-| LLM reasoning (opaque) | Formal reasoning (ARUs) |
-| External tool calls (unverified) | Verified computation (SPNs) |
-| Ad-hoc guardrails | Architectural constraints |
-| No evolution mechanism | Self-evolution with proofs |
-| Testing-based trust | Proof-based trust |
+| LLM reasoning (opaque) | Formal reasoning (ARUs) [TARGET] |
+| External tool calls (unverified) | Verified computation (SPNs) [TARGET] |
+| Ad-hoc guardrails | Architectural constraints [PARTIAL] |
+| No evolution mechanism | Self-evolution with proofs [TARGET] |
+| Testing-based trust | Proof-based trust [TARGET] |
 
 ### vs. Constitutional AI
 
-| Constitutional AI | Open AMI |
+| Constitutional AI | Open AMI (Target) |
 |------------------|----------|
-| Rules in training | Rules in architecture |
-| Training-time alignment | Runtime enforcement |
-| Natural language rules | Formal + natural language |
-| Single model | Distributed system |
-| No self-evolution | Self-evolution with verification |
+| Rules in training | Rules in architecture [TARGET] |
+| Training-time alignment | Runtime enforcement [TARGET] |
+| Natural language rules | Formal + natural language [TARGET] |
+| Single model | Distributed system [PARTIAL: MCP servers operational] |
+| No self-evolution | Self-evolution with verification [TARGET] |
 
 ---
 
-## Real-World Applications
+## Real-World Applications [TARGET VISION]
 
-### 1. Healthcare AI
+> **Note**: These are **proposed use cases** demonstrating how the complete Open AMI framework would address real-world challenges. Current production capabilities are limited to infrastructure (see [README.md](../../../README.md)).
+
+### 1. Healthcare AI [FUTURE]
 
 **Challenge**: FDA requires explainability, safety proofs, audit trails
 
-**Open AMI Solution**:
-- ✅ Every diagnosis traceable to training data + rules
-- ✅ Formal proof that AI respects safety constraints
-- ✅ Complete audit log for FDA inspection
-- ✅ Self-improvement within safety bounds
+**Proposed Open AMI Solution**:
+- 🎯 Every diagnosis traceable to training data + rules [TARGET]
+- 🎯 Formal proof that AI respects safety constraints [TARGET]
+- 🔵 Complete audit log for FDA inspection [PARTIAL: audit_trail.py]
+- 🎯 Self-improvement within safety bounds [TARGET]
 
-### 2. Financial Trading
+### 2. Financial Trading [FUTURE]
 
 **Challenge**: Regulators demand accountability, risk management
 
-**Open AMI Solution**:
-- ✅ Every trade justified with formal reasoning
-- ✅ Risk constraints enforced at architecture level
-- ✅ Byzantine fault tolerance prevents manipulation
-- ✅ Immutable audit trail for compliance
+**Proposed Open AMI Solution**:
+- 🎯 Every trade justified with formal reasoning [TARGET]
+- 🎯 Risk constraints enforced at architecture level [TARGET]
+- 🎯 Byzantine fault tolerance prevents manipulation [TARGET]
+- 🔵 Immutable audit trail for compliance [PARTIAL: audit_trail.py]
 
-### 3. Autonomous Vehicles
+### 3. Autonomous Vehicles [FUTURE]
 
 **Challenge**: Safety-critical, must prove correctness
 
-**Open AMI Solution**:
-- ✅ Formal verification of safety properties
-- ✅ Real-time compliance monitoring
-- ✅ Immediate rollback on anomaly detection
-- ✅ Continuous improvement with safety proofs
+**Proposed Open AMI Solution**:
+- 🎯 Formal verification of safety properties [TARGET]
+- 🎯 Real-time compliance monitoring [TARGET]
+- 🎯 Immediate rollback on anomaly detection [TARGET]
+- 🎯 Continuous improvement with safety proofs [TARGET]
 
-### 4. Enterprise AI Assistants
+### 4. Enterprise AI Assistants [FUTURE]
 
 **Challenge**: Handle sensitive data, meet data protection regulations
 
-**Open AMI Solution**:
-- ✅ Privacy-preserving computation (TEEs)
-- ✅ Access control at component level
-- ✅ Data governance via Compliance Manifest
-- ✅ Self-evolution respects privacy constraints
+**Proposed Open AMI Solution**:
+- 🎯 Privacy-preserving computation (TEEs) [TARGET]
+- 🔵 Access control at component level [PARTIAL: DataOps supports ACLs]
+- 🎯 Data governance via Compliance Manifest [TARGET]
+- 🎯 Self-evolution respects privacy constraints [TARGET]
+
+**Legend**: 🎯 = Target capability (not implemented) | 🔵 = Partial implementation | ✅ = Fully implemented
 
 ---
 
-## Key Technologies
+## Key Technologies [TARGET/RESEARCH]
 
-### Formal Verification
+### Formal Verification [TARGET]
 
-Open AMI uses theorem provers (Lean/Coq) to generate mathematical proofs that AI satisfies safety properties.
+**Proposed approach**: Use theorem provers (Lean/Coq) to generate mathematical proofs that AI satisfies safety properties.
 
-**Example Proof Obligation**:
+**Example Proof Obligation** (theoretical):
 ```lean
 theorem ai_preserves_safety :
   ∀ (ai_v_n : AIVersion) (ai_v_next : AIVersion),
@@ -384,25 +400,30 @@ theorem ai_preserves_safety :
   satisfies_axioms(ai_v_next, layer0_axioms)
 ```
 
+**Status**: Research phase. See [incremental.md](../../../learning/incremental.md) for Claude Formal Bootstrap approach.
+
 ### Cryptographic Guarantees
 
-- **CSTs**: Signed state snapshots using HSM/TPM
-- **Provenance Chain**: Blockchain-like linking of evolution steps
-- **Distributed Verification**: Byzantine fault-tolerant consensus
-- **Non-Repudiation**: All actions cryptographically signed
+- **CSTs**: Signed state snapshots using HSM/TPM [TARGET]
+- **Provenance Chain**: Blockchain-like linking of evolution steps [TARGET]
+- **Distributed Verification**: Byzantine fault-tolerant consensus [TARGET]
+- **Non-Repudiation**: All actions cryptographically signed [PARTIAL: audit_trail.py uses UUID v7]
+- **Current**: Basic immutable audit logging in base/backend/dataops/security/audit_trail.py
 
 ### Distributed Systems
 
-- **SPNs**: Isolated, secure execution nodes
-- **Meta-Processes**: Hierarchical coordination
-- **OAMI Protocol**: Secure inter-component communication
-- **BFT Consensus**: 4/5 verifiers must agree
+- **SPNs**: Isolated, secure execution nodes [TARGET]
+- **Meta-Processes**: Hierarchical coordination [TARGET]
+- **OAMI Protocol**: Secure inter-component communication [PARTIAL: MCP protocol operational]
+- **BFT Consensus**: 4/5 verifiers must agree [TARGET]
+- **Current**: MCP servers provide distributed tooling (DataOps, SSH, Browser, Files)
 
-### Language Stack
+### Language Stack [RESEARCH PHASE]
 
-- **AADL** (AI Architecture Description Language): High-level architectural changes
-- **AAL** (AI Assembly Language): Low-level model modifications
-- **Meta-Compiler**: Translates AADL → AAL → Model
+- **AADL** (AI Architecture Description Language): High-level architectural changes [NOT IMPLEMENTED]
+- **AAL** (AI Assembly Language): Low-level model modifications [NOT IMPLEMENTED]
+- **Meta-Compiler**: Translates AADL → AAL → Model [NOT IMPLEMENTED]
+- **Status**: Theoretical constructs defined in [learning/bootstrap.md](../../../learning/bootstrap.md) (Gemini DSE-AI approach)
 
 ---
 
@@ -410,31 +431,44 @@ theorem ai_preserves_safety :
 
 ### For Evaluators
 
-1. Read [Executive Summary](./executive-summary.md)
-2. Review [Use Cases](./use-cases.md) for your industry
-3. Check [Comparison](./comparison.md) vs alternatives
-4. Schedule demo: enterprise@independentailabs.com
+**Understanding the Vision**:
+1. Read [Executive Summary](./executive-summary.md) for high-level vision
+2. Review use cases in "Real-World Applications" section above (note TARGET status)
+3. Check "What Makes Open AMI Different?" for theoretical comparisons
+4. See [README.md](../../../README.md) for **actual production capabilities**
+
+**Current Reality**: AMI-ORCHESTRATOR provides production DataOps infrastructure and MCP servers. Advanced OpenAMI features are in research phase (Q4 2025 - Q2 2026).
 
 ### For Architects
 
-1. Study [System Architecture](../architecture/system-architecture.md)
-2. Understand [Four Pillars](../architecture/four-pillars.md)
-3. Review [Self-Evolution System](../architecture/self-evolution.md)
-4. Read [Integration Guide](../architecture/integration-guide.md)
+**Target Architecture**:
+1. Study [System Architecture](../architecture/system-architecture.md) (theoretical design)
+2. Review Four Pillars in [architecture/pillars.md](../../../compliance/docs/research/OpenAMI/architecture/pillars.md)
+3. Explore bootstrapping approaches in [learning/SYNTHESIS-OPENAMI-BOOTSTRAP.md](../../../learning/SYNTHESIS-OPENAMI-BOOTSTRAP.md)
+4. Check implementation roadmap in [EXECUTIVE_ACTION_PLAN.md](../../../compliance/docs/research/EXECUTIVE_ACTION_PLAN.md)
+
+**Production System**: See [README.md](../../../README.md) for operational architecture (MCP servers, DataOps layer, etc.)
 
 ### For Developers
 
-1. Follow [Quick Start](../guides/quickstart.md)
-2. Build [Your First Self-Evolving AI](../guides/first-self-evolving-ai.md)
-3. Explore [Module Reference](../modules/README.md)
-4. Check [API Reference](../api/README.md)
+**Production Infrastructure** (available now):
+1. [AMI-ORCHESTRATOR README](../../../README.md) - Production capabilities
+2. [MCP Servers](../../../README.md#mcp-integration) - DataOps, SSH, Browser, Files (50+ tools)
+3. [ami-agent](../../../README.md#ami-agent-reliable-auditable-verifiable-automation) - CLI automation tool
+4. Module setup: `python module_setup.py`
+
+**Research Framework** (future):
+1. [Research Specifications](../../../compliance/docs/research/OpenAMI/) - Theoretical OpenAMI
+2. [Guides README](../guides/README.md) - Future implementation roadmap
+3. [CURRENT_IMPLEMENTATION_STATUS.md](../../../compliance/docs/research/CURRENT_IMPLEMENTATION_STATUS.md) - Gap analysis
 
 ### For Researchers
 
-1. Read [Theoretical Framework](../theory/README.md)
-2. Study [Proofs & Theorems](../theory/proofs/README.md)
-3. Review [Research Papers](../theory/papers/README.md)
-4. Contribute: research@independentailabs.com
+**Theoretical Foundation**:
+1. [Research Specifications](../../../compliance/docs/research/OpenAMI/) - Complete framework specs
+2. [learning/](../../../learning/) - Bootstrapping approaches (Gemini DSE-AI, Claude Formal Bootstrap)
+3. [OPENAMI-COMPLIANCE-MAPPING.md](../../../compliance/docs/research/OPENAMI-COMPLIANCE-MAPPING.md) - Standards integration
+4. [Open AMI Chapters I-IV Peer Review Draft 3.tex](../../../compliance/docs/research/Open%20AMI%20Chapters%20I-IV%20Peer%20Review%20Draft%203.tex) - Academic paper draft
 
 ---
 
@@ -442,40 +476,58 @@ theorem ai_preserves_safety :
 
 ### Q: Is Open AMI production-ready?
 
-**A**: Release Candidate 1 (v1.0.0-rc1) is suitable for pilot deployments. Production-grade release (v1.0.0) expected Q1 2026.
+**A**: The **AMI-ORCHESTRATOR infrastructure** is production-ready (DataOps, MCP servers, audit logging, 60+ tests). The **advanced OpenAMI features** (self-evolution, formal verification, SPNs/CSTs) are in research/specification phase with implementation targeted for Q4 2025 - Q2 2026. No "v1.0.0-rc1" release exists; refer to git tags for actual versions.
 
 ### Q: How does self-evolution work in practice?
 
-**A**: The AI proposes improvements in a high-level language (AADL), which are compiled, tested, formally proven safe, verified by distributed nodes, and then activated if all checks pass. See [Self-Evolution System](../architecture/self-evolution.md).
+**A**: Self-evolution is a **theoretical concept** currently. The proposed 8-step protocol (see "How It Works" section) combines two research approaches but is **not yet implemented**. See [SYNTHESIS-OPENAMI-BOOTSTRAP.md](../../../learning/SYNTHESIS-OPENAMI-BOOTSTRAP.md) for the theoretical framework.
 
 ### Q: What about performance overhead?
 
-**A**: Formal verification adds overhead (proof generation ~seconds to minutes). However, proofs are cached, and verification is parallelized. For production workloads, overhead is <5%.
+**A**: Performance overhead for formal verification is **estimated** (proofs ~seconds to minutes), but this is speculative since the verification system is not implemented. Current production infrastructure (MCP servers, DataOps) has minimal overhead (<5% for audit logging).
 
 ### Q: Can Open AMI work with existing ML frameworks?
 
-**A**: Yes! Open AMI wraps existing models (TensorFlow, PyTorch, etc.) in SPNs and adds verification layers. See [Integration Guide](../architecture/integration-guide.md).
+**A**: **Theoretical design** proposes wrapping existing models (TensorFlow, PyTorch) in SPNs with verification layers, but this is **not yet implemented**. Current system provides infrastructure that could support such integration. See [Research Specifications](../../../compliance/docs/research/OpenAMI/) for the proposed approach.
 
 ### Q: What about closed-source LLMs (GPT-4, Claude)?
 
-**A**: Open AMI can use LLMs as external tools within verified SPNs, but self-evolution requires open models where architecture can be modified.
+**A**: The **theoretical** design proposes using LLMs as external tools within verified SPNs. Self-evolution would require open models for architecture modification. Current system uses LLMs via MCP integration but without the proposed verification layers.
 
 ### Q: Is Open AMI open source?
 
-**A**: Core framework is Apache 2.0 licensed. Enterprise features (advanced verification, support) available via commercial license.
+**A**: Yes. AMI-ORCHESTRATOR is MIT licensed (see [LICENSE](../../../LICENSE)). The codebase is open-source with no commercial licensing mentioned in the repository.
 
 ---
 
 ## Next Steps
 
-Ready to dive deeper? Choose your path:
+### Understanding the Vision
 
-**Decision Makers** → [Executive Summary](./executive-summary.md)
-**Architects** → [System Architecture](../architecture/system-architecture.md)
-**Developers** → [Quick Start](../guides/quickstart.md)
-**Researchers** → [Theoretical Framework](../theory/README.md)
+Ready to dive deeper into the **research framework**? Choose your path:
 
-Have questions? Contact us:
+- **Decision Makers** → [Executive Summary](./executive-summary.md) (vision & roadmap)
+- **Architects** → [System Architecture](../architecture/system-architecture.md) (theoretical design)
+- **Researchers** → [Research Specifications](../../../compliance/docs/research/OpenAMI/) (complete specs)
+
+### Using Production Infrastructure
+
+Want to work with the **operational system**? Start here:
+
+- **Developers** → [AMI-ORCHESTRATOR README](../../../README.md) (production capabilities)
+- **Quick Start** → `git clone` + `python module_setup.py` + [setup guide](../../../README.md#quick-start)
+- **MCP Servers** → [MCP Integration](../../../README.md#mcp-integration) (50+ production tools)
+
+### Contributing
+
+OpenAMI is open-source (MIT). Contributions welcome:
+- **Issues/PRs**: GitHub repository (see [README.md](../../../README.md))
+- **Research**: Theoretical framework specifications in [compliance/docs/research/](../../../compliance/docs/research/)
+- **Development**: Follow [CLAUDE.md](../../../CLAUDE.md) project guidelines
+
+### Questions or Feedback?
+
+Contact us:
 - **General**: hello@independentailabs.com
 - **Technical**: tech@independentailabs.com
 - **Enterprise**: enterprise@independentailabs.com
@@ -484,6 +536,7 @@ Have questions? Contact us:
 ---
 
 **Further Reading**:
-- [Key Concepts](./key-concepts.md) - Deeper dive into core concepts
-- [Use Cases](./use-cases.md) - Industry-specific applications
-- [Comparison](./comparison.md) - How Open AMI compares to alternatives
+- "Real-World Applications" section above shows **target use cases** (not current capabilities)
+- "What Makes Open AMI Different?" section compares **theoretical vision** vs existing approaches
+- [Research Specifications](../../../compliance/docs/research/OpenAMI/) contain complete theoretical foundations
+- [CURRENT_IMPLEMENTATION_STATUS.md](../../../compliance/docs/research/CURRENT_IMPLEMENTATION_STATUS.md) shows gap between vision and reality

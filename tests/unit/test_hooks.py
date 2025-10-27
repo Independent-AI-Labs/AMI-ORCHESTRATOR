@@ -466,6 +466,7 @@ class TestSessionIdLogging:
         """HookValidator logs session_id in hook_execution event."""
         # Mock the logger
         mock_logger = mocker.MagicMock()
+        mocker.patch("scripts.automation.hooks.get_logger", return_value=mock_logger)
 
         # Create a simple validator
         class SimpleValidator(HookValidator):
@@ -473,7 +474,6 @@ class TestSessionIdLogging:
                 return HookResult.allow()
 
         validator = SimpleValidator()
-        validator.logger = mock_logger
 
         # Mock stdin with session_id
         old_stdin = sys.stdin
@@ -510,13 +510,13 @@ class TestSessionIdLogging:
     def test_session_id_logged_in_hook_result(self, mocker):
         """HookValidator logs session_id in hook_result event."""
         mock_logger = mocker.MagicMock()
+        mocker.patch("scripts.automation.hooks.get_logger", return_value=mock_logger)
 
         class SimpleValidator(HookValidator):
             def validate(self, hook_input):
                 return HookResult.deny("test reason")
 
         validator = SimpleValidator()
-        validator.logger = mock_logger
 
         old_stdin = sys.stdin
         hook_data = {
@@ -547,13 +547,13 @@ class TestSessionIdLogging:
     def test_session_id_logged_in_hook_error_with_hook_input(self, mocker):
         """HookValidator logs session_id in hook_error when hook_input available."""
         mock_logger = mocker.MagicMock()
+        mocker.patch("scripts.automation.hooks.get_logger", return_value=mock_logger)
 
         class FailingValidator(HookValidator):
             def validate(self, hook_input):
                 raise RuntimeError("Validation failed")
 
         validator = FailingValidator()
-        validator.logger = mock_logger
 
         old_stdin = sys.stdin
         hook_data = {
@@ -583,13 +583,13 @@ class TestSessionIdLogging:
     def test_session_id_not_in_hook_error_without_hook_input(self, mocker):
         """HookValidator omits session_id from hook_error when hook_input unavailable."""
         mock_logger = mocker.MagicMock()
+        mocker.patch("scripts.automation.hooks.get_logger", return_value=mock_logger)
 
         class SimpleValidator(HookValidator):
             def validate(self, hook_input):
                 return HookResult.allow()
 
         validator = SimpleValidator()
-        validator.logger = mock_logger
 
         # Invalid JSON to trigger JSONDecodeError before hook_input is created
         old_stdin = sys.stdin
@@ -878,8 +878,8 @@ class TestResponseScannerSessionIdLogging:
     @pytest.mark.skipif(ResponseScanner is None, reason="ResponseScanner not implemented yet")
     def test_session_id_logged_in_moderator_transcript_error(self, mocker):
         """ResponseScanner logs session_id in completion_moderator_transcript_error."""
-        # Mock get_messages_from_last_user_forward to raise exception
-        mocker.patch("scripts.automation.hooks.get_messages_from_last_user_forward", side_effect=RuntimeError("Transcript read failed"))
+        # Mock prepare_moderator_context to raise exception
+        mocker.patch("scripts.automation.hooks.prepare_moderator_context", side_effect=RuntimeError("Transcript read failed"))
 
         mock_logger = mocker.MagicMock()
 

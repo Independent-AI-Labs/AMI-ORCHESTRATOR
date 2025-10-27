@@ -8,6 +8,7 @@ import fnmatch
 import hashlib
 import json
 import time
+import uuid
 from collections.abc import Iterator
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
@@ -58,7 +59,8 @@ class AuditEngine:
     def __init__(self) -> None:
         """Initialize audit engine."""
         self.config = get_config()
-        self.logger = get_logger("audit")
+        self.session_id = str(uuid.uuid4())
+        self.logger = get_logger("audit", session_id=self.session_id)
 
     def audit_directory(
         self,
@@ -329,10 +331,12 @@ class AuditEngine:
 ```
 """
 
+            audit_config = AgentConfigPresets.audit(self.session_id)
+            audit_config.enable_streaming = True
             output = cli.run_print(
                 instruction_file=audit_instruction,
                 stdin=audit_prompt,
-                agent_config=AgentConfigPresets.audit(),
+                agent_config=audit_config,
             )
 
             # Parse result - extract PASS/FAIL from output
@@ -630,10 +634,12 @@ File path: `{report_path}`
 
         # run_print() raises AgentExecutionError on non-zero exit
         # If we reach this line, execution was successful
+        consolidate_config = AgentConfigPresets.consolidate(session_id=self.session_id)
+        consolidate_config.enable_streaming = True
         output = cli.run_print(
             instruction_file=consolidate_instruction,
             stdin=context,
-            agent_config=AgentConfigPresets.consolidate(),
+            agent_config=consolidate_config,
         )
 
         self.logger.info("consolidation_result", result=output.strip())

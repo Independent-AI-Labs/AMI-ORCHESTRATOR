@@ -31,7 +31,7 @@ class TestTimeoutEnforcement:
             mock_process.returncode = 0
             mock_popen.return_value = mock_process
 
-            config = AgentConfig(model="test", timeout=30)
+            config = AgentConfig(model="test", session_id="test-session", timeout=30)
             result = cli.run_print(instruction="test", agent_config=config)
 
             # Verify start_new_session=True for process group
@@ -52,7 +52,7 @@ class TestTimeoutEnforcement:
         mock_process.communicate.side_effect = subprocess.TimeoutExpired(cmd=["claude"], timeout=5)
 
         with patch("subprocess.Popen", return_value=mock_process), patch("os.killpg") as mock_killpg, patch("os.getpgid", return_value=12345):
-            config = AgentConfig(model="test", timeout=5)
+            config = AgentConfig(model="test", session_id="test-session", timeout=5)
 
             # Verify AgentTimeoutError raised
             with pytest.raises(AgentTimeoutError) as exc_info:
@@ -76,7 +76,7 @@ class TestTimeoutEnforcement:
             mock_process.returncode = 0
             mock_popen.return_value = mock_process
 
-            config = AgentConfig(model="test", timeout=180)
+            config = AgentConfig(model="test", session_id="test-session", timeout=180)
             result = cli.run_print(instruction="test", agent_config=config)
 
             # Verify timeout parameter passed to communicate()
@@ -94,7 +94,7 @@ class TestTimeoutEnforcement:
             mock_process.returncode = 0
             mock_popen.return_value = mock_process
 
-            config = AgentConfig(model="test", timeout=None)
+            config = AgentConfig(model="test", session_id="test-session", timeout=None)
             result = cli.run_print(instruction="test", agent_config=config)
 
             # Verify no timeout passed to communicate()
@@ -122,7 +122,7 @@ class TestTimeoutLogging:
             patch("os.getpgid", return_value=99999),
             patch.object(cli.logger, "error") as mock_error,
         ):
-            config = AgentConfig(model="test", timeout=60)
+            config = AgentConfig(model="test", session_id="test-session", timeout=60)
 
             with pytest.raises(AgentTimeoutError):
                 cli.run_print(instruction="test", agent_config=config)
@@ -149,7 +149,7 @@ class TestTimeoutLogging:
             patch("os.getpgid", return_value=54321),
             patch.object(cli.logger, "info") as mock_info,
         ):
-            config = AgentConfig(model="test", timeout=15)
+            config = AgentConfig(model="test", session_id="test-session", timeout=15)
 
             with pytest.raises(AgentTimeoutError):
                 cli.run_print(instruction="test", agent_config=config)
@@ -176,7 +176,7 @@ class TestTimeoutLogging:
             patch("os.getpgid", return_value=11111),
             patch.object(cli.logger, "error") as mock_error,
         ):
-            config = AgentConfig(model="test", timeout=20)
+            config = AgentConfig(model="test", session_id="test-session", timeout=20)
 
             # Verify AgentProcessKillError raised on permission error
             with pytest.raises(AgentProcessKillError) as exc_info:

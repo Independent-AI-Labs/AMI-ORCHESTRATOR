@@ -1,207 +1,112 @@
 # Open AMI Guides
 
-Practical how-to guides for common tasks with Open AMI.
+Conceptual guides for the OpenAMI theoretical framework.
+
+> **⚠️ STATUS**: OpenAMI is a research framework (Q4 2025 - Q2 2026 target). For **production infrastructure**, see [AMI-ORCHESTRATOR README](../../../README.md).
 
 ---
 
 ## Quick Navigation
 
-**New to Open AMI?** → Start with [Quick Start](./quickstart.md)
+**New to OpenAMI?** → Start with [What is OpenAMI?](../overview/what-is-openami.md) (conceptual overview)
 
-**Building production systems?** → See [Implementation Guide](../implementation/README.md)
+**Need production docs?** → See [AMI-ORCHESTRATOR README](../../../README.md)
 
-**Need specific help?** → Find your guide below
+**Understanding the vision?** → Read [What is OpenAMI?](../overview/what-is-openami.md)
 
 ---
 
 ## Available Guides
 
-### Getting Started
+**Currently Available:**
+- [**Quick Start (ARCHIVED)**](../../archive/quickstart-openami-aspirational.md) - Aspirational guide describing features not yet implemented (preserved for reference)
 
-| Guide | Time | Difficulty | Status |
-|-------|------|------------|--------|
-| [**Quick Start**](./quickstart.md) | 15-30 min | Beginner | ✅ Complete |
-| [Building Your First Self-Evolving AI](./first-self-evolving-ai.md) | 2-3 hours | Intermediate | ⭕ Planned |
-| [Understanding the Four Pillars](./understanding-pillars.md) | 1 hour | Beginner | ⭕ Planned |
+**Future Research Guides** (Q4 2025 - Q2 2026):
 
-### Core Features
+These guides will be created as OpenAMI components are implemented:
 
-| Guide | Time | Difficulty | Status |
-|-------|------|------------|--------|
-| [Implementing Compliance Constraints](./compliance-constraints.md) | 1-2 hours | Intermediate | ⭕ Planned |
-| [Setting up Distributed Verification](./distributed-verification.md) | 2-3 hours | Advanced | ⭕ Planned |
-| [Creating Custom ARUs](./custom-arus.md) | 1-2 hours | Advanced | ⭕ Planned |
-| [Working with Cryptographic State Tokens](./working-with-csts.md) | 1 hour | Intermediate | ⭕ Planned |
+- **Four Pillars Architecture**: Compliance, Integrity, Abstraction, Dynamics layers
+- **Secure Process Nodes (SPNs)**: Auditable computation abstraction
+- **Cryptographic State Tokens (CSTs)**: Provenance and audit trails
+- **Formal Verification**: Safety proof generation with Lean/Coq
+- **Self-Evolution Protocol**: AAL/AADL compilers and safe evolution
+- **Compliance Manifest**: Governance and standards mapping
 
-### Self-Evolution
-
-| Guide | Time | Difficulty | Status |
-|-------|------|------------|--------|
-| [Writing AADL Code](./writing-aadl.md) | 2 hours | Intermediate | ⭕ Planned |
-| [Generating Safety Proofs](./generating-proofs.md) | 2-3 hours | Advanced | ⭕ Planned |
-| [Understanding the Evolution Protocol](./evolution-protocol.md) | 1 hour | Intermediate | ⭕ Planned |
-
-### Integration
-
-| Guide | Time | Difficulty | Status |
-|-------|------|------------|--------|
-| [Integrating Existing ML Models](./integrating-ml-models.md) | 2 hours | Intermediate | ⭕ Planned |
-| [Connecting to External Data Sources](./external-data-sources.md) | 1 hour | Intermediate | ⭕ Planned |
-| [Using MCP Servers](./using-mcp-servers.md) | 1 hour | Beginner | ⭕ Planned |
-
-### Operations
-
-| Guide | Time | Difficulty | Status |
-|-------|------|------------|--------|
-| [Deploying to Production](./deploying-production.md) | 3-4 hours | Advanced | ⭕ Planned |
-| [Monitoring & Debugging](./debugging.md) | 1-2 hours | Intermediate | ⭕ Planned |
-| [Performance Tuning](./performance-tuning.md) | 2 hours | Advanced | ⭕ Planned |
-| [Security Hardening](./security-hardening.md) | 2-3 hours | Advanced | ⭕ Planned |
+For current architecture specifications, see [research docs](../../../compliance/docs/research/OpenAMI/).
 
 ---
 
-## Guide Categories
+## Production Documentation
 
-### By Role
+**For working infrastructure** (available now), see:
 
 **Developers**
-- Quick Start
-- Building Your First Self-Evolving AI
-- Integrating Existing ML Models
-- Debugging
+- [AMI-ORCHESTRATOR README](../../../README.md) - Setup, installation, capabilities
+- [MCP Servers](../../../README.md#mcp-integration) - DataOps, SSH, Browser, Files tools
+- [ami-agent CLI](../../../README.md#ami-agent-reliable-auditable-verifiable-automation) - Automation workflows
 
 **Architects**
-- Understanding the Four Pillars
-- Setting up Distributed Verification
-- Security Hardening
-
-**Data Scientists**
-- Creating Custom ARUs
-- Writing AADL Code
-- Integrating ML Models
+- [System Architecture](../architecture/system-architecture.md) - Four-layer design (aspirational)
+- [Compliance Research](../../../compliance/docs/research/OpenAMI/) - Standards mapping
+- [Reading Map](../../GUIDE-READING-MAP.md) - Documentation navigation
 
 **DevOps Engineers**
-- Deploying to Production
-- Monitoring & Debugging
-- Performance Tuning
-
-**Compliance Officers**
-- Implementing Compliance Constraints
-- Working with Compliance Manifest
+- [Toolchain Bootstrap](../../GUIDE-TOOLCHAIN-BOOTSTRAP.md) - Development setup
+- [Setup Contract](../../SPEC-SETUP-CONTRACT.md) - Environment requirements
+- [Integration Status](../../STATUS-INTEGRATION.md) - Component readiness
 
 ---
 
-## How to Use These Guides
+## Understanding OpenAMI vs AMI-ORCHESTRATOR
 
-### Format
+**OpenAMI** = Theoretical framework for self-evolving AI with formal safety guarantees
+- Research phase (Q4 2025 - Q2 2026)
+- Describes future capabilities: SPNs, CSTs, formal verification, self-evolution
+- Documentation is **aspirational** and **conceptual**
 
-Each guide follows this structure:
+**AMI-ORCHESTRATOR** = Production infrastructure platform available today
+- Multi-storage DataOps, MCP servers, cryptographic audit trails
+- 60+ production tests, Docker-based deployment
+- Documentation is **working** and **tested**
 
-1. **Prerequisites**: What you need before starting
-2. **Learning Objectives**: What you'll achieve
-3. **Step-by-Step Instructions**: Detailed walkthrough
-4. **Code Examples**: Working code you can copy/paste
-5. **Troubleshooting**: Common issues and solutions
-6. **Next Steps**: Where to go from here
-
-### Conventions
-
-**Command-line examples**:
-```bash
-# Commands prefixed with $ are run in your terminal
-$ command-to-run
-
-# Output is shown without prefix
-output here
-```
-
-**Code examples**:
-```python
-# Python code is syntax-highlighted
-def example():
-    return "Working code you can use"
-```
-
-**Notes and warnings**:
-
-💡 **Tip**: Helpful suggestions
-
-⚠️ **Warning**: Things to watch out for
-
-📋 **Note**: Additional information
-
-✅ **Best Practice**: Recommended approach
+**When to use which docs:**
+- Learning about the vision → Read OpenAMI guides
+- Building actual systems → Use AMI-ORCHESTRATOR docs
 
 ---
 
-## Contributing Guides
+## Contributing
 
-Want to contribute a guide? Great! Here's how:
+OpenAMI guides will be developed alongside implementation (Q4 2025 - Q2 2026).
 
-### 1. Choose a Topic
+**Want to contribute now?**
+- Improve [AMI-ORCHESTRATOR documentation](../../../README.md)
+- Add [production examples](../../../README.md#mcp-integration)
+- Enhance [research specifications](../../../compliance/docs/research/OpenAMI/)
 
-Check [DOCUMENTATION-INDEX.md](../DOCUMENTATION-INDEX.md) for planned guides that need authors.
-
-### 2. Follow the Template
-
-Use the guide template:
-```bash
-cp templates/guide-template.md guides/your-guide.md
-```
-
-### 3. Write Your Guide
-
-- **Target audience**: Be explicit about who it's for
-- **Scope**: Stay focused on one task
-- **Examples**: Provide working code
-- **Test**: Try it yourself from scratch
-
-### 4. Submit for Review
-
-- Create a pull request
-- Tag `@docs-team` for review
-- Update DOCUMENTATION-INDEX.md
-
-### Quality Standards
-
-✅ **Accurate**: All code examples must work
-✅ **Complete**: Cover the full task end-to-end
-✅ **Clear**: Understandable by target audience
-✅ **Current**: Reflects latest version
-✅ **Tested**: You've run through it yourself
+**Standards for future OpenAMI guides:**
+- Align with actual implementation (not aspirational)
+- Provide working code examples
+- Test all procedures end-to-end
+- Reference specific source code locations
 
 ---
 
 ## Getting Help
 
-**Questions while following a guide?**
-- Check the **Troubleshooting** section in the guide
-- Search [GitHub Discussions](https://github.com/Independent-AI-Labs/OpenAMI/discussions)
-- Ask in [Discord](https://discord.gg/openami) (community support)
+**For AMI-ORCHESTRATOR (production infrastructure):**
+- Check [main README](../../../README.md) for setup and usage
+- Review [ami-agent documentation](../../../README.md#ami-agent-reliable-auditable-verifiable-automation)
+- Browse [MCP server examples](../../../README.md#mcp-integration)
 
-**Found an error in a guide?**
-- [Report it](https://github.com/Independent-AI-Labs/OpenAMI/issues/new?labels=documentation)
+**For OpenAMI (research framework):**
+- Read [What is OpenAMI?](../overview/what-is-openami.md)
+- Explore [theoretical specifications](../../../compliance/docs/research/OpenAMI/)
+- See [Executive Action Plan](../../../compliance/docs/research/EXECUTIVE_ACTION_PLAN.md) for roadmap
 
-**Need personalized help?**
-- **Community**: Discord, GitHub Discussions (free)
-- **Enterprise**: enterprise@independentailabs.com (commercial support)
-
----
-
-## Feedback
-
-Help us improve these guides! After completing a guide:
-
-1. [Rate it](https://forms.gle/openami-guide-feedback) (anonymous, 2 minutes)
-2. Suggest improvements via GitHub issues
-3. Contribute your own guide
-
-**Most helpful feedback**:
-- What was confusing?
-- What was missing?
-- What worked well?
-- How can we improve?
+**Found documentation errors?**
+- File issues or submit PRs to improve accuracy
 
 ---
 
-**Next**: Start with [Quick Start](./quickstart.md) or browse guides above
+**Next**: Start with [What is OpenAMI?](../overview/what-is-openami.md) to understand OpenAMI concepts, or jump to [AMI-ORCHESTRATOR README](../../../README.md) for production infrastructure.

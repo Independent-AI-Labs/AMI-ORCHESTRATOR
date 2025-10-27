@@ -7,9 +7,12 @@ AgentConfig provides type-safe configuration.
 
 import json
 import os
+import select
+import signal
 import subprocess
 import tempfile
 import time
+import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
@@ -98,15 +101,17 @@ class AgentProcessKillError(AgentError):
 class AgentConfig:
     """Configuration for an agent execution.
 
-    Defines tools, model, hooks, and timeout settings for an agent.
+    Defines tools, model, hooks, timeout, and session settings for an agent.
 
     NOTE: disallowed_tools is NOT stored here - it's computed automatically
     by ClaudeAgentCLI.compute_disallowed_tools() as the complement of allowed_tools.
     """
 
     model: str
+    session_id: str  # Claude Code session ID for execution tracking
     allowed_tools: list[str] | None = None  # None = all tools allowed
     enable_hooks: bool = True
+    enable_streaming: bool = False  # Enable --resume and --output-format stream-json
     timeout: int | None = 180  # None = no timeout (interactive)
     mcp_servers: dict[str, Any] | None = None
 
@@ -118,65 +123,70 @@ class AgentConfigPresets:
     """
 
     @staticmethod
-    def audit() -> AgentConfig:
+    def audit(session_id: str) -> AgentConfig:
         """Code audit agent: WebSearch/WebFetch only, hooks disabled, high-quality model.
 
         Used for: Full file code audits, security analysis
         """
         return AgentConfig(
             model="claude-sonnet-4-5",
+            session_id=session_id,
             allowed_tools=["WebSearch", "WebFetch"],
             enable_hooks=False,
             timeout=180,
         )
 
     @staticmethod
-    def audit_diff() -> AgentConfig:
+    def audit_diff(session_id: str) -> AgentConfig:
         """Diff audit agent: For PreToolUse hooks checking code quality.
 
         Used for: Edit/Write validation, regression detection
         """
         return AgentConfig(
             model="claude-sonnet-4-5",
+            session_id=session_id,
             allowed_tools=["WebSearch", "WebFetch"],
             enable_hooks=False,
             timeout=60,  # Fast for hooks
         )
 
     @staticmethod
-    def consolidate() -> AgentConfig:
+    def consolidate(session_id: str) -> AgentConfig:
         """Pattern consolidation agent: Read/Write/Edit for updating consolidated reports.
 
         Used for: Extracting patterns from failed audits
         """
         return AgentConfig(
             model="claude-sonnet-4-5",
+            session_id=session_id,
             allowed_tools=["Read", "Write", "Edit", "WebSearch", "WebFetch"],
             enable_hooks=False,
             timeout=300,
         )
 
     @staticmethod
-    def worker() -> AgentConfig:
+    def worker(session_id: str) -> AgentConfig:
         """General worker agent: All tools, hooks enabled.
 
         Used for: General automation, --print mode with hooks
         """
         return AgentConfig(
             model="claude-sonnet-4-5",
+            session_id=session_id,
             allowed_tools=None,  # All tools
             enable_hooks=True,
             timeout=180,
         )
 
     @staticmethod
-    def interactive(mcp_servers: dict[str, Any] | None = None) -> AgentConfig:
+    def interactive(session_id: str, mcp_servers: dict[str, Any] | None = None) -> AgentConfig:
         """Interactive agent: All tools, hooks enabled, MCP servers.
 
         Used for: Interactive sessions with user
         """
         return AgentConfig(
             model="claude-sonnet-4-5",
+            session_id=session_id,
             allowed_tools=None,
             enable_hooks=True,
             timeout=None,  # No timeout
@@ -184,66 +194,71 @@ class AgentConfigPresets:
         )
 
     @staticmethod
-    def task_worker() -> AgentConfig:
+    def task_worker(session_id: str) -> AgentConfig:
         """Task execution worker: All tools, hooks enabled, no timeout.
 
         Used for: Executing .md task files with full capabilities
         """
         return AgentConfig(
             model="claude-sonnet-4-5",
+            session_id=session_id,
             allowed_tools=None,  # All tools
             enable_hooks=True,
             timeout=None,  # Task-level timeout instead
         )
 
     @staticmethod
-    def task_moderator() -> AgentConfig:
+    def task_moderator(session_id: str) -> AgentConfig:
         """Task validation moderator: Read-only tools, no hooks, fast timeout.
 
         Used for: Validating task completion after worker execution
         """
         return AgentConfig(
             model="claude-sonnet-4-5",
+            session_id=session_id,
             allowed_tools=["Read", "Grep", "Glob", "WebSearch", "WebFetch"],
             enable_hooks=False,
             timeout=180,
         )
 
     @staticmethod
-    def sync_worker() -> AgentConfig:
+    def sync_worker(session_id: str) -> AgentConfig:
         """Git sync worker: All tools, hooks enabled, no timeout.
 
         Used for: Executing git commit/push operations with full capabilities
         """
         return AgentConfig(
             model="claude-sonnet-4-5",
+            session_id=session_id,
             allowed_tools=None,  # All tools
             enable_hooks=True,
             timeout=None,  # Sync-level timeout instead
         )
 
     @staticmethod
-    def sync_moderator() -> AgentConfig:
+    def sync_moderator(session_id: str) -> AgentConfig:
         """Git sync moderator: Read-only + Bash tools, no hooks, fast timeout.
 
         Used for: Checking git status and validating sync completion
         """
         return AgentConfig(
             model="claude-sonnet-4-5",
+            session_id=session_id,
             allowed_tools=["Read", "Grep", "Glob", "Bash", "WebSearch", "WebFetch"],
             enable_hooks=False,
             timeout=180,
         )
 
     @staticmethod
-    def completion_moderator() -> AgentConfig:
-        """Completion validation moderator: Read/inspection tools + Bash, no hooks.
+    def completion_moderator(session_id: str) -> AgentConfig:
+        """Completion validation moderator: No tools, analyzes conversation data only.
 
         Used for: Validating WORK DONE and FEEDBACK: completion markers
         """
         return AgentConfig(
             model="claude-sonnet-4-5",
-            allowed_tools=["Read", "Grep", "Glob", "Bash", "WebSearch", "WebFetch"],
+            session_id=session_id,
+            allowed_tools=[],
             enable_hooks=False,
             timeout=120,
         )
@@ -402,6 +417,13 @@ class ClaudeAgentCLI(AgentCLI):
         # Model
         cmd.extend(["--model", agent_config.model])
 
+        # Conditional streaming support
+        if agent_config.enable_streaming:
+            # Streaming JSON output for real-time log forwarding
+            cmd.extend(["--output-format", "stream-json"])
+            # stream-json requires --verbose in --print mode
+            cmd.append("--verbose")
+
         # Tool restrictions - ALWAYS provide both allowed and disallowed
         if agent_config.allowed_tools is not None:
             disallowed = self.compute_disallowed_tools(agent_config.allowed_tools)
@@ -416,6 +438,280 @@ class ClaudeAgentCLI(AgentCLI):
 
         cmd.extend(["--", instruction_text])
         return cmd
+
+    def _start_streaming_process(self, cmd: list[str], stdin_data: str | None, cwd: Path | None) -> subprocess.Popen[str]:
+        """Start subprocess for streaming execution.
+
+        Args:
+            cmd: Command to execute
+            stdin_data: Optional stdin input
+            cwd: Working directory
+
+        Returns:
+            Started process handle
+
+        Raises:
+            AgentExecutionError: If process fails immediately
+        """
+        self.logger.info("agent_streaming_subprocess_starting")
+
+        process = subprocess.Popen(
+            cmd,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            cwd=cwd,
+            start_new_session=True,
+        )
+
+        self.logger.info("agent_streaming_subprocess_started", pid=process.pid)
+
+        # Write stdin and close
+        if process.stdin:
+            if stdin_data:
+                process.stdin.write(stdin_data)
+            process.stdin.close()
+            self.logger.info("agent_streaming_stdin_closed")
+
+        # Check for immediate exit
+        time.sleep(0.1)
+        poll_result = process.poll()
+        if poll_result is not None:
+            stderr_output = process.stderr.read() if process.stderr else ""
+            self.logger.error("agent_streaming_immediate_exit", exit_code=poll_result, stderr=stderr_output[:1000])
+            raise AgentExecutionError(
+                exit_code=poll_result,
+                stdout="",
+                stderr=stderr_output,
+                cmd=cmd,
+            )
+
+        return process
+
+    def _read_streaming_line(self, process: subprocess.Popen[str], timeout_val: float, cmd: list[str]) -> tuple[str | None, bool]:
+        """Read single line from streaming process.
+
+        Args:
+            process: Running process
+            timeout_val: Timeout for select
+            cmd: Command being executed
+
+        Returns:
+            Tuple of (line, process_exited). Line is None if timeout or EOF.
+
+        Raises:
+            AgentExecutionError: If select/readline fails
+        """
+        if not process.stdout:
+            return None, True
+
+        try:
+            ready, _, _ = select.select([process.stdout.fileno()], [], [], timeout_val)
+        except (OSError, ValueError) as e:
+            self.logger.error("agent_streaming_select_error", error=str(e))
+            raise AgentExecutionError(exit_code=-1, stdout="", stderr=f"select() failed: {e}", cmd=cmd) from e
+
+        if not ready:
+            poll_result = process.poll()
+            if poll_result is not None:
+                try:
+                    remaining_stderr = process.stderr.read() if process.stderr else ""
+                except OSError as e:
+                    remaining_stderr = f"<failed to read stderr: {e}>"
+                self.logger.info("agent_streaming_process_exited_in_select", exit_code=poll_result, stderr=remaining_stderr[:1000])
+                return None, True
+            return None, False
+
+        try:
+            line = process.stdout.readline()
+        except OSError as e:
+            self.logger.error("agent_streaming_readline_error", error=str(e))
+            raise AgentExecutionError(exit_code=-1, stdout="", stderr=f"readline() failed: {e}", cmd=cmd) from e
+
+        if not line:
+            self.logger.info("agent_streaming_eof")
+            return None, True
+
+        return line, False
+
+    def _parse_stream_message(self, line: str, cmd: list[str], line_count: int, agent_config: AgentConfig) -> str:
+        """Parse streaming JSON message and extract assistant text.
+
+        Args:
+            line: JSON line from stream
+            cmd: Command being executed
+            line_count: Current line number
+            agent_config: Agent configuration
+
+        Returns:
+            Extracted assistant text (empty string if none)
+
+        Raises:
+            AgentExecutionError: If JSON parsing fails
+        """
+        # Print raw JSON
+        print(line, end="", flush=True)
+
+        if line_count == 1:
+            self.logger.info("agent_streaming_first_line_received")
+
+        try:
+            msg = json.loads(line)
+        except json.JSONDecodeError as e:
+            self.logger.error("agent_stream_invalid_json", line=line[:200], error=str(e))
+            raise AgentExecutionError(
+                exit_code=-1,
+                stdout="",
+                stderr=f"Invalid JSON in streaming output: {line[:200]}",
+                cmd=cmd,
+            ) from e
+
+        self.logger.info("agent_stream_message", session_id=agent_config.session_id, msg_type=msg.get("type"))
+
+        # Extract assistant text
+        if msg.get("type") == "assistant":
+            text_parts = []
+            for content in msg.get("message", {}).get("content", []):
+                if content.get("type") == "text":
+                    text = content.get("text", "")
+                    if text:
+                        text_parts.append(text)
+            return "".join(text_parts)
+
+        return ""
+
+    def _calculate_stream_timeout(
+        self, agent_config: AgentConfig, last_log_time: float, line_count: int, elapsed: float, iterations: int
+    ) -> tuple[float, float]:
+        """Calculate timeout value and update logging.
+
+        Args:
+            agent_config: Agent configuration
+            last_log_time: Last log time
+            line_count: Current line count
+            elapsed: Elapsed time
+            iterations: Loop iterations
+
+        Returns:
+            Tuple of (timeout_val, new_last_log_time)
+
+        Raises:
+            subprocess.TimeoutExpired: If timeout exceeded
+        """
+        log_interval_seconds = 10
+
+        if agent_config.timeout:
+            remaining = agent_config.timeout - elapsed
+            if remaining <= 0:
+                self.logger.error("agent_streaming_timeout_in_loop", line_count=line_count, elapsed=elapsed, iterations=iterations)
+                raise subprocess.TimeoutExpired([], agent_config.timeout)
+
+            if time.time() - last_log_time > log_interval_seconds:
+                self.logger.info("agent_streaming_still_waiting", line_count=line_count, elapsed=elapsed, iterations=iterations)
+                return min(1.0, remaining), time.time()
+
+            return min(1.0, remaining), last_log_time
+
+        # No timeout configured
+        if time.time() - last_log_time > log_interval_seconds:
+            self.logger.info("agent_streaming_still_waiting_no_timeout", line_count=line_count, elapsed=elapsed, iterations=iterations)
+            return 1.0, time.time()
+
+        return 1.0, last_log_time
+
+    def _execute_streaming(
+        self,
+        cmd: list[str],
+        stdin_data: str | None,
+        agent_config: AgentConfig,
+        cwd: Path | None,
+    ) -> str:
+        """Execute command with streaming JSON output parsing.
+
+        Args:
+            cmd: Command to execute
+            stdin_data: Optional stdin input
+            agent_config: Agent configuration
+            cwd: Working directory
+
+        Returns:
+            Accumulated assistant text content
+
+        Raises:
+            AgentTimeoutError: Execution exceeded timeout
+            AgentExecutionError: Non-zero exit code
+        """
+        start_time = time.time()
+        process = None
+        assistant_text: list[str] = []
+
+        try:
+            process = self._start_streaming_process(cmd, stdin_data, cwd)
+
+            # Read loop
+            line_count = 0
+            last_log_time = time.time()
+            loop_iterations = 0
+
+            self.logger.info("agent_streaming_entering_loop", has_timeout=agent_config.timeout is not None)
+
+            while True:
+                loop_iterations += 1
+                elapsed = time.time() - start_time
+
+                # Calculate timeout
+                timeout_val, last_log_time = self._calculate_stream_timeout(agent_config, last_log_time, line_count, elapsed, loop_iterations)
+
+                # Read line
+                line, process_exited = self._read_streaming_line(process, timeout_val, cmd)
+
+                if process_exited:
+                    self.logger.info("agent_streaming_loop_exit", line_count=line_count, iterations=loop_iterations)
+                    break
+
+                if line:
+                    line_count += 1
+                    text = self._parse_stream_message(line, cmd, line_count, agent_config)
+                    if text:
+                        assistant_text.append(text)
+
+            # Wait for process completion
+            process.wait(timeout=10)
+            duration = time.time() - start_time
+
+            if process.returncode != 0:
+                stderr = process.stderr.read() if process.stderr else ""
+                self.logger.info(
+                    "agent_print_complete",
+                    exit_code=process.returncode,
+                    duration=round(duration, 1),
+                    stderr=stderr[:1000] if stderr else "",
+                )
+                raise AgentExecutionError(
+                    exit_code=process.returncode,
+                    stdout="".join(assistant_text),
+                    stderr=stderr,
+                    cmd=cmd,
+                )
+
+            self.logger.info("agent_print_complete", exit_code=process.returncode, duration=round(duration, 1))
+            return "".join(assistant_text)
+
+        except subprocess.TimeoutExpired as timeout_err:
+            duration = time.time() - start_time
+            self.logger.error("agent_print_timeout", timeout=agent_config.timeout, duration=round(duration, 1))
+
+            if process and process.pid:
+                import contextlib
+
+                with contextlib.suppress(ProcessLookupError):
+                    os.killpg(os.getpgid(process.pid), signal.SIGKILL)
+
+            raise AgentTimeoutError(timeout=agent_config.timeout or 0, duration=duration, cmd=cmd) from timeout_err
+
+        except FileNotFoundError as e:
+            raise AgentCommandNotFoundError(cmd=cmd[0]) from e
 
     def _execute_with_timeout(
         self,
@@ -441,6 +737,11 @@ class ClaudeAgentCLI(AgentCLI):
             AgentExecutionError: Non-zero exit code
             AgentProcessKillError: Failed to kill hung process
         """
+        # Route to streaming execution if enabled
+        if agent_config.enable_streaming:
+            self.logger.info("agent_using_streaming_path")
+            return self._execute_streaming(cmd, stdin_data, agent_config, cwd)
+
         import signal
 
         start_time = time.time()
@@ -465,20 +766,29 @@ class ClaudeAgentCLI(AgentCLI):
             )
 
             duration = time.time() - start_time
-            self.logger.info(
-                "agent_print_complete",
-                exit_code=process.returncode,
-                duration=round(duration, 1),
-            )
 
-            # Raise exception on non-zero exit
+            # Log completion with error details if non-zero exit
             if process.returncode != 0:
+                self.logger.info(
+                    "agent_print_complete",
+                    exit_code=process.returncode,
+                    duration=round(duration, 1),
+                    stdout_preview=stdout[:1000] if stdout else "",
+                    stderr=stderr[:1000] if stderr else "",
+                )
                 raise AgentExecutionError(
                     exit_code=process.returncode,
                     stdout=stdout,
                     stderr=stderr,
                     cmd=cmd,
                 )
+
+            # Success case - no need to log stdout (can be large)
+            self.logger.info(
+                "agent_print_complete",
+                exit_code=process.returncode,
+                duration=round(duration, 1),
+            )
 
             return stdout
 
@@ -548,7 +858,7 @@ class ClaudeAgentCLI(AgentCLI):
         """
         # Default to worker preset if no config provided
         if agent_config is None:
-            agent_config = AgentConfigPresets.worker()
+            agent_config = AgentConfigPresets.worker(session_id=str(uuid.uuid4()))
 
         # Load instruction
         if instruction_file:
@@ -563,11 +873,9 @@ class ClaudeAgentCLI(AgentCLI):
         if stdin:
             stdin_data = stdin if isinstance(stdin, str) else stdin.read()
 
-        # Create temp settings file when code quality/response scanner hooks should be disabled
-        # SECURITY: Bash command guard remains enabled via custom settings file
-        settings_file = None
-        if not agent_config.enable_hooks:
-            settings_file = self._create_bash_only_hooks_file()
+        # Create temp settings file based on hook configuration
+        # SECURITY: Bash command guard ALWAYS enabled (either full hooks or bash-only)
+        settings_file = self._create_full_hooks_file() if agent_config.enable_hooks else self._create_bash_only_hooks_file()
 
         # Build command from agent_config
         cmd = self._build_claude_command(instruction_text, agent_config, settings_file)
@@ -578,6 +886,8 @@ class ClaudeAgentCLI(AgentCLI):
             model=agent_config.model,
             hooks=agent_config.enable_hooks,
             stdin_size=len(stdin_data) if stdin_data else 0,
+            streaming=agent_config.enable_streaming,
+            command=" ".join(cmd),
         )
 
         try:
@@ -627,6 +937,67 @@ class ClaudeAgentCLI(AgentCLI):
 
         return settings_path_obj
 
+    def _create_full_hooks_file(self) -> Path:
+        """Create temp settings file with all hooks from hooks.yaml.
+
+        Returns:
+            Path to temp settings file with full hook configuration
+
+        Raises:
+            RuntimeError: If hooks.yaml not found or settings file write fails
+        """
+        # Load hooks from config
+        hooks_file = self.config.root / self.config.get("hooks.file")
+        if not hooks_file.exists():
+            raise RuntimeError(f"Hooks file not found: {hooks_file}")
+
+        with hooks_file.open() as f:
+            hooks_config = yaml.safe_load(f)
+
+        # Convert to Claude Code settings format
+        settings: dict[str, Any] = {"hooks": {}}
+
+        for hook in hooks_config["hooks"]:
+            event = hook["event"]
+            if event not in settings["hooks"]:
+                settings["hooks"][event] = []
+
+            # Build hook command with timeout
+            hook_command = {
+                "type": "command",
+                "command": f"{self.config.root}/scripts/ami-agent --hook {hook['command']}",
+            }
+
+            if "timeout" in hook:
+                hook_command["timeout"] = hook["timeout"]
+
+            # Build hook entry with matcher first (for correct JSON order)
+            hook_entry: dict[str, Any] = {}
+            if "matcher" in hook:
+                # Convert array matcher to regex string (e.g., ["Edit", "Write"] -> "Edit|Write")
+                matcher = hook["matcher"]
+                if isinstance(matcher, list):
+                    hook_entry["matcher"] = "|".join(matcher)
+                else:
+                    hook_entry["matcher"] = matcher
+
+            hook_entry["hooks"] = [hook_command]
+
+            settings["hooks"][event].append(hook_entry)
+
+        try:
+            with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as settings_file:
+                json.dump(settings, settings_file, indent=2)
+                file_name = settings_file.name
+
+            self.logger.info("agent_settings_file_created", path=file_name, hooks_count=sum(len(v) for v in settings.get("hooks", {}).values()))
+            return Path(file_name)
+        except (OSError, TypeError) as e:
+            # Clean up file if it was created
+            if "settings_file" in locals() and hasattr(settings_file, "name"):
+                Path(settings_file.name).unlink(missing_ok=True)
+            raise RuntimeError(f"Failed to write settings file: {e}") from e
+
     def _load_instruction(self, instruction_file: Path) -> str:
         """Load instruction from file with template substitution.
 
@@ -649,7 +1020,7 @@ class ClaudeAgentCLI(AgentCLI):
         return content.replace("{date}", datetime.now().strftime("%Y-%m-%d %H:%M:%S %Z"))
 
 
-def get_agent_cli() -> AgentCLI:
+def get_agent_cli() -> "ClaudeAgentCLI":
     """Factory function to get agent CLI instance.
 
     Returns ClaudeAgentCLI by default.

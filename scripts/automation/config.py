@@ -63,6 +63,17 @@ class Config:
         substituted = self._substitute_env(data)
         if not isinstance(substituted, dict):
             raise ValueError(f"Config must be a dict, got {type(substituted)}")
+
+        # Test mode override: explicitly disable file locking when AMI_TEST_MODE environment variable is set to "1"
+        # This is required for integration tests to run without sudo permissions
+        test_mode_value = os.environ.get("AMI_TEST_MODE", "")
+        if test_mode_value == "1":
+            if "tasks" not in substituted:
+                substituted["tasks"] = {}
+            if not isinstance(substituted["tasks"], dict):
+                raise ValueError("tasks config must be a dict")
+            substituted["tasks"]["file_locking"] = False
+
         return substituted
 
     def _substitute_env(self, data: Any) -> Any:

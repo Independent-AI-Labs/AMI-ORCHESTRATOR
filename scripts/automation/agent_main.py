@@ -11,6 +11,9 @@ Usage:
     ami-agent --print <instruction>     # Non-interactive mode
     ami-agent --hook <validator>        # Hook validator mode
     ami-agent --audit <directory>       # Batch audit mode
+    ami-agent --tasks <directory>       # Task execution mode
+    ami-agent --sync <module>           # Git sync mode
+    ami-agent --docs <directory>        # Documentation maintenance mode
 
 Examples:
     # Interactive agent with hooks
@@ -24,6 +27,9 @@ Examples:
 
     # Batch audit
     ami-agent --audit base/
+
+    # Documentation maintenance
+    ami-agent --docs docs/
 """
 
 from __future__ import annotations
@@ -32,11 +38,11 @@ import json
 import subprocess
 import sys
 import tempfile
+import uuid
+from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
 from typing import Any
-
-import yaml
 
 # Standard /base imports pattern to find orchestrator root
 _root = next(p for p in Path(__file__).resolve().parents if (p / "base").exists())
@@ -111,11 +117,11 @@ def _create_mcp_config_file(config: Any) -> Path | None:
         raise RuntimeError(f"Failed to write MCP config: {e}") from e
 
 
-def _create_settings_file(config: Any) -> Path:
+def _create_settings_file(_config: Any) -> Path:
     """Create Claude settings file with hooks from config.
 
     Args:
-        config: Configuration object
+        _config: Configuration object (unused, preserved for future use)
 
     Returns:
         Path to created settings file with hooks configuration
@@ -123,56 +129,8 @@ def _create_settings_file(config: Any) -> Path:
     Raises:
         RuntimeError: If hooks file not found or settings file write fails
     """
-    # Load hooks from config
-    hooks_file = config.root / config.get("hooks.file")
-    if not hooks_file.exists():
-        raise RuntimeError(f"Hooks file not found: {hooks_file}")
-
-    with hooks_file.open() as f:
-        hooks_config = yaml.safe_load(f)
-
-    # Convert to Claude Code settings format
-    settings: dict[str, Any] = {"hooks": {}}
-
-    for hook in hooks_config["hooks"]:
-        event = hook["event"]
-        if event not in settings["hooks"]:
-            settings["hooks"][event] = []
-
-        # Build hook command with timeout
-        hook_command = {
-            "type": "command",
-            "command": f"{config.root}/scripts/ami-agent --hook {hook['command']}",
-        }
-
-        if "timeout" in hook:
-            hook_command["timeout"] = hook["timeout"]
-
-        # Build hook entry with matcher first (for correct JSON order)
-        hook_entry: dict[str, Any] = {}
-        if "matcher" in hook:
-            # Convert array matcher to regex string (e.g., ["Edit", "Write"] -> "Edit|Write")
-            matcher = hook["matcher"]
-            if isinstance(matcher, list):
-                hook_entry["matcher"] = "|".join(matcher)
-            else:
-                hook_entry["matcher"] = matcher
-
-        hook_entry["hooks"] = [hook_command]
-
-        settings["hooks"][event].append(hook_entry)
-
-    try:
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as settings_file:
-            json.dump(settings, settings_file)
-            file_name = settings_file.name
-
-        return Path(file_name)
-    except (OSError, TypeError) as e:
-        # Clean up file if it was created
-        if "settings_file" in locals() and hasattr(settings_file, "name"):
-            Path(settings_file.name).unlink(missing_ok=True)
-        raise RuntimeError(f"Failed to write settings file: {e}") from e
+    # Delegate to agent_cli for hook settings file creation
+    return get_agent_cli()._create_full_hooks_file()
 
 
 def mode_interactive() -> int:
@@ -264,10 +222,11 @@ def mode_print(instruction_path: str) -> int:
     # Run with worker agent preset (hooks enabled, all tools)
     cli = get_agent_cli()
     try:
+        session_id = str(uuid.uuid4())
         output = cli.run_print(
             instruction_file=instruction_file,
             stdin=stdin,
-            agent_config=AgentConfigPresets.worker(),
+            agent_config=AgentConfigPresets.worker(session_id=session_id),
         )
         # Print output
         print(output)
@@ -454,6 +413,78 @@ def mode_sync(module_path: str) -> int:
     return 0 if result.status == "synced" else 1
 
 
+def mode_docs(directory_path: str, root_dir: str | None = None, parallel: bool = False) -> int:
+    """Documentation maintenance mode - Maintain all .md docs in directory.
+
+    Args:
+        directory_path: Path to directory containing documentation files
+        root_dir: Root directory for codebase inspection (defaults to current directory)
+        parallel: Enable parallel doc maintenance
+
+    Returns:
+        Exit code (0=success, 1=failure)
+    """
+    directory = Path(directory_path)
+
+    if not directory.exists():
+        print(f"Directory not found: {directory_path}", file=sys.stderr)
+        return 1
+
+    # Convert root_dir to Path if provided
+    root_path = Path(root_dir) if root_dir else None
+
+    if root_path and not root_path.exists():
+        print(f"Root directory not found: {root_dir}", file=sys.stderr)
+        return 1
+
+    from scripts.automation.docs import DocsExecutor
+
+    executor = DocsExecutor()
+
+    # Execute docs maintenance
+    results = executor.execute_docs(directory, parallel=parallel, root_dir=root_path)
+
+    # Print summary
+    completed = sum(1 for r in results if r.status == "completed")
+    feedback = sum(1 for r in results if r.status == "feedback")
+    failed = sum(1 for r in results if r.status == "failed")
+    timeout = sum(1 for r in results if r.status == "timeout")
+
+    print("\nDocumentation Maintenance Summary:")
+    print(f"  Total: {len(results)}")
+    print(f"  Completed: {completed}")
+    print(f"  Needs Feedback: {feedback}")
+    print(f"  Failed: {failed}")
+    print(f"  Timeout: {timeout}")
+
+    # Print action breakdown for completed docs
+    if completed > 0:
+        updated = sum(1 for r in results if r.status == "completed" and r.action == "UPDATE")
+        archived = sum(1 for r in results if r.status == "completed" and r.action == "ARCHIVE")
+        deleted = sum(1 for r in results if r.status == "completed" and r.action == "DELETE")
+
+        print("\nActions Taken:")
+        print(f"  Updated: {updated}")
+        print(f"  Archived: {archived}")
+        print(f"  Marked for Deletion: {deleted}")
+
+    # Print feedback files
+    if feedback > 0:
+        print("\nDocs Needing Feedback:")
+        for result in results:
+            if result.status == "feedback" and result.feedback:
+                print(f"  - {result.doc_file.name}: {result.feedback[:100]}...")
+
+    # Print failed docs
+    if failed > 0:
+        print("\nFailed Docs:")
+        for result in results:
+            if result.status == "failed":
+                print(f"  - {result.doc_file.name}: {result.error}")
+
+    return 1 if (failed > 0 or timeout > 0) else 0
+
+
 def main() -> int:
     """Main entry point - Route to appropriate mode."""
     import argparse
@@ -506,6 +537,12 @@ def main() -> int:
     )
 
     parser.add_argument(
+        "--docs",
+        metavar="DIRECTORY",
+        help="Documentation maintenance mode - maintain all .md docs in directory",
+    )
+
+    parser.add_argument(
         "--root-dir",
         metavar="DIRECTORY",
         help="Root directory where tasks execute (defaults to current directory)",
@@ -520,22 +557,28 @@ def main() -> int:
     parser.add_argument(
         "--parallel",
         action="store_true",
-        help="Enable parallel execution (for --tasks or --audit)",
+        help="Enable parallel execution (for --tasks, --docs, or --audit)",
     )
 
     args = parser.parse_args()
 
-    # Route to appropriate mode
-    if args.print:
-        return mode_print(args.print)
-    if args.hook:
-        return mode_hook(args.hook)
-    if args.audit:
-        return mode_audit(args.audit, retry_errors=args.retry_errors)
-    if args.tasks:
-        return mode_tasks(args.tasks, root_dir=args.root_dir, parallel=args.parallel, user_instruction=args.user_instruction)
-    if args.sync:
-        return mode_sync(args.sync)
+    # Route to appropriate mode using dispatch
+    mode_handlers: list[tuple[str | bool | None, Callable[[], int]]] = [
+        (args.print, lambda: mode_print(args.print) if args.print else 1),
+        (args.hook, lambda: mode_hook(args.hook) if args.hook else 1),
+        (args.audit, lambda: mode_audit(args.audit, retry_errors=args.retry_errors) if args.audit else 1),
+        (
+            args.tasks,
+            lambda: mode_tasks(args.tasks, root_dir=args.root_dir, parallel=args.parallel, user_instruction=args.user_instruction) if args.tasks else 1,
+        ),
+        (args.sync, lambda: mode_sync(args.sync) if args.sync else 1),
+        (args.docs, lambda: mode_docs(args.docs, root_dir=args.root_dir, parallel=args.parallel) if args.docs else 1),
+    ]
+
+    for condition, handler in mode_handlers:
+        if condition:
+            return handler()
+
     # Default to interactive
     return mode_interactive()
 

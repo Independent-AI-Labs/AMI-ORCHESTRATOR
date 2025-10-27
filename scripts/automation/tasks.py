@@ -10,6 +10,7 @@ import os
 import re
 import subprocess
 import time
+import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -50,16 +51,32 @@ class TaskExecutor:
         """Initialize task executor.
 
         Raises:
-            RuntimeError: If AMI_SUDO_PASSWORD environment variable not set
+            RuntimeError: If AMI_SUDO_PASSWORD environment variable not set and file locking enabled
         """
         self.config = get_config()
-        self.logger = get_logger("tasks")
+        self.session_id = str(uuid.uuid4())
+        self.logger = get_logger("tasks", session_id=self.session_id)
         self.cli = get_agent_cli()
+        self.prompts_dir = self.config.root / self.config.get("prompts.dir")
 
-        # Validate sudo password is available
-        self.sudo_password = os.environ.get("AMI_SUDO_PASSWORD")
-        if not self.sudo_password:
-            raise RuntimeError("AMI_SUDO_PASSWORD environment variable must be set for task execution. This password is required for file locking with chattr.")
+        # Check if file locking is enabled (can be disabled for tests)
+        file_locking_enabled = self.config.get("tasks.file_locking", True)
+
+        # Check if running as root
+        self.is_root = os.geteuid() == 0
+
+        # Validate sudo password is available (only needed if not running as root and file locking enabled)
+        if file_locking_enabled and not self.is_root:
+            self.sudo_password = os.environ.get("AMI_SUDO_PASSWORD")
+            if not self.sudo_password:
+                raise RuntimeError(
+                    "AMI_SUDO_PASSWORD environment variable must be set for task execution. This password is required for file locking with chattr."
+                )
+        else:
+            self.sudo_password = None  # Not needed when running as root or file locking disabled
+
+        # Cache for filesystems that don't support chattr
+        self._unsupported_filesystems: set[str] = set()
 
     def execute_tasks(
         self,
@@ -192,6 +209,163 @@ class TaskExecutor:
         finally:
             await pool.shutdown()
 
+    def _handle_feedback_result(
+        self,
+        task_file: Path,
+        task_name: str,
+        timestamp_str: str,
+        completion_marker: dict[str, str],
+        attempts: list[TaskAttempt],
+        attempt_num: int,
+        worker_output: str,
+        attempt_duration: float,
+        start_time: float,
+    ) -> TaskResult:
+        """Handle worker feedback request.
+
+        Args:
+            task_file: Task file path
+            task_name: Task name
+            timestamp_str: Timestamp string for file naming
+            completion_marker: Parsed completion marker
+            attempts: List of attempts so far
+            attempt_num: Current attempt number
+            worker_output: Worker output text
+            attempt_duration: Duration of this attempt
+            start_time: Task start time
+
+        Returns:
+            TaskResult with feedback status
+        """
+        feedback_file = task_file.parent / f"feedback-{timestamp_str}-{task_name}.md"
+        feedback_file.write_text(f"# Feedback Request: {task_name}\n\n{completion_marker['content']}\n")
+
+        attempts.append(
+            TaskAttempt(
+                attempt_number=attempt_num,
+                worker_output=worker_output,
+                moderator_output=None,
+                timestamp=datetime.now(),
+                duration=attempt_duration,
+            )
+        )
+
+        return TaskResult(
+            task_file=task_file,
+            status="feedback",
+            attempts=attempts,
+            feedback=completion_marker["content"],
+            total_duration=time.time() - start_time,
+        )
+
+    def _validate_with_moderator(
+        self,
+        task_name: str,
+        task_content: str,
+        worker_output: str,
+        progress_file: Path,
+        root_dir: Path | None,
+        attempt_num: int,
+    ) -> tuple[dict[str, str], str]:
+        """Run moderator validation on worker output.
+
+        Args:
+            task_name: Task name
+            task_content: Original task content
+            worker_output: Worker output to validate
+            progress_file: Progress file to update
+            root_dir: Working directory
+            attempt_num: Current attempt number
+
+        Returns:
+            Tuple of (moderator_result dict, moderator_output text)
+        """
+        moderator_start = time.time()
+        self.logger.info("moderator_check_started", task=task_name, attempt=attempt_num)
+
+        with progress_file.open("a") as f:
+            f.write("### Moderator Validation\n\n")
+
+        moderator_prompt = self.prompts_dir / "task_moderator.txt"
+        validation_context = f"""ORIGINAL TASK:
+{task_content}
+
+WORKER OUTPUT:
+{worker_output}
+
+Validate if the task was completed correctly."""
+
+        moderator_config = AgentConfigPresets.task_moderator(self.session_id)
+        moderator_config.enable_streaming = True
+        moderator_output = self.cli.run_print(
+            instruction_file=moderator_prompt,
+            stdin=validation_context,
+            agent_config=moderator_config,
+            cwd=root_dir,
+        )
+
+        moderator_result = self._parse_moderator_result(moderator_output)
+        moderator_duration = time.time() - moderator_start
+        self.logger.info(
+            "moderator_check_completed",
+            task=task_name,
+            attempt=attempt_num,
+            duration=round(moderator_duration, 1),
+            final_status=moderator_result["status"],
+        )
+
+        with progress_file.open("a") as f:
+            f.write(f"Moderator output:\n```\n{moderator_output}\n```\n\n")
+
+        return moderator_result, moderator_output
+
+    def _execute_worker_attempt(
+        self,
+        task_name: str,
+        task_content: str,
+        user_instruction: str | None,
+        additional_context: str,
+        root_dir: Path | None,
+        progress_file: Path,
+        attempt_num: int,
+    ) -> str:
+        """Execute single worker attempt.
+
+        Args:
+            task_name: Task name
+            task_content: Task content
+            user_instruction: Optional user instruction
+            additional_context: Additional context from previous attempts
+            root_dir: Root directory
+            progress_file: Progress file to update
+            attempt_num: Current attempt number
+
+        Returns:
+            Worker output text
+        """
+        self.logger.info("worker_attempt", task=task_name, attempt=attempt_num)
+
+        with progress_file.open("a") as f:
+            f.write(f"## Attempt {attempt_num} ({datetime.now()})\n\n")
+
+        # Build worker instruction
+        worker_instruction = ""
+        if user_instruction:
+            worker_instruction = f"{user_instruction}\n\n"
+        worker_instruction += task_content
+        if additional_context:
+            worker_instruction += f"\n\n{additional_context}"
+
+        # Execute worker
+        worker_config = AgentConfigPresets.task_worker(self.session_id)
+        worker_config.enable_streaming = True
+        return self.cli.run_print(
+            instruction=worker_instruction,
+            stdin="",
+            agent_config=worker_config,
+            cwd=root_dir,
+        )
+
     def _execute_single_task(self, task_file: Path, root_dir: Path | None = None, user_instruction: str | None = None) -> TaskResult:
         """Execute a single task with retry loop.
 
@@ -204,7 +378,7 @@ class TaskExecutor:
             Task result
         """
         start_time = time.time()
-        attempts = []
+        attempts: list[TaskAttempt] = []
         timeout = self.config.get("tasks.timeout_per_task", 3600)
         moderator_enabled = self.config.get("tasks.moderator_enabled", True)
 
@@ -213,9 +387,12 @@ class TaskExecutor:
         task_name = task_file.stem
         progress_file = task_file.parent / f"progress-{timestamp_str}-{task_name}.md"
 
+        file_locking_enabled = self.config.get("tasks.file_locking", True)
+
         try:
             # Lock task file
-            self._lock_file(task_file)
+            if file_locking_enabled:
+                self._lock_file(task_file)
 
             # Initialize progress file
             progress_file.parent.mkdir(parents=True, exist_ok=True)
@@ -234,30 +411,9 @@ class TaskExecutor:
                 attempt_num += 1
                 attempt_start = time.time()
 
-                self.logger.info(
-                    "worker_attempt",
-                    task=task_name,
-                    attempt=attempt_num,
-                )
-
-                # Update progress
-                with progress_file.open("a") as f:
-                    f.write(f"## Attempt {attempt_num} ({datetime.now()})\n\n")
-
-                # Build worker instruction
-                worker_instruction = ""
-                if user_instruction:
-                    worker_instruction = f"{user_instruction}\n\n"
-                worker_instruction += task_content
-                if additional_context:
-                    worker_instruction += f"\n\n{additional_context}"
-
                 # Execute worker
-                worker_output = self.cli.run_print(
-                    instruction=worker_instruction,
-                    stdin="",
-                    agent_config=AgentConfigPresets.task_worker(),
-                    cwd=root_dir,
+                worker_output = self._execute_worker_attempt(
+                    task_name, task_content, user_instruction, additional_context, root_dir, progress_file, attempt_num
                 )
 
                 attempt_duration = time.time() - attempt_start
@@ -270,32 +426,13 @@ class TaskExecutor:
                 completion_marker = self._parse_completion_marker(worker_output)
 
                 if completion_marker["type"] == "feedback":
-                    # Worker needs feedback - write feedback file and stop
-                    feedback_file = task_file.parent / f"feedback-{timestamp_str}-{task_name}.md"
-                    feedback_file.write_text(f"# Feedback Request: {task_name}\n\n{completion_marker['content']}\n")
-
-                    attempts.append(
-                        TaskAttempt(
-                            attempt_number=attempt_num,
-                            worker_output=worker_output,
-                            moderator_output=None,
-                            timestamp=datetime.now(),
-                            duration=attempt_duration,
-                        )
-                    )
-
-                    return TaskResult(
-                        task_file=task_file,
-                        status="feedback",
-                        attempts=attempts,
-                        feedback=completion_marker["content"],
-                        total_duration=time.time() - start_time,
+                    return self._handle_feedback_result(
+                        task_file, task_name, timestamp_str, completion_marker, attempts, attempt_num, worker_output, attempt_duration, start_time
                     )
 
                 if completion_marker["type"] == "work_done":
-                    # Worker claims completion - validate with moderator
+                    # Worker claims completion
                     if not moderator_enabled:
-                        # No moderator, accept worker's claim
                         attempts.append(
                             TaskAttempt(
                                 attempt_number=attempt_num,
@@ -305,7 +442,6 @@ class TaskExecutor:
                                 duration=attempt_duration,
                             )
                         )
-
                         return TaskResult(
                             task_file=task_file,
                             status="completed",
@@ -313,42 +449,10 @@ class TaskExecutor:
                             total_duration=time.time() - start_time,
                         )
 
-                    # Run moderator
-                    moderator_start = time.time()
-                    self.logger.info(
-                        "moderator_check_started",
-                        task=task_name,
-                        attempt=attempt_num,
+                    # Validate with moderator
+                    moderator_result, moderator_output = self._validate_with_moderator(
+                        task_name, task_content, worker_output, progress_file, root_dir, attempt_num
                     )
-
-                    with progress_file.open("a") as f:
-                        f.write("### Moderator Validation\n\n")
-
-                    moderator_instruction = (
-                        f"ORIGINAL TASK:\n{task_content}\n\nWORKER OUTPUT:\n{worker_output}\n\nValidate if the task was completed correctly."
-                    )
-
-                    moderator_output = self.cli.run_print(
-                        instruction=moderator_instruction,
-                        stdin="",
-                        agent_config=AgentConfigPresets.task_moderator(),
-                        cwd=root_dir,
-                    )
-
-                    moderator_duration = time.time() - moderator_start
-                    self.logger.info(
-                        "moderator_check_completed",
-                        task=task_name,
-                        attempt=attempt_num,
-                        duration=round(moderator_duration, 1),
-                    )
-
-                    # Update progress
-                    with progress_file.open("a") as f:
-                        f.write(f"Moderator output:\n```\n{moderator_output}\n```\n\n")
-
-                    # Parse moderator output
-                    moderator_result = self._parse_moderator_result(moderator_output)
 
                     attempts.append(
                         TaskAttempt(
@@ -361,20 +465,19 @@ class TaskExecutor:
                     )
 
                     if moderator_result["status"] == "pass":
-                        # Task completed successfully
                         return TaskResult(
                             task_file=task_file,
                             status="completed",
                             attempts=attempts,
                             total_duration=time.time() - start_time,
                         )
+
                     # Moderator failed - retry with feedback
-                    additional_context = f"PREVIOUS ATTEMPT FAILED VALIDATION:\n{moderator_result['reason']}\n\nPlease fix the issues and try again."
+                    failure_reason = moderator_result["reason"] if moderator_result["reason"] else "Validation failed"
+                    additional_context = f"PREVIOUS ATTEMPT FAILED VALIDATION:\n{failure_reason}\n\nPlease fix the issues and try again."
 
                     with progress_file.open("a") as f:
-                        f.write(f"❌ Validation failed: {moderator_result['reason']}\n\n")
-
-                    # Continue retry loop
+                        f.write(f"❌ Validation failed: {failure_reason}\n\n")
                     continue
 
                 # No completion marker - worker didn't finish properly
@@ -396,8 +499,6 @@ class TaskExecutor:
 
                 with progress_file.open("a") as f:
                     f.write("⚠️ No completion marker found\n\n")
-
-                # Continue retry loop
                 continue
 
             # Timeout reached
@@ -425,8 +526,9 @@ class TaskExecutor:
             )
 
         finally:
-            # Always unlock task file
-            self._unlock_file(task_file)
+            # Always unlock task file (if locking was enabled)
+            if file_locking_enabled:
+                self._unlock_file(task_file)
 
             # Final progress update
             with progress_file.open("a") as f:
@@ -463,6 +565,8 @@ class TaskExecutor:
                 "**/dist/**",
                 "**/build/**",
                 "**/ux/ui-concept/**",
+                "**/.gcloud/**",
+                "**/google-cloud-sdk/**",
             ],
         )
 
@@ -470,10 +574,11 @@ class TaskExecutor:
 
         for pattern in include_patterns:
             for file_path in directory.glob(pattern):
-                # Check exclusions
+                # Check exclusions using Path.match() which handles ** correctly
                 excluded = False
                 for exclude_pattern in exclude_patterns:
-                    if fnmatch.fnmatch(str(file_path), exclude_pattern):
+                    # Use Path.match for proper glob pattern matching
+                    if file_path.match(exclude_pattern) or fnmatch.fnmatch(str(file_path), exclude_pattern):
                         excluded = True
                         break
 
@@ -510,7 +615,7 @@ class TaskExecutor:
             output: Moderator output text
 
         Returns:
-            Dict with status and reason
+            Dict with status ('pass' or 'fail') and optional reason
         """
         # Check for "PASS"
         if "PASS" in output:
@@ -521,8 +626,41 @@ class TaskExecutor:
         if fail_match:
             return {"status": "fail", "reason": fail_match.group(1).strip()}
 
-        # Default to fail if unclear
-        return {"status": "fail", "reason": "Moderator output unclear"}
+        # Moderator didn't output PASS or FAIL - treat as validation failure
+        return {"status": "fail", "reason": "Moderator validation unclear - no explicit PASS or FAIL in output"}
+
+    def _filesystem_supports_chattr(self, file_path: Path) -> bool:
+        """Check if filesystem supports chattr by getting mount point.
+
+        Args:
+            file_path: File to check
+
+        Returns:
+            True if chattr is supported, False otherwise
+        """
+        # Get absolute resolved path
+        abs_path = file_path.resolve()
+
+        # Find mount point by walking up the directory tree
+        current = abs_path
+        while current != current.parent:
+            if str(current) in self._unsupported_filesystems:
+                return False
+            current = current.parent
+
+        # Check root too
+        return str(current) not in self._unsupported_filesystems
+
+    def _mark_filesystem_unsupported(self, file_path: Path) -> None:
+        """Mark a filesystem as not supporting chattr.
+
+        Args:
+            file_path: File on the unsupported filesystem
+        """
+        # Get the directory (mount point will be a parent)
+        current = file_path.resolve().parent
+        self._unsupported_filesystems.add(str(current))
+        self.logger.info("filesystem_chattr_unsupported", path=str(current))
 
     def _lock_file(self, file_path: Path) -> None:
         """Lock file using chattr +i with sudo password injection.
@@ -533,19 +671,38 @@ class TaskExecutor:
         Raises:
             subprocess.CalledProcessError: If chattr command fails
         """
-        cmd = ["sudo", "-S", "chattr", "+i", str(file_path)]
+        # Skip if filesystem doesn't support chattr
+        if not self._filesystem_supports_chattr(file_path):
+            return
 
-        process = subprocess.Popen(
-            cmd,
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-        )
-        stdout, stderr = process.communicate(input=f"{self.sudo_password}\n")
+        if self.is_root:
+            # Already running as root, no sudo needed
+            cmd = ["chattr", "+i", str(file_path)]
+            result = subprocess.run(cmd, check=False, capture_output=True, text=True)
+            if result.returncode != 0:
+                # Check if filesystem doesn't support it
+                if "Operation not supported" in result.stderr:
+                    self._mark_filesystem_unsupported(file_path)
+                    return
+                raise subprocess.CalledProcessError(result.returncode, cmd, result.stdout, result.stderr)
+        else:
+            # Not root, use sudo with password
+            cmd = ["sudo", "-S", "chattr", "+i", str(file_path)]
+            process = subprocess.Popen(
+                cmd,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            stdout, stderr = process.communicate(input=f"{self.sudo_password}\n")
 
-        if process.returncode != 0:
-            raise subprocess.CalledProcessError(process.returncode, cmd, stdout, stderr)
+            if process.returncode != 0:
+                # Check if filesystem doesn't support it
+                if "Operation not supported" in stderr:
+                    self._mark_filesystem_unsupported(file_path)
+                    return
+                raise subprocess.CalledProcessError(process.returncode, cmd, stdout, stderr)
 
         self.logger.info("file_locked", file=str(file_path))
 
@@ -558,22 +715,35 @@ class TaskExecutor:
         Raises:
             subprocess.CalledProcessError: If chattr command fails
         """
-        cmd = ["sudo", "-S", "chattr", "-i", str(file_path)]
-
-        process = subprocess.Popen(
-            cmd,
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-        )
-        stdout, stderr = process.communicate(input=f"{self.sudo_password}\n")
-
-        if process.returncode != 0:
-            self.logger.error(
-                "file_unlock_error",
-                file=str(file_path),
-                returncode=process.returncode,
-                stderr=stderr,
+        if self.is_root:
+            # Already running as root, no sudo needed
+            cmd = ["chattr", "-i", str(file_path)]
+            result = subprocess.run(cmd, check=False, capture_output=True, text=True)
+            if result.returncode != 0:
+                self.logger.error(
+                    "file_unlock_error",
+                    file=str(file_path),
+                    returncode=result.returncode,
+                    stderr=result.stderr,
+                )
+                raise subprocess.CalledProcessError(result.returncode, cmd, result.stdout, result.stderr)
+        else:
+            # Not root, use sudo with password
+            cmd = ["sudo", "-S", "chattr", "-i", str(file_path)]
+            process = subprocess.Popen(
+                cmd,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
             )
-            raise subprocess.CalledProcessError(process.returncode, cmd, stdout, stderr)
+            stdout, stderr = process.communicate(input=f"{self.sudo_password}\n")
+
+            if process.returncode != 0:
+                self.logger.error(
+                    "file_unlock_error",
+                    file=str(file_path),
+                    returncode=process.returncode,
+                    stderr=stderr,
+                )
+                raise subprocess.CalledProcessError(process.returncode, cmd, stdout, stderr)
