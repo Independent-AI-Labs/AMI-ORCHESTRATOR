@@ -8,7 +8,7 @@
 
 ![AMI Orchestrator Banner](docs/REPO-BANNER.png)
 
-## **THE OPEN-SOURCE HYPERSCALER**
+**THE OPEN-SOURCE HYPERSCALER**
 
 Secure infrastructure for distributed enterprise automation and governance.
 Supports bare metal, cloud, and hybrid deployments.
@@ -17,7 +17,7 @@ Integrates with **any** web or API service.
 Built for regulated industries demanding compliance, security, and complete operational transparency.
 Accessible to every privacy-conscious professional.
 
-### **ISO** / **NIST** / **EU AI Act** compliant by design.
+**ISO** / **NIST** / **EU AI Act** compliant by design.
 
 ![AMI Orchestrator Screenshot](docs/AMI-PORTAL.png)
 
@@ -29,67 +29,52 @@ Accessible to every privacy-conscious professional.
 
 ### What You Get
 
----
-
-### 🏗️ **Infrastructure Orchestration**
+**Infrastructure Orchestration**
 - **Multi-Cloud Infrastructure as Code**: Full OpenTofu integration planned for vendor-neutral IaC (AWS, Azure, GCP, bare metal)
 - **VM & Hypervisor Management**: Production-ready Windows VM orchestration with GPU passthrough (Hyper-V), Linux VM support in development
 - **Service Launcher**: Unified orchestration for Docker containers, Python services, Node.js apps, and custom processes
 - **Remote Machine Management**: Secure SSH-based fleet management via MCP protocol
 - **Multi-Stack Deployment**: Pre-configured Docker Compose stacks for data (Postgres, Redis, MongoDB, Dgraph), services (Matrix, SearXNG, OpenVPN), and secrets (OpenBao)
 
----
-
-### 🤖 **AI Agent Orchestration**
+**AI Agent Orchestration**
 - **BPMN-Compatible Workflow Engine**: Business process automation with formal verification (in development)
 - **Task Execution**: Worker/moderator pattern with automatic retry, timeout handling, and quality gates
 - **Real-Time Streaming**: JSON streaming for live monitoring of all agent operations
 - **Hook-Protected Operations**: Three-layer validation prevents destructive operations and ensures code quality
 
----
-
-### 🌐 **Enterprise Web Platform**
+**Enterprise Web Platform**
 - **AMI-PORTAL Distributed Content Management System**: Next.js-based content services & administration console with authentication, file management, and extensible architecture
 - **Active Development**: Web UIs for Agent Management, DataOps, VM Orchestration, and Service Launcher control
 - **Planned Modules**: KYC (Know Your Customer), KYE (Know Your Employee), Risk Management, Software Engineering (with AST analysis)
 - **Web Automation Plugin**: Playwright-compatible Chrome extension for DOM-based automation trigger authoring and scenario execution
 - **Secure Authentication**: NextAuth.js integration with multi-provider support
 
----
-
-### 💾 **Data & Storage**
+**Data & Storage**
 - **Universal Storage Layer (Data Warehousing)**: Single API for 9 backends (Postgres/pgvector, MongoDB, Redis, Dgraph, OpenBao, Prometheus, File, REST) with automated high-availability, clustering, and migration capabilities
 - **Vector Search**: Built-in pgvector support for AI/ML embeddings and semantic search
 - **Graph Database**: Dgraph integration for complex relationship modeling
 - **Secrets Management**: OpenBao for all secrets including cryptographic secrets, API keys, certificates, and user passwords
 
----
-
-### 🌍 **Browser & Research Automation**
+**Browser & Research Automation**
 - **Chrome Automation**: Full browser control for testing, scraping, and RPA workflows
 - **Meta-Search**: SearXNG integration for privacy-respecting search across 70+ engines
 - **Research Tools**: Specialized MCP server for marketing research and data collection
 
----
-
-### 📡 **Communications & Streaming**
+**Communications & Streaming**
 - **Matrix Homeserver**: Production Synapse deployment with Element web client for federated team collaboration and end-to-end encryption
 - **Real-Time Messaging**: WebSocket-based event streaming for instant message delivery and presence updates
 - **Distributed CDN Platform (Planned)**: Edge network with P2P content distribution, DHT-based discovery, and BitTorrent-style swarming for bandwidth cost reduction
 - **Media Streaming (Planned)**: RTMP/HLS/DASH/WebRTC streaming infrastructure with hardware-accelerated transcoding and adaptive bitrate delivery
 - **VPN Ready**: OpenVPN integration for secure remote access
 
----
-
-### 🖥️ **Virtual Machine Management**
+**Virtual Machine Management**
 - **Automated VM Provisioning**: One-command Ubuntu VM creation with Hyper-V on Windows
 - **GPU Passthrough**: Direct Device Assignment (DDA) for ML training, gaming, or CAD workloads running in isolated VMs
 - **Network Isolation**: Automatic NAT switch configuration with firewall rules for secure development environments
 - **Linux Hypervisor Support**: KVM/libvirt integration in development for cross-platform VM orchestration
 
----
 
-### 🛡️ Built for Regulated Industries
+### Built for Regulated Industries
 
 AMI-ORCHESTRATOR architecture implements compliance controls for regulated industries.
 
@@ -106,9 +91,7 @@ AMI-ORCHESTRATOR architecture implements compliance controls for regulated indus
 - **Layer 2: OPERATIONAL** → Secure isolated execution with cryptographic audit tokens
 - **Layer 1: FOUNDATION** → Immutable safety axioms and compliance primitives
 
----
-
-### ⚡ ami-agent: Workflow Automation CLI
+### ami-agent: Validated Automation CLI
 
 ```bash
 ami-agent                       # Interactive AI agent with full MCP toolkit
@@ -126,9 +109,8 @@ ami-agent --sync base           # Safe git operations with pre-flight validation
 - **Parallel Execution**: Configurable concurrency with automatic retry and timeout management
 - **MCP Protocol Native**: Seamless integration with 60+ tools across DataOps, SSH, Browser, Files, Launcher, and Research domains
 
----
 
-### 🔒 Three-Layer Validation System
+### Three-Layer Validation System
 
 Hooks validate operations before execution:
 
@@ -149,9 +131,8 @@ Hooks validate operations before execution:
 
 All three validators run automatically on every operation. Full audit logs available at `logs/hooks/{session_id}.log`.
 
----
 
-### 🔧 60+ Tools Via Model Context Protocol
+### 60+ Tools Via Model Context Protocol
 
 AMI-ORCHESTRATOR implements the Model Context Protocol (MCP). **63 tools** across 6 specialized servers provide structured access to infrastructure operations.
 
@@ -166,9 +147,8 @@ AMI-ORCHESTRATOR implements the Model Context Protocol (MCP). **63 tools** acros
 
 All servers auto-configure from `scripts/config/automation.yaml`. Launch once, use everywhere.
 
----
 
-### 💼 Real-World Workflows
+### Real-World Workflows
 
 ```bash
 # Find and fix security vulnerabilities across 10+ microservices in parallel
@@ -199,9 +179,7 @@ ami-run base/scripts/run_ssh_fastmcp.py
 cd nodes/scripts/vm/win && powershell -ExecutionPolicy Bypass -File main.ps1
 ```
 
----
-
-### 🚀 Get Started in 5 Minutes
+### Get Started in 5 Minutes
 
 **1. Bootstrap Your Hyperscaler**
 ```bash
@@ -237,9 +215,8 @@ cd ux/cms && npm install && npm run dev
 
 **Basic infrastructure stack is now running.**
 
----
 
-### 🔌 MCP Servers
+### MCP Servers
 
 MCP servers expose infrastructure operations via structured protocol. Launch individually or use `ami-agent --interactive` to auto-load.
 
@@ -293,9 +270,7 @@ AMI-ORCHESTRATOR development focuses on multi-cloud orchestration and compliance
 - Never-jettison guarantee prevents value drift across 1000+ generations
 - Complete implementation of formal verification pipeline
 
----
-
-### 🎯 Who Should Use AMI-ORCHESTRATOR
+### Who Should Use AMI-ORCHESTRATOR
 
 ✅ **Regulated Industries**: Healthcare, finance, government, defense - anywhere compliance failures cost millions
 
