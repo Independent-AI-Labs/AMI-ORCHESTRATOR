@@ -39,9 +39,26 @@ python install.py
 
 ### 1. Branch Strategy
 
-- Always work on the `main` branch for root and all submodules
+**Main Development:**
+- Primary work happens on `main` branch
+- Keep `main` stable and production-ready
+- All tests must pass before pushing to `main`
+
+**Feature Branches:**
+- Create feature branches for experimental work: `git checkout -b feature/feature-name`
+- Create fix branches for bug fixes: `git checkout -b fix/bug-description`
+- Branch naming: lowercase with hyphens, descriptive names
+- Merge back to `main` via pull request after review
+
+**Submodule Branches:**
+- Keep submodules on `main` unless working on isolated changes
 - Never commit to detached HEAD states
-- If detached, return immediately to main
+- If detached, return immediately to main: `git checkout main`
+
+**Branch Hygiene:**
+- Delete merged branches: `git branch -d feature/old-feature`
+- Keep branches focused - one feature/fix per branch
+- Rebase on `main` frequently to avoid merge conflicts
 
 ### 2. Before Making Changes
 
@@ -238,14 +255,32 @@ cd base && git add -A && cd ..
 ```
 <type>: <description>
 
-[optional body]
-
-🤖 Generated with [Claude Code](https://claude.com/claude-code)
-
-Co-Authored-By: Claude <noreply@anthropic.com>
+[optional body explaining what and why, not how]
 ```
 
 **Types:** `feat`, `fix`, `docs`, `test`, `refactor`, `chore`
+
+**Examples:**
+```
+feat: add PostgreSQL connection pooling
+
+Implement connection pooling for PostgreSQL DAO to reduce
+connection overhead and improve performance under high load.
+Uses asyncpg.create_pool with configurable pool size.
+```
+
+```
+fix: prevent race condition in service launcher
+
+Service health checks were racing with startup initialization.
+Added 2-second startup delay before first health probe.
+```
+
+**Banned Patterns:**
+- No AI/automation signatures (enforced by pre-commit hooks)
+- No emojis
+- No URLs or links
+- Keep messages professional and descriptive
 
 ### 8. Pull Requests
 
