@@ -41,9 +41,9 @@ Deploy on bare metal, private cloud, or hybrid infrastructure. Multi-cloud orche
 - **Hook-Protected Operations**: Three-layer validation prevents destructive operations and ensures code quality
 
 **Enterprise Web Platform**
-- **Unified Control Center (CMS)**: Next.js-based management console with authentication, file management, and extensible architecture
+- **AMI-PORTAL Distributed Content Management System**: Next.js-based content services & administration console with authentication, file management, and extensible architecture
 - **Active Development**: Web UIs for Agent Management, DataOps, VM Orchestration, and Service Launcher control
-- **Planned Modules**: KYC (Know Your Customer), KYE (Know Your Employee), Risk Management, Software Engineering (with AST parsing)
+- **Planned Modules**: KYC (Know Your Customer), KYE (Know Your Employee), Risk Management, Software Engineering (with AST analysis)
 - **Web Automation Plugin**: Playwright-compatible Chrome extension for DOM-based automation trigger authoring and scenario execution
 - **Secure Authentication**: NextAuth.js integration with multi-provider support
 
