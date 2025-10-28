@@ -1,8 +1,12 @@
 version: '3.8'
 
+# This compose file is compatible with both docker-compose and podman-compose
+# AMI-ORCHESTRATOR uses Podman by default for enhanced security and rootless containers
+# To use: podman-compose -f docker-compose.yml up -d
+
 services:
   # Only include services not already running on the host to avoid port conflicts.
-  # Existing containers detected via `docker ps`:
+  # Existing containers detected via `podman ps`:
   #  - redis (6379)
   #  - pgvector (5432)
   #  - dgraph (8080/9080)

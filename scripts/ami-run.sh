@@ -61,6 +61,9 @@ if [[ ! -x "$VENV_PYTHON" ]]; then
     exit 1
 fi
 
+# Add venv/bin to PATH so podman and other venv tools are available
+export PATH="$VENV_DIR/bin:$PATH"
+
 # Special command: install (alias for setup)
 # Special command: setup
 if [[ "$1" == "install" ]] || [[ "$1" == "setup" ]]; then

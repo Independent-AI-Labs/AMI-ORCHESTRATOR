@@ -96,3 +96,7 @@ critical_noqa*.txt
 
 # Client-specific work (gitignored development area)
 /clients/
+
+# Logo processing scripts (not part of migration)
+scripts/process_tech_logos.py
+docs/tech-logos/

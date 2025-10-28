@@ -48,9 +48,11 @@ YOU ALWAYS DELIVER THE HIGHEST QUALITY ENTERPRISE SOFTWARE
 - Run `npm run dev` in a separate shell or background job
 - Use `setup_service.py preinstall` and `setup_service.py verify` for node automation
 
-### Docker and Infrastructure
-- Add yourself to the `docker` group before using compose
-- Bring up stacks with the provided `docker-compose.*.yml` files when tests need them
+### Podman and Infrastructure
+- Podman is bootstrapped in the virtual environment (`.venv/bin/podman`)
+- Use `podman-compose` to bring up stacks with the provided `docker-compose.*.yml` files
+- Docker compatibility symlinks are created automatically: `docker` -> `podman`, `docker-compose` -> `podman-compose`
+- Podman provides rootless containers for enhanced security without requiring group membership
 
 ## CRITICAL
 

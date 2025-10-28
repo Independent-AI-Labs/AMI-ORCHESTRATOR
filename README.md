@@ -36,23 +36,24 @@ Accessible to every privacy-conscious professional.
 ### 🏗️ **Infrastructure Orchestration**
 - **Multi-Cloud Infrastructure as Code**: Full OpenTofu integration planned for vendor-neutral IaC (AWS, Azure, GCP, bare metal)
 - **VM & Hypervisor Management**: Production-ready Windows VM orchestration with GPU passthrough (Hyper-V), Linux VM support in development
-- **Service Launcher**: Unified orchestration for Docker containers, Python services, Node.js apps, and custom processes
+- **Service Launcher**: Unified orchestration for Podman containers, Python services, Node.js apps, and custom processes
 - **Remote Machine Management**: Secure SSH-based fleet management via MCP protocol
-- **Multi-Stack Deployment**: Pre-configured Docker Compose stacks for data (Postgres, Redis, MongoDB, Dgraph), services (Matrix, SearXNG, OpenVPN), and secrets (OpenBao)
+- **Multi-Stack Deployment**: Pre-configured Podman Compose stacks for data (Postgres, Redis, MongoDB, Dgraph), services (Matrix, SearXNG, OpenVPN), and secrets (OpenBao)
+- **Rootless Containers**: Podman provides enhanced security with rootless containers, no daemon required
 
 ---
 
 ### 🤖 **AI Agent Orchestration**
 - **BPMN-Compatible Workflow Engine**: Business process automation with formal verification (in development)
 - **Task Execution**: Worker/moderator pattern with automatic retry, timeout handling, and quality gates
-- **Real-Time Streaming**: JSON streaming for live monitoring of all agent operations
+- **Real-Time Streaming**: JSON streaming for live monitoring of all agentic operations
 - **Hook-Protected Operations**: Three-layer validation prevents destructive operations and ensures code quality
 
 ---
 
 ### 🌐 **Enterprise Web Platform**
-- **AMI-PORTAL Distributed Content Management System**: Next.js-based content services & administration console with authentication, file management, and extensible architecture
-- **Active Development**: Web UIs for Agent Management, DataOps, VM Orchestration, and Service Launcher control
+- **AMI-PORTAL Distributed Content Management System**: Collaborative content distribution & system administration UI with authentication, file management, and extensible architecture
+- **Active Development**: Web UI features for Agent Management, DataOps, VM Orchestration, and Service Launcher control
 - **Planned Modules**: KYC (Know Your Customer), KYE (Know Your Employee), Risk Management, Software Engineering (with AST analysis)
 - **Web Automation Plugin**: Playwright-compatible Chrome extension for DOM-based automation trigger authoring and scenario execution
 - **Secure Authentication**: NextAuth.js integration with multi-provider support
@@ -164,7 +165,7 @@ AMI-ORCHESTRATOR implements the Model Context Protocol (MCP). **63 tools** acros
 | **Browser Automation** | `browser/scripts/run_chrome.py` | Automate web testing, data extraction, and user workflows. Screenshots, tab management, and headless operation. |
 | **File Operations** | `files/scripts/run_filesys_fastmcp.py` | Safe filesystem access with extraction, validation, and audit trails. Prevents directory traversal attacks. |
 | **Market Research** | `domains/marketing/scripts/run_research_mcp.py` | Automated competitor analysis, trend monitoring, and data collection from public sources. |
-| **Service Management** | `nodes/scripts/run_launcher_mcp.py` | Start, stop, monitor services across Docker, Python, Node.js. Unified interface for heterogeneous stacks. |
+| **Service Management** | `nodes/scripts/run_launcher_mcp.py` | Start, stop, monitor services across Podman, Python, Node.js. Unified interface for heterogeneous stacks. |
 
 All servers auto-configure from `scripts/config/automation.yaml`.
 
