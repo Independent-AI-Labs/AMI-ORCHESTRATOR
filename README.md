@@ -10,6 +10,7 @@
 
 Secure infrastructure for distributed enterprise automation and governance.
 Supports bare metal, cloud, and hybrid deployments.
+Connects to ANY web or API service.
 
 Built for regulated industries demanding compliance, security, and complete operational transparency.
 
