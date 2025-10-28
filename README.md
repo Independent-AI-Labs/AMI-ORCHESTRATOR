@@ -12,12 +12,14 @@
 
 Secure infrastructure for distributed enterprise automation and governance.
 Supports bare metal, cloud, and hybrid deployments.
-Integrates with **any** web or API service.
+Integrates with **any** **web**, **data** or **API** service.
 
 Built for regulated industries demanding compliance, security, and complete operational transparency.
 Accessible to every privacy-conscious professional.
 
-### **ISO** / **NIST** / **EU AI Act** compliant by design.
+### ✔️**ISO**, ✔️**NIST**, and ✔️**EU AI Act** compliant by design.
+
+**AMI-ORHESTRATOR** helps you benefit from standartisation by reducing administrative overhead and automating audit and compliance procedures. 
 
 ![AMI Orchestrator Screenshot](docs/AMI-PORTAL.png)
 
@@ -25,7 +27,7 @@ Accessible to every privacy-conscious professional.
 
 ## Why AMI-ORCHESTRATOR
 
-**Build your own hyperscaler without the hyperscale bills.** Multi-cloud orchestration without vendor lock-in.
+**Build your own hyperscaler without the hyperscale bills.** Multi-cloud orchestration with **zero** vendor lock-in.
 
 ### What You Get
 
@@ -102,7 +104,7 @@ AMI-ORCHESTRATOR architecture implements compliance controls for regulated indus
 
 **Four-Layer Compliance Architecture**
 - **Layer 4: GOVERNANCE** → Policy enforcement, risk management, human oversight
-- **Layer 3: INTELLIGENCE** → ML models, self-evolution engine, proof generators, knowledge graphs (specification only, target Q1-Q2 2026)
+- **Layer 3: INTELLIGENCE** → ML models, proof generators, distributed knowledge graphs
 - **Layer 2: OPERATIONAL** → Secure isolated execution with cryptographic audit tokens
 - **Layer 1: FOUNDATION** → Immutable safety axioms and compliance primitives
 
