@@ -6,6 +6,8 @@
 [![ISO](https://img.shields.io/badge/ISO_9001_|_27001_|_42001_-Compliant-blue.svg)](compliance/)
 [![NIST](https://img.shields.io/badge/NIST_AI_CSF_|_RMF_-Compliant-blue.svg)](compliance/)
 
+![AMI Orchestrator Banner](docs/REPO-BANNER.png)
+
 **THE OPEN-SOURCE HYPERSCALER**
 
 Secure infrastructure for distributed enterprise automation and governance.
