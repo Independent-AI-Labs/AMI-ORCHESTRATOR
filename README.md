@@ -22,7 +22,7 @@ ISO / NIST / EU AI Act compliant by design.
 
 **Build your own hyperscaler without the hyperscale bills.**
 
-Break free from cloud vendor lock-in. Deploy on bare metal, private cloud, or hybrid infrastructure with enterprise-grade orchestration that rivals AWS, Azure, and GCP—but you own the stack.
+Break free from cloud vendor lock-in. Deploy on bare metal, private cloud, or hybrid infrastructure with enterprise-grade orchestration that rivals AWS, Azure, and GCP - but you own the stack.
 
 ### What You Get
 
@@ -116,7 +116,7 @@ ami-agent --sync base           # Safe git operations with pre-flight validation
 
 **Prevent Incidents Before They Happen**
 
-AMI-ORCHESTRATOR's validation architecture stops problems at the source—saving you from costly rollbacks, data loss, and emergency fixes.
+AMI-ORCHESTRATOR's validation architecture stops problems at the source - saving you from costly rollbacks, data loss, and emergency fixes.
 
 **1. Command Guard** (`command-guard`)
 - **Prevents Catastrophic Mistakes**: Blocks `rm -rf`, force push, destructive git operations
@@ -126,7 +126,7 @@ AMI-ORCHESTRATOR's validation architecture stops problems at the source—saving
 **2. Code Quality Gate** (`code-quality`)
 - **Pre-Flight Checks**: Validates all code changes before they touch your repository
 - **Catches Common Bugs**: Identifies exception handling gaps, unchecked subprocess calls, security issues
-- **Zero-Tolerance Policy**: Rejects low-quality code automatically—no manual review needed
+- **Zero-Tolerance Policy**: Rejects low-quality code automatically - no manual review needed
 
 **3. Completion Verification** (`response-scanner`)
 - **Prevents False Success**: Detects agents claiming "done" without actually finishing work
@@ -140,7 +140,7 @@ All three validators run automatically on every operation. Full audit logs avail
 
 **Extend AI Capabilities Beyond Chat**
 
-AMI-ORCHESTRATOR implements the Model Context Protocol (MCP)—giving AI agents structured access to your infrastructure without brittle API integrations. **63 production tools** across 6 specialized servers.
+AMI-ORCHESTRATOR implements the Model Context Protocol (MCP) - giving AI agents structured access to your infrastructure without brittle API integrations. **63 production tools** across 6 specialized servers.
 
 | Domain | Server | Business Value |
 |--------|--------|----------------|
@@ -197,7 +197,7 @@ cd nodes/scripts/vm/win && powershell -ExecutionPolicy Bypass -File main.ps1
 ```bash
 git clone https://github.com/independent-ai-labs/ami-orchestrator
 cd ami-orchestrator
-python install.py  # Automated setup—grab coffee, it'll take 2-3 minutes
+python install.py  # Automated setup - grab coffee, it'll take 2-3 minutes
 ```
 
 This one command sets up:
@@ -293,7 +293,7 @@ AMI-ORCHESTRATOR is being built to challenge the hyperscaler status quo. Why pay
 
 ### Who Should Use AMI-ORCHESTRATOR
 
-✅ **Regulated Industries**: Healthcare, finance, government, defense—anywhere compliance failures cost millions
+✅ **Regulated Industries**: Healthcare, finance, government, defense - anywhere compliance failures cost millions
 
 ✅ **Cost-Conscious Enterprises**: Teams tired of hyperscaler bills growing 40% YoY
 
@@ -311,7 +311,7 @@ You can't verify what you can't inspect. AMI-ORCHESTRATOR is MIT-licensed becaus
 
 **Community > Vendor**
 
-The best infrastructure tools are built by communities who use them daily—not product managers optimizing for upsells.
+The best infrastructure tools are built by communities who use them daily - not product managers optimizing for upsells.
 
 ---
 
@@ -346,7 +346,6 @@ See [LICENSE](LICENSE) for full text.
 
 ### 💬 Community & Support
 - **Issues**: [GitHub Issues](https://github.com/independent-ai-labs/ami-orchestrator/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/independent-ai-labs/ami-orchestrator/discussions)
 - **Contributing**: See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines
 - **Security**: Report vulnerabilities to security@independentailabs.com
 
