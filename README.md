@@ -3,18 +3,20 @@
 **THE OPEN-SOURCE HYPERSCALER**
 
 Secure infrastructure for distributed enterprise automation and governance.
+
 Deploy on bare metal, cloud, or hybrid infrastructure.
 
 Built for regulated industries demanding compliance, security, and complete operational transparency.
-ISO / NIST / EU AI Act compliant by design.
 
-![AMI Orchestrator Screenshot](docs/AMI-PORTAL.png)
+**ISO** / **NIST** / **EU AI Act** compliant by design.
 
 [![Python 3.12+](https://img.shields.io/badge/Python_-3.12+-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/License-MIT_-green.svg)](LICENSE)
 [![EU AI Act](https://img.shields.io/badge/EU_AI_Act_|_GDPR_-Compliant-blue.svg)](compliance/)
 [![ISO](https://img.shields.io/badge/ISO_9001_|_27001_|_42001_-Compliant-blue.svg)](compliance/)
 [![NIST](https://img.shields.io/badge/NIST_AI_CSF_|_RMF_-Compliant-blue.svg)](compliance/)
+
+![AMI Orchestrator Screenshot](docs/AMI-PORTAL.png)
 
 ---
 
