@@ -61,16 +61,13 @@ Multi-cloud orchestration without vendor lock-in.
 - **Meta-Search**: SearXNG integration for privacy-respecting search across 70+ engines
 - **Research Tools**: Specialized MCP server for marketing research and data collection
 
-**Real-Time Messaging & Streaming**
-- **Matrix Homeserver (Production)**: Self-hosted Synapse for team collaboration with Element web client and end-to-end encryption
-- **Federated Communication**: Connect to global Matrix network or run isolated for secure internal messaging
-- **Future CDN & P2P Distribution (Planned)**: Distributed content delivery network with peer-to-peer capabilities for high-scale media streaming
-- **Live Streaming Infrastructure (Planned)**: RTMP ingest, HLS/DASH output, WebRTC ultra-low latency, hardware-accelerated transcoding
-- **Edge Computing Platform (Planned)**: Serverless functions at edge nodes with DHT-based content discovery and BitTorrent-style swarming
-
-**Networking & VPN**
+**Communications & Streaming**
+- **Matrix Homeserver**: Production Synapse deployment with Element web client for federated team collaboration and end-to-end encryption
+- **Real-Time Messaging**: WebSocket-based event streaming for instant message delivery and presence updates
+- **Distributed CDN Platform (Planned)**: Edge network with P2P content distribution, DHT-based discovery, and BitTorrent-style swarming for bandwidth cost reduction
+- **Media Streaming (Planned)**: RTMP/HLS/DASH/WebRTC streaming infrastructure with hardware-accelerated transcoding and adaptive bitrate delivery
 - **VPN Ready**: OpenVPN integration for secure remote access
-- **Infrastructure Automation**: Custom OpenTofu runner with MCP servers for declarative infrastructure provisioning (replacing legacy tunnel automation)
+- **Infrastructure Automation**: Custom OpenTofu runner with MCP servers for declarative infrastructure provisioning
 
 **Virtual Machine Management**
 - **Automated VM Provisioning**: One-command Ubuntu VM creation with Hyper-V on Windows
@@ -211,10 +208,8 @@ ami-agent --help                                 # Check CLI is installed
 # Launch infrastructure services via nodes launcher
 ./scripts/ami-run.sh nodes/scripts/setup_service.py start <service>
 
-# Start Matrix homeserver for team collaboration
+# Start Matrix homeserver for team collaboration (optional)
 docker-compose -f docker-compose.services.yml --profile matrix up -d
-# Access Element web client at http://localhost:8888
-# See streams/config/matrix/README.md for complete setup
 
 # Start the CMS (Next.js web platform)
 cd ux/cms && npm install && npm run dev
@@ -277,13 +272,6 @@ AMI-ORCHESTRATOR development focuses on multi-cloud orchestration and compliance
 - Never-jettison guarantee prevents value drift across 1000+ generations
 - Complete implementation of formal verification pipeline
 
-**2026-2027: Distributed Streaming & CDN**
-- **Q1 2026**: RTMP ingest, FFmpeg transcoding, HLS/DASH output, S3-compatible storage
-- **Q2 2026**: Edge distribution network with geographic load balancing and cache invalidation
-- **Q3 2026**: Peer-to-peer distribution (DHT, BitTorrent-style swarms, WebRTC mesh networking)
-- **Q4 2026**: Edge computing functions, content-addressed storage, Raft consensus
-- **Q1 2027**: Remote desktop streaming (RDP), virtual display management, OBS integration
-
 ### Who Should Use AMI-ORCHESTRATOR
 
 ✅ **Regulated Industries**: Healthcare, finance, government, defense - anywhere compliance failures cost millions
@@ -315,8 +303,6 @@ MIT License - Copyright © 2025 Independent AI Labs
 - **[Quick Setup Guide](docs/GUIDE-TOOLCHAIN-BOOTSTRAP.md)** - Bootstrap Python 3.12, uv, and development environment
 - **[Setup Contract](docs/SPEC-SETUP-CONTRACT.md)** - How modules integrate with the orchestrator
 - **[Quality Standards](docs/POLICY-QUALITY.md)** - Zero-tolerance quality policy and enforcement mechanisms
-- **[Streaming & CDN](streams/README.md)** - Matrix homeserver (production), future distributed CDN and P2P capabilities
-- **[Matrix Setup Guide](streams/config/matrix/README.md)** - Complete Matrix homeserver deployment and configuration
 
 ### 🛡️ Compliance & Security
 - **[OpenAMI Framework](docs/openami/README.md)** - Self-evolving AI with formal safety guarantees
