@@ -354,6 +354,12 @@ Patterns consolidated from comprehensive codebase audit of 217 Python files.
 - **Pattern**: `try: operation(); except Exception as e: if "substring" in str(e): pytest.skip()`
 - **Impact**: Exceptions converted to test skips based on message content, failures masked as skipped tests
 
+#### Test Skipping via Decorators or Calls
+- **Pattern**: `@pytest.mark.skip`, `@skip`, `pytest.skip()`, `unittest.skip()`, `self.skipTest()`
+- **Impact**: Tests skipped instead of fixed, failures hidden from CI/CD, broken functionality appears to pass, technical debt accumulates, no visibility into what's broken
+- **CRITICAL**: Skipping tests is STRICTLY FORBIDDEN with ZERO TOLERANCE - tests must either pass or fail, never skip
+- **Required fix**: Fix the underlying issue causing test failure, or remove the test entirely if it's no longer relevant
+
 #### Unvalidated Query Result Usage
 - **Pattern**: `result = execute_query(sql); use(result)` (no validation of result structure/type)
 - **Impact**: Malformed query results processed without validation, type assumptions fail

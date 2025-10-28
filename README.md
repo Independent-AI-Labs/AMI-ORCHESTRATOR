@@ -25,9 +25,9 @@ Accessible to every privacy-conscious professional.
 
 ---
 
-## Why AMI-ORCHESTRATOR
+# Why AMI-ORCHESTRATOR
 
-**Build your own hyperscaler without the hyperscale bills.** Multi-cloud orchestration with **zero** vendor lock-in.
+## **Build your own hyperscaler without the hyperscale bills.** Multi-cloud orchestration with **zero** vendor lock-in.
 
 ### What You Get
 
