@@ -79,7 +79,7 @@ Accessible to every privacy-conscious professional.
 - **Real-Time Messaging**: WebSocket-based event streaming for instant message delivery and presence updates
 - **Distributed CDN Platform (Planned)**: Edge network with P2P content distribution, DHT-based discovery, and BitTorrent-style swarming for bandwidth cost reduction
 - **Media Streaming (Planned)**: RTMP/HLS/DASH/WebRTC streaming infrastructure with hardware-accelerated transcoding and adaptive bitrate delivery
-- **VPN Ready**: OpenVPN integration for secure remote access
+- **VPN Ready**: OpenVPN integration for secure remote access and self-hosted service
 
 ---
 
@@ -166,7 +166,7 @@ AMI-ORCHESTRATOR implements the Model Context Protocol (MCP). **63 tools** acros
 | **Market Research** | `domains/marketing/scripts/run_research_mcp.py` | Automated competitor analysis, trend monitoring, and data collection from public sources. |
 | **Service Management** | `nodes/scripts/run_launcher_mcp.py` | Start, stop, monitor services across Docker, Python, Node.js. Unified interface for heterogeneous stacks. |
 
-All servers auto-configure from `scripts/config/automation.yaml`. Launch once, use everywhere.
+All servers auto-configure from `scripts/config/automation.yaml`.
 
 ---
 
@@ -186,7 +186,7 @@ ami-agent --docs docs/ --root-dir .
 ami-agent --sync base --user-instruction "Add SSO authentication"
 
 # Interactive AI agent with access to full infrastructure
-ami-agent --interactive
+ami-agent (--interactive set by default)
 
 # Run comprehensive test suite across all modules
 ./scripts/ami-run.sh scripts/run_tests.py
@@ -227,11 +227,13 @@ ami-agent --help                                 # Check CLI is installed
 
 **3. Launch Your Infrastructure Stack**
 ```bash
-# Launch infrastructure services via nodes launcher
-./scripts/ami-run.sh nodes/scripts/setup_service.py start <service>
+# Start development profile (data-stack + secrets-broker)
+./scripts/ami-run.sh nodes/scripts/setup_service.py profile start dev
 
-# Start Matrix homeserver for team collaboration (optional)
-docker-compose -f docker-compose.services.yml --profile matrix up -d
+# Or start individual services
+./scripts/ami-run.sh nodes/scripts/setup_service.py process start data-stack
+./scripts/ami-run.sh nodes/scripts/setup_service.py process start secrets-broker
+./scripts/ami-run.sh nodes/scripts/setup_service.py process start searxng
 
 # Start the CMS (Next.js web platform)
 cd ux/cms && npm install && npm run dev
