@@ -1,12 +1,12 @@
 # AMI-ORCHESTRATOR
 
-![AMI Orchestrator Banner](docs/REPO-BANNER.png)
-
 [![Python 3.12+](https://img.shields.io/badge/Python_-3.12+-blue.svg)](https://www.python.org/downloads/)
 ![License](https://img.shields.io/badge/License-MIT_-green.svg)
 [![EU AI Act](https://img.shields.io/badge/EU_AI_Act_|_GDPR_-Compliant-blue.svg)](compliance/)
 [![ISO](https://img.shields.io/badge/ISO_9001_|_27001_|_42001_-Compliant-blue.svg)](compliance/)
 [![NIST](https://img.shields.io/badge/NIST_AI_CSF_|_RMF_-Compliant-blue.svg)](compliance/)
+
+![AMI Orchestrator Banner](docs/REPO-BANNER.png)
 
 **THE OPEN-SOURCE HYPERSCALER**
 
