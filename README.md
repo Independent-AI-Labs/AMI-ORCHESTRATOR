@@ -100,7 +100,7 @@ ami-agent --sync base           # Safe git operations with pre-flight validation
 
 **Features**
 - **Zero Surprise Deployments**: Three-layer hook validation catches destructive operations before execution
-- **Complete Auditability**: Every operation logged to immutable session files with timestamps and context
+- **Full Auditability**: Every operation logged to append-only session files with timestamps and structured context
 - **Completion Verification**: Worker/moderator pattern detects and rejects premature completion claims
 - **Real-Time Observability**: Streaming JSON output for integration with monitoring platforms
 - **Parallel Execution**: Configurable concurrency with automatic retry and timeout management
@@ -124,7 +124,7 @@ Hooks validate operations before execution:
 **3. Completion Verification** (`response-scanner`)
 - **Prevents False Success**: Moderator agent validates completion claims before accepting
 - **Blocks Incomplete Work**: Rejects premature "WORK DONE" and forces continuation
-- **Audit Evidence**: Immutable logs of all completion attempts and moderator decisions
+- **Audit Trail**: Append-only logs of all completion attempts and moderator decisions
 
 All three validators run automatically on every operation. Full audit logs available at `logs/hooks/{session_id}.log`.
 
