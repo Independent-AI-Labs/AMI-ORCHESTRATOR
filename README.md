@@ -49,7 +49,7 @@ Deploy on bare metal, private cloud, or hybrid infrastructure. Multi-cloud orche
 - **Secure Authentication**: NextAuth.js integration with multi-provider support
 
 **Data & Storage**
-- **Universal Storage Layer**: Single API for 9 backends (Postgres/pgvector, MongoDB, Redis, Dgraph, OpenBao, Prometheus, File, REST)
+- **Universal Storage Layer (Data Warehousing)**: Single API for 9 backends (Postgres/pgvector, MongoDB, Redis, Dgraph, OpenBao, Prometheus, File, REST) with automated high-availability, clustering, and migration capabilities
 - **Vector Search**: Built-in pgvector support for AI/ML embeddings and semantic search
 - **Graph Database**: Dgraph integration for complex relationship modeling
 - **Secrets Management**: OpenBao for cryptographic secrets, Vaultwarden for password management
