@@ -84,7 +84,7 @@ AMI-ORCHESTRATOR architecture implements compliance controls for regulated indus
 
 **Four-Layer Compliance Architecture**
 - **Layer 4: GOVERNANCE** → Policy enforcement, risk management, human oversight
-- **Layer 3: INTELLIGENCE** → Verifiable AI evolution with proof generation
+- **Layer 3: INTELLIGENCE** → ML models, self-evolution engine, proof generators, knowledge graphs (specification only, target Q1-Q2 2026)
 - **Layer 2: OPERATIONAL** → Secure isolated execution with cryptographic audit tokens
 - **Layer 1: FOUNDATION** → Immutable safety axioms and compliance primitives
 
