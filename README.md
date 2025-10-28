@@ -2,7 +2,7 @@
 
 **THE OPEN-SOURCE HYPERSCALER**
 
-Infrastructure orchestration and AI automation platform.
+Secure infrastructure for distributed enterprise automation and governance.
 Deploy on bare metal, cloud, or hybrid infrastructure.
 
 Built for regulated industries demanding compliance, security, and complete operational transparency.
