@@ -3,6 +3,7 @@
 # Usage: git_commit.sh <module-path> <commit-message>
 #        git_commit.sh <module-path> -F <file>
 #        git_commit.sh <module-path> --amend
+#        git_commit.sh <module-path> --amend <commit-message>
 
 set -euo pipefail
 
@@ -11,11 +12,13 @@ if [ $# -lt 1 ]; then
     echo "Usage: $0 <module-path> <commit-message>"
     echo "       $0 <module-path> -F <file>"
     echo "       $0 <module-path> --amend"
+    echo "       $0 <module-path> --amend <commit-message>"
     echo ""
     echo "Examples:"
     echo "  $0 . \"fix: update root\""
     echo "  $0 . -F /tmp/commit_msg.txt"
     echo "  $0 . --amend"
+    echo "  $0 . --amend \"fix: corrected message\""
     echo "  $0 clients/irisai/demo \"fix: add migrations\""
     exit 1
 fi
@@ -25,12 +28,18 @@ shift
 
 # Parse commit message argument
 USE_AMEND=false
+AMEND_MESSAGE=""
 if [ $# -eq 0 ]; then
     echo "Error: Commit message or --amend flag required"
     exit 1
 elif [ "$1" = "--amend" ]; then
     USE_AMEND=true
     USE_FILE=false
+    shift
+    # Check if there's a message after --amend
+    if [ $# -gt 0 ]; then
+        AMEND_MESSAGE="$1"
+    fi
 elif [ "$1" = "-F" ]; then
     if [ $# -lt 2 ]; then
         echo "Error: -F flag requires file path"
@@ -68,7 +77,11 @@ git add -A
 
 echo "Creating commit..."
 if [ "$USE_AMEND" = true ]; then
-    git commit --amend --no-edit
+    if [ -n "$AMEND_MESSAGE" ]; then
+        git commit --amend -m "$AMEND_MESSAGE"
+    else
+        git commit --amend --no-edit
+    fi
 elif [ "$USE_FILE" = true ]; then
     git commit -F "$COMMIT_FILE"
 else

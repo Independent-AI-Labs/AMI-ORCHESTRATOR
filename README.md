@@ -67,7 +67,6 @@ Multi-cloud orchestration without vendor lock-in.
 - **Distributed CDN Platform (Planned)**: Edge network with P2P content distribution, DHT-based discovery, and BitTorrent-style swarming for bandwidth cost reduction
 - **Media Streaming (Planned)**: RTMP/HLS/DASH/WebRTC streaming infrastructure with hardware-accelerated transcoding and adaptive bitrate delivery
 - **VPN Ready**: OpenVPN integration for secure remote access
-- **Infrastructure Automation**: Custom OpenTofu runner with MCP servers for declarative infrastructure provisioning
 
 **Virtual Machine Management**
 - **Automated VM Provisioning**: One-command Ubuntu VM creation with Hyper-V on Windows
