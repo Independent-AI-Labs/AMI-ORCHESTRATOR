@@ -109,12 +109,21 @@ services:
       local:
         enabled: true
         kind: python
-        command: uv run --python 3.12 base/scripts/run_secrets_broker.py
-        cwd: .
+        command: uv run --python 3.12 scripts/run_secrets_broker.py
+        cwd: base
     module: base
     env:
       SECRETS_BROKER_HOST: 0.0.0.0
       SECRETS_BROKER_PORT: '8700'
+      SECRETS_BROKER_OPENBAO_ADDR: http://localhost:8200
+      SECRETS_BROKER_OPENBAO_TOKEN: openbao-root
+      SECRETS_BROKER_OPENBAO_MOUNT: secret
+      SECRETS_BROKER_OPENBAO_NAMESPACE: ""
+      POSTGRES_HOST: 127.0.0.1
+      POSTGRES_PORT: '5432'
+      POSTGRES_DB: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
     health:
       tcp:
         host: 0.0.0.0

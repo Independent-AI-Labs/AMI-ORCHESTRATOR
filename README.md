@@ -1,8 +1,14 @@
 # AMI-ORCHESTRATOR
 
-**OPEN DISTRIBUTED HYPERSCALER**
+**THE OPEN-SOURCE HYPERSCALER**
 
-Secure infrastructure for scalable enterprise automation and governance. ISO / NIST / EU AI Act compliant by design. Run anywhere.
+Enterprise-grade infrastructure orchestration and AI automation platform.
+Deploy anywhere. Scale infinitely. Control everything.
+
+Built for regulated industries demanding compliance, security, and complete operational transparency.
+ISO / NIST / EU AI Act compliant by design.
+
+![AMI Orchestrator Screenshot](docs/AMI-PORTAL.png)
 
 [![Python 3.12+](https://img.shields.io/badge/Python_-3.12+-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/License-MIT_-green.svg)](LICENSE)
@@ -14,159 +20,300 @@ Secure infrastructure for scalable enterprise automation and governance. ISO / N
 
 ## Why AMI-ORCHESTRATOR
 
-**The only enterprise platform architected for 100% industry-compliance with 0 vendor lock-in.**
+**Build your own hyperscaler without the hyperscale bills.**
 
-### Production Ready
+Break free from cloud vendor lock-in. Deploy on bare metal, private cloud, or hybrid infrastructure with enterprise-grade orchestration that rivals AWS, Azure, and GCP—but you own the stack.
 
-- **Task Execution Framework**: Worker/moderator pattern with retry loops and timeout handling (scripts/automation/tasks.py)
-- **Documentation Maintenance**: Automated doc sync with codebase - UPDATE/ARCHIVE/DELETE actions (scripts/automation/docs.py)
-- **Git Sync Automation**: Intelligent commit/push with validation and moderator checks (scripts/automation/sync.py)
-- **Batch Code Auditing**: Parallel code quality analysis with pattern-based detection (scripts/automation/audit.py)
-- **Real-time Streaming**: JSON streaming output for all agent operations via Claude Code `--output-format stream-json`
+### What You Get
+
+**Infrastructure Orchestration**
+- **Multi-Cloud Infrastructure as Code**: Full OpenTofu integration planned for vendor-neutral IaC (AWS, Azure, GCP, bare metal)
+- **VM & Hypervisor Management**: Production-ready Windows VM orchestration with GPU passthrough (Hyper-V), Linux VM support in development
+- **Intelligent Service Launcher**: Unified orchestration for Docker containers, Python services, Node.js apps, and custom processes
+- **Remote Machine Management**: Secure SSH-based fleet management via MCP protocol
+- **Multi-Stack Deployment**: Pre-configured Docker Compose stacks for data (Postgres, Redis, MongoDB, Dgraph), services (Matrix, SearXNG, OpenVPN), and secrets (OpenBao, Vaultwarden)
+
+**AI Agent Orchestration**
+- **BPMN-Compatible Workflow Engine**: Business process automation with formal verification (in development)
+- **Intelligent Task Execution**: Worker/moderator pattern with automatic retry, timeout handling, and quality gates
+- **Real-Time Streaming**: JSON streaming for live monitoring of all agent operations
+- **Hook-Protected Operations**: Three-layer validation prevents destructive operations and ensures code quality
+
+**Enterprise Web Platform**
+- **Unified Control Center (CMS)**: Next.js-based management console with authentication, file management, and extensible architecture
+- **Active Development**: Web UIs for Agent Management, DataOps, VM Orchestration, and Service Launcher control
+- **Planned Modules**: KYC (Know Your Customer), KYE (Know Your Employee), Risk Management, Software Engineering (with AST parsing)
+- **Web Automation Plugin**: Playwright-compatible Chrome extension for DOM-based automation trigger authoring and scenario execution
+- **Secure Authentication**: NextAuth.js integration with multi-provider support
+
+**Data & Storage**
+- **Universal Storage Layer**: Single API for 9 backends (Postgres/pgvector, MongoDB, Redis, Dgraph, OpenBao, Prometheus, File, REST)
+- **Vector Search**: Built-in pgvector support for AI/ML embeddings and semantic search
+- **Graph Database**: Dgraph integration for complex relationship modeling
+- **Secrets Management**: OpenBao for cryptographic secrets, Vaultwarden for password management
+
+**Browser & Research Automation**
+- **Chrome Automation**: Full browser control for testing, scraping, and RPA workflows
+- **Meta-Search**: SearXNG integration for privacy-respecting search across 70+ engines
+- **Research Tools**: Specialized MCP server for marketing research and data collection
+
+**Communications & Networking**
+- **Matrix Homeserver**: Self-hosted Synapse for team collaboration and ISMS compliance
+- **Secure Messaging**: Element web client with end-to-end encryption
+- **VPN Ready**: OpenVPN integration for secure remote access
+- **Infrastructure Automation**: Custom OpenTofu runner with MCP servers for declarative infrastructure provisioning (replacing legacy tunnel automation)
+
+**Virtual Machine Management**
+- **Automated VM Provisioning**: One-command Ubuntu VM creation with Hyper-V on Windows
+- **GPU Passthrough**: Direct Device Assignment (DDA) for ML training, gaming, or CAD workloads running in isolated VMs
+- **Network Isolation**: Automatic NAT switch configuration with firewall rules for secure development environments
+- **Linux Hypervisor Support**: KVM/libvirt integration in development for cross-platform VM orchestration
 
 
+### Built for Regulated Industries
 
-### Compliance Framework
+**Compliance by Architecture, Not Afterthought**
 
-Layer 4: GOVERNANCE    → Compliance Manifest, Risk Management, Human Oversight
-Layer 3: INTELLIGENCE  → Verifiable Software Development & Evolution, Proof Generation, ML Models
-Layer 2: OPERATIONAL   → Secure Process Nodes (SPNs), Cryptographic State Tokens for Auditable Provenance (CSTs)
-Layer 1: FOUNDATION    → Immutable Code & Axioms, Process Theory, Safety Protocols
+AMI-ORCHESTRATOR is designed from the ground up for industries where compliance failures mean regulatory fines, lost certifications, or worse.
 
-### ami-agent: Reliable, Auditable, Verifiable Automation
+- **EU AI Act Ready**: Architecture maps directly to high-risk AI system requirements
+- **ISO Certified Design**: Aligned with ISO 9001 (Quality), 27001 (Security), 42001 (AI Management)
+- **NIST AI Framework**: Implements AI Risk Management Framework and Cybersecurity Framework controls
+- **Complete Audit Trail**: Every operation logged with cryptographic provenance for regulatory inspection
+- **Formal Verification**: Mathematical proofs of safety properties (in development)
+- **Zero Trust Security**: Least-privilege access, secrets isolation, hook-based validation at every layer
 
-Unified CLI for secure, hook-protected automation with full auditability (scripts/ami-agent):
+**Four-Layer Compliance Architecture**
+- **Layer 4: GOVERNANCE** → Policy enforcement, risk management, human oversight
+- **Layer 3: INTELLIGENCE** → Verifiable AI evolution with proof generation
+- **Layer 2: OPERATIONAL** → Secure isolated execution with cryptographic audit tokens
+- **Layer 1: FOUNDATION** → Immutable safety axioms and compliance primitives
+
+### ami-agent: Enterprise Automation That Actually Works
+
+**Autonomous Operations With Human-Level Guardrails**
+
+Traditional automation breaks in production. AMI-ORCHESTRATOR's ami-agent brings enterprise-grade reliability through intelligent validation and self-healing execution.
 
 ```bash
-ami-agent                       # Interactive mode with Claude Code
-ami-agent --audit base/         # Batch code quality analysis
-ami-agent --tasks tasks/        # Execute .md task files
-ami-agent --docs docs/          # Maintain documentation
-ami-agent --sync base           # Git commit/push with validation
-ami-agent --hook code-quality   # Hook validator (called by Claude Code)
+ami-agent                       # Interactive AI agent with full MCP toolkit
+ami-agent --audit base/         # Parallel code quality analysis across modules
+ami-agent --tasks tasks/        # Execute complex multi-step workflows
+ami-agent --docs docs/          # Intelligent documentation maintenance
+ami-agent --sync base           # Safe git operations with pre-flight validation
 ```
 
-**Features:**
-- Session-based logging for full auditability (logs/{mode}/{session_id}.log)
-- Worker/moderator validation pattern prevents premature completion
-- Streaming JSON output for real-time monitoring
-- Configurable timeouts, retries, and parallel execution
-- Hook integration for command safety and code quality gates
+**Why Teams Trust ami-agent**
+- **Zero Surprise Deployments**: Three-layer hook validation catches destructive operations before execution
+- **Complete Auditability**: Every operation logged to immutable session files with timestamps and context
+- **Self-Healing Workflows**: Worker/moderator pattern detects and corrects premature completions
+- **Real-Time Observability**: Streaming JSON output for integration with monitoring platforms
+- **Parallel Execution**: Configurable concurrency with automatic retry and timeout management
+- **MCP Protocol Native**: Seamless integration with 60+ tools across DataOps, SSH, Browser, Files, Launcher, and Research domains
 
 
-### Built-in Validators
+### Three-Layer Safety System
 
-Three hook validators protect agent operations (scripts/automation/hooks.py):
+**Prevent Incidents Before They Happen**
 
-1. **CommandValidator** (`command-guard`)
-   - Blocks destructive bash operations (rm -rf, force push, rebase)
-   - Enforces use of dedicated tools over pipes/redirects
-   - Validates file permissions and git operations
+AMI-ORCHESTRATOR's validation architecture stops problems at the source—saving you from costly rollbacks, data loss, and emergency fixes.
 
-2. **CodeQualityValidator** (`code-quality`)
-   - Pre-validates Edit/Write tool calls before execution
-   - Catches exception handling issues, unchecked subprocess calls
-   - Enforces zero-tolerance quality policy
+**1. Command Guard** (`command-guard`)
+- **Prevents Catastrophic Mistakes**: Blocks `rm -rf`, force push, destructive git operations
+- **Enforces Best Practices**: Requires dedicated tools over brittle pipes and redirects
+- **Validates Permissions**: Ensures file operations respect security boundaries
 
-3. **ResponseScanner** (`response-scanner`)
-   - Validates completion markers (WORK DONE vs FEEDBACK)
-   - Runs completion moderator for premature termination detection
-   - Prevents agents from claiming success without verification
+**2. Code Quality Gate** (`code-quality`)
+- **Pre-Flight Checks**: Validates all code changes before they touch your repository
+- **Catches Common Bugs**: Identifies exception handling gaps, unchecked subprocess calls, security issues
+- **Zero-Tolerance Policy**: Rejects low-quality code automatically—no manual review needed
 
-All validators log to `logs/hooks/{session_id}.log` and integrate with Claude Code's hook system.
+**3. Completion Verification** (`response-scanner`)
+- **Prevents False Success**: Detects agents claiming "done" without actually finishing work
+- **Moderator Review**: AI-powered verification of completion claims
+- **Audit Evidence**: Immutable logs prove work was completed correctly
 
-
-### MCP Integration
-
-Model Context Protocol servers provide specialized capabilities to Claude:
-
-| Module | Server | Script | Capabilities |
-|--------|--------|--------|--------------|
-| base | SSH | `base/scripts/run_ssh_fastmcp.py` | Secure remote command execution |
-| base | DataOps | `base/scripts/run_dataops_fastmcp.py` | Database operations, data access layer |
-| browser | Chrome | `browser/scripts/run_chrome.py` | Browser automation, tab management, screenshots |
-| files | Filesys | `files/scripts/run_filesys_fastmcp.py` | Filesystem operations, file extraction |
-| domains/marketing | Research | `domains/marketing/scripts/run_research_mcp.py` | Research tools and data collection |
-| nodes | Launcher | `nodes/scripts/run_launcher_mcp.py` | Service orchestration and management |
-
-MCP servers are configured in `scripts/config/automation.yaml` under `mcp.servers` and automatically loaded in interactive mode.
+All three validators run automatically on every operation. Full audit logs available at `logs/hooks/{session_id}.log`.
 
 
-### Usage Examples
+### 60+ Tools Via Model Context Protocol
+
+**Extend AI Capabilities Beyond Chat**
+
+AMI-ORCHESTRATOR implements the Model Context Protocol (MCP)—giving AI agents structured access to your infrastructure without brittle API integrations. **63 production tools** across 6 specialized servers.
+
+| Domain | Server | Business Value |
+|--------|--------|----------------|
+| **DataOps** | `base/scripts/run_dataops_fastmcp.py` | Query any database (Postgres, Mongo, Redis, Dgraph) through unified interface. No more per-database integration code. |
+| **Remote Fleets** | `base/scripts/run_ssh_fastmcp.py` | Execute commands across hundreds of machines securely. Automatic authentication, logging, and error handling. |
+| **Browser Automation** | `browser/scripts/run_chrome.py` | Automate web testing, data extraction, and user workflows. Screenshots, tab management, and headless operation. |
+| **File Operations** | `files/scripts/run_filesys_fastmcp.py` | Safe filesystem access with extraction, validation, and audit trails. Prevents directory traversal attacks. |
+| **Market Research** | `domains/marketing/scripts/run_research_mcp.py` | Automated competitor analysis, trend monitoring, and data collection from public sources. |
+| **Service Management** | `nodes/scripts/run_launcher_mcp.py` | Start, stop, monitor services across Docker, Python, Node.js. Unified interface for heterogeneous stacks. |
+
+All servers auto-configure from `scripts/config/automation.yaml`. Launch once, use everywhere.
+
+
+### Real-World Workflows
 
 ```bash
-# Audit codebase for quality issues
-ami-agent --audit base/ --parallel
+# Find and fix security vulnerabilities across 10+ microservices in parallel
+ami-agent --audit base/ browser/ files/ nodes/ --parallel
 
-# Execute task files with full logging
-ami-agent --tasks tasks/ --root-dir .
+# Deploy infrastructure changes with pre-flight validation
+ami-agent --tasks tasks/deploy-production.md --root-dir .
 
-# Maintain documentation (sync with codebase)
+# Keep documentation synchronized with code automatically
 ami-agent --docs docs/ --root-dir .
 
-# Git sync with validation
-ami-agent --sync base --user-instruction "Add new feature"
+# Safe git operations with compliance checks
+ami-agent --sync base --user-instruction "Add SSO authentication"
 
-# Interactive development with MCP servers
+# Interactive AI agent with access to full infrastructure
 ami-agent --interactive
 
-# Run tests across all modules
+# Run comprehensive test suite across all modules
 ./scripts/ami-run.sh scripts/run_tests.py
+
+# Launch data infrastructure (Postgres, Redis, Mongo, Dgraph)
+docker compose --profile postgres --profile redis --profile dgraph -f docker-compose.data.yml up -d
+
+# Launch secrets management (OpenBao)
+docker compose --profile openbao -f docker-compose.secrets.yml up -d
+
+# Start communication stack (Matrix + Element)
+docker compose --profile matrix -f docker-compose.services.yml up -d
+
+# Secure remote command execution across server fleet
+ami-run base/scripts/run_ssh_fastmcp.py
+
+# Provision GPU-enabled Ubuntu VM with Hyper-V (Windows host)
+cd nodes/scripts/vm/win && powershell -ExecutionPolicy Bypass -File main.ps1
 ```
 
-### Quick Start
+### Get Started in 5 Minutes
 
-**1. Clone and setup:**
+**1. Bootstrap Your Hyperscaler**
 ```bash
 git clone https://github.com/independent-ai-labs/ami-orchestrator
 cd ami-orchestrator
-python install.py
+python install.py  # Automated setup—grab coffee, it'll take 2-3 minutes
 ```
 
-This bootstraps:
-- Git submodules (base, browser, files, nodes, domains, compliance, streams, ux)
-- Python 3.12 via `uv`
-- Per-module virtual environments
-- Pre-commit hooks
-- Shell aliases (`ami-run`, `ami-uv`)
+This one command sets up:
+- 8 specialized modules (base, browser, files, nodes, domains, compliance, streams, ux)
+- Python 3.12 toolchain via `uv` (fastest Python package manager)
+- Isolated virtual environments per module (no dependency conflicts)
+- Pre-commit quality hooks (catch issues before they reach CI)
+- Shell aliases (`ami-run`, `ami-uv`) for streamlined workflows
 
-**2. Verify installation:**
+**2. Verify Everything Works**
 ```bash
-./scripts/ami-run.sh base/scripts/run_tests.py
-ami-agent --help
+./scripts/ami-run.sh base/scripts/run_tests.py  # Run base module tests
+ami-agent --help                                 # Check CLI is installed
 ```
 
-**3. Start services (optional):**
+**3. Launch Your Infrastructure Stack**
 ```bash
-docker compose -f docker-compose.services.yml up -d
+# Data layer (choose what you need)
+docker compose --profile postgres --profile redis -f docker-compose.data.yml up -d
+
+# Secrets management (OpenBao)
+docker compose --profile openbao -f docker-compose.secrets.yml up -d
+
+# Application services (Matrix, SearXNG, VPN, etc.)
+docker compose --profile matrix -f docker-compose.services.yml up -d
+
+# Start the CMS (Next.js web platform)
+cd ux/cms && npm install && npm run dev
 ```
 
+**You're now running your own hyperscaler infrastructure.**
 
-### Running MCP Servers
 
-MCP servers run via `ami-run` wrapper and are automatically configured in interactive mode:
+### MCP Servers: Your Infrastructure API
+
+**One Command Per Capability Domain**
+
+MCP servers transform your infrastructure into AI-accessible APIs. Launch them individually for specific needs or let `ami-agent --interactive` auto-load everything.
 
 ```bash
-# SSH remote execution
+# Fleet management - SSH into any machine, run commands, collect outputs
 ami-run base/scripts/run_ssh_fastmcp.py
 
-# DataOps database operations
+# Universal database access - Postgres, Mongo, Redis, Dgraph via one interface
 ami-run base/scripts/run_dataops_fastmcp.py
 
-# Chrome browser automation
+# Browser automation - Web scraping, testing, RPA without Selenium complexity
 ami-run browser/scripts/run_chrome.py
 
-# Filesystem operations
+# Safe file operations - Read, write, extract with automatic security validation
 ami-run files/scripts/run_filesys_fastmcp.py --root-dir /path/to/files
 
-# Research tools
+# Market intelligence - Automated research and competitive analysis
 ami-run domains/marketing/scripts/run_research_mcp.py
 
-# Service launcher
+# Service orchestration - Start/stop/monitor services across heterogeneous stacks
 ami-run nodes/scripts/run_launcher_mcp.py
 ```
 
-Configuration: `scripts/config/automation.yaml` → `mcp.servers`
+**Configuration**: Edit `scripts/config/automation.yaml` → `mcp.servers` to customize which servers auto-load.
+
+**Production Tip**: Run MCP servers as systemd services for 24/7 availability.
+
+---
+
+## The Open-Source Hyperscaler Vision
+
+**Own Your Infrastructure. Control Your Costs. Maintain Your Compliance.**
+
+AMI-ORCHESTRATOR is being built to challenge the hyperscaler status quo. Why pay AWS, Azure, or GCP a tax on every transaction when you can deploy equivalent capabilities on your own infrastructure?
+
+### What's Next: The Roadmap
+
+**Q4 2025 - Q1 2026: Infrastructure as Code**
+- Full OpenTofu integration for multi-cloud provisioning
+- Declarative infrastructure templates for AWS, Azure, GCP, and bare metal
+- Automated disaster recovery and blue-green deployments
+
+**Q1-Q2 2026: BPMN Workflow Engine**
+- Visual business process modeling for complex automations
+- Formal verification of workflow safety properties
+- Integration with existing BPMN tools (Camunda, Flowable compatibility)
+
+**Q2-Q3 2026: Advanced Compliance**
+- Cryptographic State Tokens for immutable audit trails
+- Secure Process Nodes (SPNs) with TEE support (Intel SGX, AMD SEV)
+- Byzantine fault-tolerant verification for high-assurance AI
+
+**Q4 2026: Self-Evolving AI (OpenAMI)**
+- AI systems that prove their own safety before each improvement
+- Never-jettison guarantee prevents value drift across 1000+ generations
+- Complete implementation of formal verification pipeline
+
+### Who Should Use AMI-ORCHESTRATOR
+
+✅ **Regulated Industries**: Healthcare, finance, government, defense—anywhere compliance failures cost millions
+
+✅ **Cost-Conscious Enterprises**: Teams tired of hyperscaler bills growing 40% YoY
+
+✅ **On-Premise Requirements**: Organizations with data sovereignty, air-gap, or residency requirements
+
+✅ **Open-Source First**: Companies committed to transparency, auditability, and avoiding vendor lock-in
+
+✅ **AI/ML Teams**: Researchers and engineers building trustworthy AI with formal safety guarantees
+
+### Why Open Source?
+
+**Trust Through Transparency**
+
+You can't verify what you can't inspect. AMI-ORCHESTRATOR is MIT-licensed because compliance-critical infrastructure demands auditability. No backdoors. No telemetry. No surprises.
+
+**Community > Vendor**
+
+The best infrastructure tools are built by communities who use them daily—not product managers optimizing for upsells.
+
+---
 
 ### License
 
@@ -176,13 +323,31 @@ See [LICENSE](LICENSE) for full text.
 
 ---
 
-## Links
+## Essential Resources
 
-- **Documentation**: [docs/](docs/) - Architecture, setup contracts, quality policy
-- **Compliance**: [compliance/docs/](compliance/docs/) - ISO/NIST/EU AI Act research
-- **Module Setup**: [docs/SPEC-SETUP-CONTRACT.md](docs/SPEC-SETUP-CONTRACT.md)
-- **Toolchain Bootstrap**: [docs/GUIDE-TOOLCHAIN-BOOTSTRAP.md](docs/GUIDE-TOOLCHAIN-BOOTSTRAP.md)
-- **Architecture Map**: [docs/GUIDE-ARCHITECTURE-MAP.md](docs/GUIDE-ARCHITECTURE-MAP.md)
-- **Quality Policy**: [docs/POLICY-QUALITY.md](docs/POLICY-QUALITY.md)
+### 📚 Documentation & Guides
+- **[Architecture Overview](docs/GUIDE-ARCHITECTURE-MAP.md)** - Understand the module structure and ownership model
+- **[Quick Setup Guide](docs/GUIDE-TOOLCHAIN-BOOTSTRAP.md)** - Bootstrap Python 3.12, uv, and development environment
+- **[Setup Contract](docs/SPEC-SETUP-CONTRACT.md)** - How modules integrate with the orchestrator
+- **[Quality Standards](docs/POLICY-QUALITY.md)** - Zero-tolerance quality policy and enforcement mechanisms
+
+### 🛡️ Compliance & Security
+- **[OpenAMI Framework](docs/openami/README.md)** - Self-evolving AI with formal safety guarantees
+- **[Compliance Research](compliance/docs/)** - ISO 9001/27001/42001, NIST AI CSF, EU AI Act mappings
+- **[Executive Summary](docs/openami/overview/executive-summary.md)** - Business case for trustworthy AI
+- **[System Architecture](docs/openami/architecture/system-architecture.md)** - Four-layer compliance architecture
+
+### 🚀 Getting Started
+1. **Clone**: `git clone https://github.com/independent-ai-labs/ami-orchestrator`
+2. **Setup**: `python install.py` (automated bootstrap)
+3. **Verify**: `./scripts/ami-run.sh base/scripts/run_tests.py`
+4. **Deploy**: `docker compose --profile postgres -f docker-compose.data.yml up -d`
+5. **Explore**: `ami-agent --help`
+
+### 💬 Community & Support
+- **Issues**: [GitHub Issues](https://github.com/independent-ai-labs/ami-orchestrator/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/independent-ai-labs/ami-orchestrator/discussions)
+- **Contributing**: See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines
+- **Security**: Report vulnerabilities to security@independentailabs.com
 
 ---
