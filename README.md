@@ -2,8 +2,8 @@
 
 **THE OPEN-SOURCE HYPERSCALER**
 
-Enterprise-grade infrastructure orchestration and AI automation platform.
-Deploy anywhere. Scale infinitely. Control everything.
+Infrastructure orchestration and AI automation platform.
+Deploy on bare metal, cloud, or hybrid infrastructure.
 
 Built for regulated industries demanding compliance, security, and complete operational transparency.
 ISO / NIST / EU AI Act compliant by design.
@@ -22,20 +22,20 @@ ISO / NIST / EU AI Act compliant by design.
 
 **Build your own hyperscaler without the hyperscale bills.**
 
-Break free from cloud vendor lock-in. Deploy on bare metal, private cloud, or hybrid infrastructure with enterprise-grade orchestration that rivals AWS, Azure, and GCP - but you own the stack.
+Deploy on bare metal, private cloud, or hybrid infrastructure. Multi-cloud orchestration without vendor lock-in.
 
 ### What You Get
 
 **Infrastructure Orchestration**
 - **Multi-Cloud Infrastructure as Code**: Full OpenTofu integration planned for vendor-neutral IaC (AWS, Azure, GCP, bare metal)
 - **VM & Hypervisor Management**: Production-ready Windows VM orchestration with GPU passthrough (Hyper-V), Linux VM support in development
-- **Intelligent Service Launcher**: Unified orchestration for Docker containers, Python services, Node.js apps, and custom processes
+- **Service Launcher**: Unified orchestration for Docker containers, Python services, Node.js apps, and custom processes
 - **Remote Machine Management**: Secure SSH-based fleet management via MCP protocol
 - **Multi-Stack Deployment**: Pre-configured Docker Compose stacks for data (Postgres, Redis, MongoDB, Dgraph), services (Matrix, SearXNG, OpenVPN), and secrets (OpenBao, Vaultwarden)
 
 **AI Agent Orchestration**
 - **BPMN-Compatible Workflow Engine**: Business process automation with formal verification (in development)
-- **Intelligent Task Execution**: Worker/moderator pattern with automatic retry, timeout handling, and quality gates
+- **Task Execution**: Worker/moderator pattern with automatic retry, timeout handling, and quality gates
 - **Real-Time Streaming**: JSON streaming for live monitoring of all agent operations
 - **Hook-Protected Operations**: Three-layer validation prevents destructive operations and ensures code quality
 
@@ -72,9 +72,7 @@ Break free from cloud vendor lock-in. Deploy on bare metal, private cloud, or hy
 
 ### Built for Regulated Industries
 
-**Compliance by Architecture, Not Afterthought**
-
-AMI-ORCHESTRATOR is designed from the ground up for industries where compliance failures mean regulatory fines, lost certifications, or worse.
+AMI-ORCHESTRATOR architecture implements compliance controls for regulated industries.
 
 - **EU AI Act Ready**: Architecture maps directly to high-risk AI system requirements
 - **ISO Certified Design**: Aligned with ISO 9001 (Quality), 27001 (Security), 42001 (AI Management)
@@ -89,11 +87,7 @@ AMI-ORCHESTRATOR is designed from the ground up for industries where compliance 
 - **Layer 2: OPERATIONAL** → Secure isolated execution with cryptographic audit tokens
 - **Layer 1: FOUNDATION** → Immutable safety axioms and compliance primitives
 
-### ami-agent: Enterprise Automation That Actually Works
-
-**Autonomous Operations With Human-Level Guardrails**
-
-Traditional automation breaks in production. AMI-ORCHESTRATOR's ami-agent brings enterprise-grade reliability through intelligent validation and self-healing execution.
+### ami-agent: Validated Automation CLI
 
 ```bash
 ami-agent                       # Interactive AI agent with full MCP toolkit
@@ -103,7 +97,7 @@ ami-agent --docs docs/          # Intelligent documentation maintenance
 ami-agent --sync base           # Safe git operations with pre-flight validation
 ```
 
-**Why Teams Trust ami-agent**
+**Features**
 - **Zero Surprise Deployments**: Three-layer hook validation catches destructive operations before execution
 - **Complete Auditability**: Every operation logged to immutable session files with timestamps and context
 - **Self-Healing Workflows**: Worker/moderator pattern detects and corrects premature completions
@@ -112,11 +106,9 @@ ami-agent --sync base           # Safe git operations with pre-flight validation
 - **MCP Protocol Native**: Seamless integration with 60+ tools across DataOps, SSH, Browser, Files, Launcher, and Research domains
 
 
-### Three-Layer Safety System
+### Three-Layer Validation System
 
-**Prevent Incidents Before They Happen**
-
-AMI-ORCHESTRATOR's validation architecture stops problems at the source - saving you from costly rollbacks, data loss, and emergency fixes.
+Hooks validate operations before execution:
 
 **1. Command Guard** (`command-guard`)
 - **Prevents Catastrophic Mistakes**: Blocks `rm -rf`, force push, destructive git operations
@@ -138,9 +130,7 @@ All three validators run automatically on every operation. Full audit logs avail
 
 ### 60+ Tools Via Model Context Protocol
 
-**Extend AI Capabilities Beyond Chat**
-
-AMI-ORCHESTRATOR implements the Model Context Protocol (MCP) - giving AI agents structured access to your infrastructure without brittle API integrations. **63 production tools** across 6 specialized servers.
+AMI-ORCHESTRATOR implements the Model Context Protocol (MCP). **63 tools** across 6 specialized servers provide structured access to infrastructure operations.
 
 | Domain | Server | Business Value |
 |--------|--------|----------------|
@@ -197,7 +187,7 @@ cd nodes/scripts/vm/win && powershell -ExecutionPolicy Bypass -File main.ps1
 ```bash
 git clone https://github.com/independent-ai-labs/ami-orchestrator
 cd ami-orchestrator
-python install.py  # Automated setup - grab coffee, it'll take 2-3 minutes
+python install.py  # Automated setup takes 2-3 minutes
 ```
 
 This one command sets up:
@@ -228,14 +218,12 @@ docker compose --profile matrix -f docker-compose.services.yml up -d
 cd ux/cms && npm install && npm run dev
 ```
 
-**You're now running your own hyperscaler infrastructure.**
+**Basic infrastructure stack is now running.**
 
 
-### MCP Servers: Your Infrastructure API
+### MCP Servers
 
-**One Command Per Capability Domain**
-
-MCP servers transform your infrastructure into AI-accessible APIs. Launch them individually for specific needs or let `ami-agent --interactive` auto-load everything.
+MCP servers expose infrastructure operations via structured protocol. Launch individually or use `ami-agent --interactive` to auto-load.
 
 ```bash
 # Fleet management - SSH into any machine, run commands, collect outputs
@@ -263,13 +251,9 @@ ami-run nodes/scripts/run_launcher_mcp.py
 
 ---
 
-## The Open-Source Hyperscaler Vision
+## Roadmap
 
-**Own Your Infrastructure. Control Your Costs. Maintain Your Compliance.**
-
-AMI-ORCHESTRATOR is being built to challenge the hyperscaler status quo. Why pay AWS, Azure, or GCP a tax on every transaction when you can deploy equivalent capabilities on your own infrastructure?
-
-### What's Next: The Roadmap
+AMI-ORCHESTRATOR development focuses on multi-cloud orchestration and compliance automation.
 
 **Q4 2025 - Q1 2026: Infrastructure as Code**
 - Full OpenTofu integration for multi-cloud provisioning
@@ -305,13 +289,7 @@ AMI-ORCHESTRATOR is being built to challenge the hyperscaler status quo. Why pay
 
 ### Why Open Source?
 
-**Trust Through Transparency**
-
-You can't verify what you can't inspect. AMI-ORCHESTRATOR is MIT-licensed because compliance-critical infrastructure demands auditability. No backdoors. No telemetry. No surprises.
-
-**Community > Vendor**
-
-The best infrastructure tools are built by communities who use them daily - not product managers optimizing for upsells.
+AMI-ORCHESTRATOR is MIT-licensed for transparency and auditability. No telemetry, no backdoors.
 
 ---
 
