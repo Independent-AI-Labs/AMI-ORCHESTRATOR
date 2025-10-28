@@ -10,7 +10,7 @@
 
 Secure infrastructure for distributed enterprise automation and governance.
 Supports bare metal, cloud, and hybrid deployments.
-Connects to ANY web or API service.
+Connects to **any** web or API service.
 
 Built for regulated industries demanding compliance, security, and complete operational transparency.
 
@@ -33,7 +33,7 @@ Deploy on bare metal, private cloud, or hybrid infrastructure. Multi-cloud orche
 - **VM & Hypervisor Management**: Production-ready Windows VM orchestration with GPU passthrough (Hyper-V), Linux VM support in development
 - **Service Launcher**: Unified orchestration for Docker containers, Python services, Node.js apps, and custom processes
 - **Remote Machine Management**: Secure SSH-based fleet management via MCP protocol
-- **Multi-Stack Deployment**: Pre-configured Docker Compose stacks for data (Postgres, Redis, MongoDB, Dgraph), services (Matrix, SearXNG, OpenVPN), and secrets (OpenBao, Vaultwarden)
+- **Multi-Stack Deployment**: Pre-configured Docker Compose stacks for data (Postgres, Redis, MongoDB, Dgraph), services (Matrix, SearXNG, OpenVPN), and secrets (OpenBao)
 
 **AI Agent Orchestration**
 - **BPMN-Compatible Workflow Engine**: Business process automation with formal verification (in development)
@@ -52,7 +52,7 @@ Deploy on bare metal, private cloud, or hybrid infrastructure. Multi-cloud orche
 - **Universal Storage Layer (Data Warehousing)**: Single API for 9 backends (Postgres/pgvector, MongoDB, Redis, Dgraph, OpenBao, Prometheus, File, REST) with automated high-availability, clustering, and migration capabilities
 - **Vector Search**: Built-in pgvector support for AI/ML embeddings and semantic search
 - **Graph Database**: Dgraph integration for complex relationship modeling
-- **Secrets Management**: OpenBao for cryptographic secrets, Vaultwarden for password management
+- **Secrets Management**: OpenBao for all secrets including cryptographic secrets, API keys, certificates, and user passwords
 
 **Browser & Research Automation**
 - **Chrome Automation**: Full browser control for testing, scraping, and RPA workflows
