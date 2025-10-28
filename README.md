@@ -12,14 +12,15 @@
 
 Secure infrastructure for distributed enterprise automation and governance.
 Supports bare metal, cloud, and hybrid deployments.
-Integrates with **any** **web**, **data** or **API** service.
+Safely integrates with **any** **web**, **data** or **API** service.
 
-Built for regulated industries demanding compliance, security, and complete operational transparency.
-Accessible to every privacy-conscious professional.
+**Built for regulated industries demanding compliance, security, and complete operational transparency.**
 
-### ✔️**ISO**, ✔️**NIST**, and ✔️**EU AI Act** compliant by design.
+### **Available to everyone.**
 
-**AMI-ORHESTRATOR** helps you benefit from standartisation by reducing administrative overhead and automating audit and compliance procedures. 
+### The AMI project is ✔️**ISO**, ✔️**NIST**, and ✔️**EU AI Act** compliant by design.
+
+Benefit from standartisation with reduced administrative overhead by automating audit and compliance procedures. 
 
 ![AMI Orchestrator Screenshot](docs/AMI-PORTAL.png)
 
@@ -27,14 +28,17 @@ Accessible to every privacy-conscious professional.
 
 ## Why AMI-ORCHESTRATOR
 
-### **Build your own hyperscaler without the hyperscale bills.** Multi-cloud orchestration with **zero** vendor lock-in.
+### I. Get to own your software, data and AI. Your privacy is your most important asset.
+### II. Reduces your dependence and spending on SaaS and third-party infrastructure.* 
+### III. Provdes enterprise multi-cloud orchestration with **zero** vendor lock-in.
+### IV. Built for safety, verifiability and regulatory compliance.
+
+*Hardware not included
 
 ## What You Get
 
----
-
 ### 🏗️ **Infrastructure Orchestration**
-- **Multi-Cloud Infrastructure as Code**: Full OpenTofu integration planned for vendor-neutral IaC (AWS, Azure, GCP, bare metal)
+- **Multi-Cloud Infrastructure as Code**: Full OpenTofu integration for vendor-neutral IaC (bare metal / private cloud, AWS, Azure, GCP)
 - **VM & Hypervisor Management**: Production-ready Windows VM orchestration with GPU passthrough (Hyper-V), Linux VM support in development
 - **Service Launcher**: Unified orchestration for Podman containers, Python services, Node.js apps, and custom processes
 - **Remote Machine Management**: Secure SSH-based fleet management via MCP protocol
@@ -174,7 +178,7 @@ All servers auto-configure from `scripts/config/automation.yaml`.
 ### 💼 Real-World Workflows
 
 ```bash
-# Find and fix security vulnerabilities across 10+ microservices in parallel
+# Find and fix security vulnerabilities across multiple microservices in parallel
 ami-agent --audit base/ browser/ files/ nodes/ --parallel
 
 # Deploy infrastructure changes with pre-flight validation
@@ -237,7 +241,7 @@ ami-agent --help                                 # Check CLI is installed
 ./scripts/ami-run.sh nodes/scripts/setup_service.py process start searxng
 
 # Start the CMS (Next.js web platform)
-cd ux/cms && npm install && npm run dev
+./scripts/ami-run.sh nodes/scripts/setup_service.py profile start cms
 ```
 
 **Basic infrastructure stack is now running.**
@@ -270,11 +274,9 @@ ami-run nodes/scripts/run_launcher_mcp.py
 
 **Configuration**: Edit `scripts/config/automation.yaml` → `mcp.servers` to customize which servers auto-load.
 
-**Production Tip**: Run MCP servers as systemd services for 24/7 availability.
-
 ---
 
-## Roadmap
+### Roadmap
 
 AMI-ORCHESTRATOR development focuses on multi-cloud orchestration and compliance automation.
 
