@@ -1,7 +1,7 @@
 # AMI-ORCHESTRATOR
 
 [![Python 3.12+](https://img.shields.io/badge/Python_-3.12+-blue.svg)](https://www.python.org/downloads/)
-[![License](https://img.shields.io/badge/License-MIT_-green.svg)](LICENSE)
+![License](https://img.shields.io/badge/License-MIT_-green.svg)
 [![EU AI Act](https://img.shields.io/badge/EU_AI_Act_|_GDPR_-Compliant-blue.svg)](compliance/)
 [![ISO](https://img.shields.io/badge/ISO_9001_|_27001_|_42001_-Compliant-blue.svg)](compliance/)
 [![NIST](https://img.shields.io/badge/NIST_AI_CSF_|_RMF_-Compliant-blue.svg)](compliance/)
@@ -13,6 +13,7 @@ Supports bare metal, cloud, and hybrid deployments.
 Connects to **any** web or API service.
 
 Built for regulated industries demanding compliance, security, and complete operational transparency.
+Accessible to every privacy-conscious professional.
 
 **ISO** / **NIST** / **EU AI Act** compliant by design.
 
@@ -24,7 +25,8 @@ Built for regulated industries demanding compliance, security, and complete oper
 
 **Build your own hyperscaler without the hyperscale bills.**
 
-Deploy on bare metal, private cloud, or hybrid infrastructure. Multi-cloud orchestration without vendor lock-in.
+Deploy on bare metal, private cloud, or hybrid infrastructure.
+Multi-cloud orchestration without vendor lock-in.
 
 ### What You Get
 
@@ -167,14 +169,8 @@ ami-agent --interactive
 # Run comprehensive test suite across all modules
 ./scripts/ami-run.sh scripts/run_tests.py
 
-# Launch data infrastructure (Postgres, Redis, Mongo, Dgraph)
-docker compose --profile postgres --profile redis --profile dgraph -f docker-compose.data.yml up -d
-
-# Launch secrets management (OpenBao)
-docker compose --profile openbao -f docker-compose.secrets.yml up -d
-
-# Start communication stack (Matrix + Element)
-docker compose --profile matrix -f docker-compose.services.yml up -d
+# Launch infrastructure services via nodes launcher
+./scripts/ami-run.sh nodes/scripts/setup_service.py start <service>
 
 # Secure remote command execution across server fleet
 ami-run base/scripts/run_ssh_fastmcp.py
@@ -207,14 +203,8 @@ ami-agent --help                                 # Check CLI is installed
 
 **3. Launch Your Infrastructure Stack**
 ```bash
-# Data layer (choose what you need)
-docker compose --profile postgres --profile redis -f docker-compose.data.yml up -d
-
-# Secrets management (OpenBao)
-docker compose --profile openbao -f docker-compose.secrets.yml up -d
-
-# Application services (Matrix, SearXNG, VPN, etc.)
-docker compose --profile matrix -f docker-compose.services.yml up -d
+# Launch infrastructure services via nodes launcher
+./scripts/ami-run.sh nodes/scripts/setup_service.py start <service>
 
 # Start the CMS (Next.js web platform)
 cd ux/cms && npm install && npm run dev
@@ -299,8 +289,6 @@ AMI-ORCHESTRATOR is MIT-licensed for transparency and auditability. No telemetry
 
 MIT License - Copyright © 2025 Independent AI Labs
 
-See [LICENSE](LICENSE) for full text.
-
 ---
 
 ## Essential Resources
@@ -313,7 +301,6 @@ See [LICENSE](LICENSE) for full text.
 
 ### 🛡️ Compliance & Security
 - **[OpenAMI Framework](docs/openami/README.md)** - Self-evolving AI with formal safety guarantees
-- **[Compliance Research](compliance/docs/)** - ISO 9001/27001/42001, NIST AI CSF, EU AI Act mappings
 - **[Executive Summary](docs/openami/overview/executive-summary.md)** - Business case for trustworthy AI
 - **[System Architecture](docs/openami/architecture/system-architecture.md)** - Four-layer compliance architecture
 
@@ -321,7 +308,7 @@ See [LICENSE](LICENSE) for full text.
 1. **Clone**: `git clone https://github.com/independent-ai-labs/ami-orchestrator`
 2. **Setup**: `python install.py` (automated bootstrap)
 3. **Verify**: `./scripts/ami-run.sh base/scripts/run_tests.py`
-4. **Deploy**: `docker compose --profile postgres -f docker-compose.data.yml up -d`
+4. **Deploy**: `./scripts/ami-run.sh nodes/scripts/setup_service.py start <service>`
 5. **Explore**: `ami-agent --help`
 
 ### 💬 Community & Support

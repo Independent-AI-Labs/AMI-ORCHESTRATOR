@@ -18,11 +18,9 @@ The `docs/` folder captures orchestrator-wide policies and the modernization sta
 
 All specifications and implementation plans have been moved to `specs/`:
 
-- **Authentication:** `specs/SPEC-AUTH.md`, `specs/SPEC-NEXTAUTH-INTEGRATION.md`, `specs/TODO-AUTH.md`
+- **Authentication:** `specs/SPEC-AUTH.md`, `specs/SPEC-NEXTAUTH-INTEGRATION.md`
 - **DataOps:** `specs/SPEC-DATAOPS-DATA-ACCESS.md`, `specs/SPEC-STORAGE.md`
-- **Security:** `specs/SPEC-HARDEN.md`, `specs/SPEC-REMEDIATION.md`
-- **Code Quality:** `specs/SPEC-SYNTAX.md`
-- **Automation:** `specs/SPEC-AUTOMATION-V2.md`, `specs/SPEC-AUTOMATION-TESTS.md`
+- **Security:** `specs/SPEC-REMEDIATION.md`
 - **ISMS:** `specs/SPEC-ISMS-FUNCTIONALITY.md`
 
 ## Archived Documents

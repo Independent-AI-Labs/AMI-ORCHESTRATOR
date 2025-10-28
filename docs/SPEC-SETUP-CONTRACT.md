@@ -52,7 +52,7 @@ Located in `base/scripts/env/`:
 
 ## Module Setup Pattern
 
-All modules follow this standardized `module_setup.py` pattern (see base/module_setup.py:1):
+All modules follow this standardized `module_setup.py` pattern (see base/module_setup.py:16-17):
 
 ```python
 # Bootstrap sys.path - MUST come before base imports

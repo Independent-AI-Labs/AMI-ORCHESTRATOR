@@ -15,7 +15,7 @@ This document summarises the current module boundaries, responsibilities, and pr
 | Module | Responsibilities | Primary entry points / notes |
 | --- | --- | --- |
 | `base/` | Shared environment management, DataOps storage layer (async PostgreSQL, Dgraph, in-memory), FastMCP DataOps + SSH servers, security utilities. | `module_setup.py`, `scripts/run_tests.py`, `backend/mcp/dataops/dataops_server.py`, `backend/utils/runner_bootstrap.py`. |
-| `browser/` | Managed Chromium provisioning and auditable browser automation tooling. | `module_setup.py`, `scripts/setup_chrome.py`, `backend/mcp/chrome/**`. Experimental anti-detection work is documented under `browser/docs/research/`. |
+| `browser/` | Managed Chromium provisioning and auditable browser automation tooling. | `module_setup.py`, `scripts/setup_chrome.py`, `backend/mcp/chrome/**`. |
 | `files/` | Secure file ingestion/extraction services and MCP tooling for file operations. | `module_setup.py`, `scripts/run_tests.py`, `backend/mcp/**`, `backend/extractors/**`. |
 | `domains/` | Domain models (risk, SDA). | `module_setup.py`, `risk/`, `sda/`. Marketing is git submodule; keyring contains only type stubs (`__init__.pyi`). |
 | `compliance/` | Documentation-only snapshot of code quality and CI/DI alignment. Compliance backend spec and historical standards research in `docs/research/`. | `module_setup.py`, `docs/README.md`, `docs/research/COMPLIANCE_BACKEND_SPEC.md`. Backend implementation TBD. |

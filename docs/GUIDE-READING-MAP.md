@@ -15,9 +15,9 @@ High-value docs by area:
 - `POLICY-QUALITY.md` — quality policy and guardrails
 - `STATUS-INTEGRATION.md` — integration status tracker
 - `TODO-DOCS-GAPS.md` — documentation gaps and backlog
-- `TODO-NEXT-STEPS.md` — next steps and suggested owners
 - `specs/` — specifications and implementation plans (auth, DataOps, security, automation, ISMS)
 - `archive/` — historical documents, completed work, progress reports
+- `archive/TODO-NEXT-STEPS.md` — next steps and suggested owners (archived)
 - `openami/` — OpenAMI framework documentation
 
 ## Module Documentation
@@ -28,7 +28,6 @@ High-value docs by area:
 ### Browser (`browser/`)
 - `README.md` — module overview
 - `CODE_EXCEPTIONS.md` — intentional deviations
-- `docs/research/` — experimental anti-detection work
 
 ### Files (`files/`)
 - `README.md` — capabilities and operations
@@ -48,8 +47,7 @@ High-value docs by area:
 - `docs/` — reference material
 
 ### Domains (`domains/`)
-- `risk/` — risk domain models
-- `sda/` — SDA domain models
+- `risk/SPEC-RISK.md` — risk domain specification
 
 ## Suggested Reading Order
 
