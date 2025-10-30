@@ -77,10 +77,14 @@ def get_claude_version() -> str | None:
         return None
 
 
-def ensure_claude_version(required_version: str = "2.0.10") -> bool:
+def ensure_claude_version(required_version: str = "2.0.10", venv_path: Path | None = None) -> bool:
     """Ensure Claude CLI is installed at exactly the required version.
 
-    Auto-installs via npm if missing or wrong version.
+    Auto-installs via npm in venv if missing or wrong version.
+
+    Args:
+        required_version: Claude CLI version required
+        venv_path: Path to venv for local installation (uses global if None)
     """
     if not check_npm():
         return False
@@ -97,10 +101,20 @@ def ensure_claude_version(required_version: str = "2.0.10") -> bool:
     else:
         logger.info(f"Claude CLI not found. Installing version {required_version}...")
 
-    # Install exact version via npm
+    # Install locally in venv if venv_path provided, otherwise attempt global (may fail without sudo)
+    install_cmd = ["npm", "install"]
+    if venv_path:
+        # Install locally in venv node_modules
+        install_cmd.extend(["--prefix", str(venv_path)])
+    else:
+        # Global install (requires sudo - may fail in restricted environments)
+        install_cmd.append("-g")
+
+    install_cmd.append(f"@anthropic-ai/claude-code@{required_version}")
+
     try:
         subprocess.run(
-            ["npm", "install", "-g", f"@anthropic-ai/claude-code@{required_version}"],
+            install_cmd,
             check=True,
             capture_output=True,
             text=True
@@ -305,12 +319,6 @@ def setup(module_root: Path, project_name: str | None) -> int:
     if not check_uv():
         return 1
 
-    # Load required Claude CLI version from .env
-    required_claude_version = load_env_var(module_root, "CLAUDE_CLI_VERSION", "2.0.10")
-    if not ensure_claude_version(required_claude_version):
-        logger.error(f"Claude CLI version {required_claude_version} is required but could not be installed")
-        return 1
-
     ensure_uv_python("3.12")
 
     pyproject = module_root / "pyproject.toml"
@@ -330,6 +338,13 @@ def setup(module_root: Path, project_name: str | None) -> int:
     # Bootstrap Node.js/npm into venv
     if not bootstrap_node_in_venv(module_root):
         logger.warning("Failed to bootstrap Node.js, continuing anyway...")
+
+    # Install Claude CLI locally in venv (after Node.js bootstrap)
+    required_claude_version = load_env_var(module_root, "CLAUDE_CLI_VERSION", "2.0.10")
+    venv_path = module_root / ".venv"
+    if not ensure_claude_version(required_claude_version, venv_path):
+        logger.error(f"Claude CLI version {required_claude_version} is required but could not be installed")
+        return 1
 
     install_precommit(module_root)
 
