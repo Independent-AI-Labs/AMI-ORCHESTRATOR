@@ -23,18 +23,44 @@ fi
 
 # Check Claude CLI version
 check_claude_version() {
-    if ! command -v claude &> /dev/null; then
+    local claude_path="$1"
+
+    if [ ! -x "$claude_path" ]; then
         return 1
     fi
 
     local current_version
-    current_version=$(claude --version 2>/dev/null | awk '{print $1}')
+    current_version=$("$claude_path" --version 2>/dev/null | awk '{print $1}')
 
     if [ "$current_version" != "$REQUIRED_VERSION" ]; then
         return 2
     fi
 
     return 0
+}
+
+# Determine which claude binary to use (priority order)
+find_claude_binary() {
+    # Priority 1: CLAUDE_CLI_PATH env var (explicit override)
+    if [ -n "${CLAUDE_CLI_PATH:-}" ] && [ -x "${CLAUDE_CLI_PATH:-}" ]; then
+        echo "$CLAUDE_CLI_PATH"
+        return 0
+    fi
+
+    # Priority 2: venv-local claude (npm installed)
+    local venv_claude="$ROOT_DIR/.venv/node_modules/.bin/claude"
+    if [ -x "$venv_claude" ]; then
+        echo "$venv_claude"
+        return 0
+    fi
+
+    # Priority 3: system claude (PATH)
+    if command -v claude &> /dev/null; then
+        command -v claude
+        return 0
+    fi
+
+    return 1
 }
 
 # Install Claude CLI using bootstrapped npm from venv
@@ -46,9 +72,9 @@ install_claude_cli() {
         return 1
     fi
 
-    echo "Installing Claude CLI version $REQUIRED_VERSION using bootstrapped npm..." >&2
-    if "$npm_bin" install -g "@anthropic-ai/claude-code@$REQUIRED_VERSION"; then
-        echo "✓ Successfully installed Claude CLI $REQUIRED_VERSION" >&2
+    echo "Installing Claude CLI version $REQUIRED_VERSION to venv using bootstrapped npm..." >&2
+    if "$npm_bin" install --prefix "$ROOT_DIR/.venv" "@anthropic-ai/claude-code@$REQUIRED_VERSION"; then
+        echo "✓ Successfully installed Claude CLI $REQUIRED_VERSION to .venv/node_modules/" >&2
         return 0
     else
         echo "✗ Failed to install Claude CLI" >&2
@@ -56,26 +82,56 @@ install_claude_cli() {
     fi
 }
 
-# Verify Claude CLI version, offer to install if missing/wrong
-if ! check_claude_version; then
-    ret=$?
-    if [ $ret -eq 1 ]; then
-        echo "Error: Claude CLI not found." >&2
-        echo "Required version: $REQUIRED_VERSION" >&2
-    else
-        current=$(claude --version 2>/dev/null | awk '{print $1}')
-        echo "Error: Claude CLI version mismatch." >&2
-        echo "Required: $REQUIRED_VERSION, Found: $current" >&2
-    fi
+# Find and verify Claude CLI
+CLAUDE_BIN=$(find_claude_binary)
+if [ -z "$CLAUDE_BIN" ]; then
+    echo "Error: Claude CLI not found." >&2
+    echo "Required version: $REQUIRED_VERSION" >&2
+    echo "Searched: CLAUDE_CLI_PATH env var, .venv/node_modules/.bin/claude, system PATH" >&2
 
-    read -p "Install Claude CLI $REQUIRED_VERSION now? (y/N) " -n 1 -r
+    read -p "Install Claude CLI $REQUIRED_VERSION to venv now? (y/N) " -n 1 -r
     echo
     if [[ $REPLY =~ ^[Yy]$ ]]; then
         if ! install_claude_cli; then
             exit 1
         fi
+        CLAUDE_BIN=$(find_claude_binary)
+        if [ -z "$CLAUDE_BIN" ]; then
+            echo "Error: Installation completed but claude binary not found" >&2
+            exit 1
+        fi
     else
         echo "Aborted. Please install Claude CLI version $REQUIRED_VERSION manually." >&2
+        exit 1
+    fi
+fi
+
+# Verify version
+if ! check_claude_version "$CLAUDE_BIN"; then
+    ret=$?
+    if [ $ret -eq 2 ]; then
+        current=$("$CLAUDE_BIN" --version 2>/dev/null | awk '{print $1}')
+        echo "Error: Claude CLI version mismatch." >&2
+        echo "Required: $REQUIRED_VERSION, Found: $current" >&2
+        echo "Using: $CLAUDE_BIN" >&2
+
+        read -p "Install correct version $REQUIRED_VERSION to venv now? (y/N) " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            if ! install_claude_cli; then
+                exit 1
+            fi
+            CLAUDE_BIN=$(find_claude_binary)
+            if [ -z "$CLAUDE_BIN" ] || ! check_claude_version "$CLAUDE_BIN"; then
+                echo "Error: Installation completed but version check still fails" >&2
+                exit 1
+            fi
+        else
+            echo "Aborted. Please install Claude CLI version $REQUIRED_VERSION manually." >&2
+            exit 1
+        fi
+    else
+        echo "Error: Claude CLI check failed" >&2
         exit 1
     fi
 fi

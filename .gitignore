@@ -26,6 +26,10 @@ ENV/
 .venv/
 # EXCEPT root .venv which is our bootstrap
 !/.venv/
+# But ignore npm packages installed in venv (claude CLI)
+/.venv/node_modules/
+/.venv/package.json
+/.venv/package-lock.json
 # Platform-specific venv copies
 .venv-linux/
 .venv-windows/
