@@ -74,9 +74,9 @@ class TestOrchestratorDeployment:
         assert (install_path / ".git").exists(), "Git repository not cloned properly"
         assert (install_path / "install.py").exists(), "install.py not found in cloned repository"
 
-        # Phase 2: Run installation
+        # Phase 2: Run installation (skip Claude CLI prompt for automated test)
         install_result = subprocess.run(
-            ["python", "install.py"],
+            ["python", "install.py", "--skip-claude-check"],
             cwd=install_path,
             capture_output=True,
             text=True,
@@ -151,9 +151,9 @@ class TestOrchestratorDeployment:
             check=True,
         )
 
-        # Install
+        # Install (skip Claude CLI prompt for automated test)
         subprocess.run(
-            ["python", "install.py"],
+            ["python", "install.py", "--skip-claude-check"],
             cwd=install_path,
             capture_output=True,
             timeout=INSTALL_TIMEOUT,
@@ -186,9 +186,9 @@ class TestOrchestratorDeployment:
             check=True,
         )
 
-        # Install
+        # Install (skip Claude CLI prompt for automated test)
         subprocess.run(
-            ["python", "install.py"],
+            ["python", "install.py", "--skip-claude-check"],
             cwd=install_path,
             capture_output=True,
             timeout=INSTALL_TIMEOUT,

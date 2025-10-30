@@ -12,6 +12,7 @@ For updates, run module_setup.py directly.
 
 from __future__ import annotations
 
+import argparse
 import logging
 import subprocess
 import sys
@@ -169,7 +170,44 @@ def register_shell_aliases() -> bool:
     return True
 
 
+def prompt_claude_install_mode() -> str:
+    """Prompt user to choose Claude CLI installation mode.
+
+    Returns:
+        "local" for venv-local install, "system" for global, "skip" to skip
+    """
+    logger.info("")
+    logger.info("=" * 60)
+    logger.info("Claude CLI Installation")
+    logger.info("=" * 60)
+    logger.info("")
+    logger.info("Choose how to install Claude CLI:")
+    logger.info("  local  - Install to .venv/node_modules/ (recommended, no sudo)")
+    logger.info("  system - Install globally via npm -g (requires sudo)")
+    logger.info("  skip   - Skip installation (install manually later)")
+    logger.info("")
+
+    while True:
+        choice = input("Install mode [local/system/skip]: ").strip().lower()
+        if choice in ("local", "system", "skip"):
+            return choice
+        logger.warning(f"Invalid choice: {choice}. Please enter 'local', 'system', or 'skip'.")
+
+
 def main() -> int:
+    parser = argparse.ArgumentParser(description="AMI Orchestrator installer")
+    parser.add_argument(
+        "--skip-claude-check",
+        action="store_true",
+        help="Skip Claude CLI installation prompt (for automated installs)",
+    )
+    parser.add_argument(
+        "--claude-mode",
+        choices=["local", "system", "skip"],
+        help="Claude CLI install mode (local=venv, system=global, skip=none)",
+    )
+    args = parser.parse_args()
+
     logger.info("=" * 60)
     logger.info("AMI Orchestrator Installation")
     logger.info("=" * 60)
@@ -186,9 +224,17 @@ def main() -> int:
     if not register_shell_aliases():
         logger.warning("Failed to register shell aliases (non-fatal)")
 
+    # Step 3: Determine Claude CLI installation mode
+    if args.skip_claude_check:
+        claude_mode = "skip"
+    elif args.claude_mode:
+        claude_mode = args.claude_mode
+    else:
+        claude_mode = prompt_claude_install_mode()
+
     logger.info("")
 
-    # Step 3: Run module_setup.py for recursive venv creation
+    # Step 4: Run module_setup.py for recursive venv creation
     module_setup = ROOT / "module_setup.py"
     if not module_setup.exists():
         logger.error("module_setup.py not found - run propagate.py first")
@@ -197,7 +243,9 @@ def main() -> int:
     logger.info("=" * 60)
     logger.info("Running module_setup.py for recursive venv creation...")
     logger.info("=" * 60)
-    result = subprocess.run([sys.executable, str(module_setup)], cwd=ROOT, check=False)
+
+    setup_cmd = [sys.executable, str(module_setup), "--claude-mode", claude_mode]
+    result = subprocess.run(setup_cmd, cwd=ROOT, check=False)
 
     if result.returncode != 0:
         logger.error("module_setup.py failed")

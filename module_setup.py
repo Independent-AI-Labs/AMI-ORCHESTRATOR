@@ -325,8 +325,14 @@ def setup_child_submodules(module_root: Path) -> None:
             logger.info(f"✓ {child.name} setup complete")
 
 
-def setup(module_root: Path, project_name: str | None) -> int:
-    """Main setup orchestration."""
+def setup(module_root: Path, project_name: str | None, claude_mode: str = "local") -> int:
+    """Main setup orchestration.
+
+    Args:
+        module_root: Root directory of the module
+        project_name: Optional project name for display
+        claude_mode: Claude CLI install mode (local/system/skip)
+    """
     name = project_name or module_root.name
     logger.info("=" * 60)
     logger.info(f"Setting up {name} Development Environment")
@@ -356,12 +362,21 @@ def setup(module_root: Path, project_name: str | None) -> int:
     if not bootstrap_node_in_venv(module_root):
         logger.warning("Failed to bootstrap Node.js, continuing anyway...")
 
-    # Install Claude CLI locally in venv (after Node.js bootstrap)
-    required_claude_version = load_env_var(module_root, "CLAUDE_CLI_VERSION", "2.0.10")
-    venv_path = module_root / ".venv"
-    if not ensure_claude_version(required_claude_version, venv_path):
-        logger.error(f"Claude CLI version {required_claude_version} is required but could not be installed")
-        return 1
+    # Install Claude CLI based on mode
+    if claude_mode == "skip":
+        logger.info("Skipping Claude CLI installation (--claude-mode skip)")
+    else:
+        required_claude_version = load_env_var(module_root, "CLAUDE_CLI_VERSION", "2.0.10")
+        venv_path = module_root / ".venv" if claude_mode == "local" else None
+
+        if claude_mode == "local":
+            logger.info(f"Installing Claude CLI {required_claude_version} to venv (local mode)")
+        else:
+            logger.info(f"Installing Claude CLI {required_claude_version} globally (system mode)")
+
+        if not ensure_claude_version(required_claude_version, venv_path):
+            logger.error(f"Claude CLI version {required_claude_version} is required but could not be installed")
+            return 1
 
     install_precommit(module_root)
 
@@ -390,9 +405,15 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Set up development environment for AMI base module")
     parser.add_argument("--project-dir", type=Path, default=Path(__file__).resolve().parent, help="Project directory (default: this module)")
     parser.add_argument("--project-name", type=str, help="Optional project name for display")
+    parser.add_argument(
+        "--claude-mode",
+        choices=["local", "system", "skip"],
+        default="local",
+        help="Claude CLI install mode (local=venv, system=global, skip=none)",
+    )
     args = parser.parse_args()
 
-    return setup(args.project_dir, args.project_name)
+    return setup(args.project_dir, args.project_name, args.claude_mode)
 
 
 if __name__ == "__main__":
