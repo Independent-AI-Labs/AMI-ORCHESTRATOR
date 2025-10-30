@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
 import shutil
 import subprocess
 import sys
@@ -21,6 +22,28 @@ from base.scripts.env.paths import setup_imports  # noqa: E402
 from base.scripts.env.venv import ensure_venv  # noqa: E402
 
 
+def load_env_var(module_root: Path, var_name: str, default: str | None = None) -> str | None:
+    """Load environment variable from .env file."""
+    env_file = module_root / ".env"
+    if not env_file.exists():
+        return default
+
+    try:
+        with open(env_file) as f:
+            for line in f:
+                line = line.strip()
+                if line.startswith("#") or not line:
+                    continue
+                if "=" in line:
+                    key, value = line.split("=", 1)
+                    if key.strip() == var_name:
+                        return value.strip()
+    except Exception as e:
+        logger.warning(f"Failed to load {var_name} from .env: {e}")
+
+    return default
+
+
 def check_uv() -> bool:
     """Check if uv is installed."""
     try:
@@ -29,6 +52,71 @@ def check_uv() -> bool:
     except (subprocess.CalledProcessError, FileNotFoundError):
         logger.error("uv is not installed or not on PATH.")
         logger.info("Install uv: https://docs.astral.sh/uv/")
+        return False
+
+
+def check_npm() -> bool:
+    """Check if npm is installed."""
+    try:
+        subprocess.run(["npm", "--version"], capture_output=True, check=True)
+        return True
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        logger.error("npm is not installed or not on PATH.")
+        logger.info("Install npm: https://nodejs.org/")
+        return False
+
+
+def get_claude_version() -> str | None:
+    """Get installed Claude CLI version."""
+    try:
+        result = subprocess.run(["claude", "--version"], capture_output=True, text=True, check=True)
+        # Output format: "claude version X.Y.Z"
+        version = result.stdout.strip().split()[-1]
+        return version
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return None
+
+
+def ensure_claude_version(required_version: str = "2.0.10") -> bool:
+    """Ensure Claude CLI is installed at exactly the required version.
+
+    Auto-installs via npm if missing or wrong version.
+    """
+    if not check_npm():
+        return False
+
+    current_version = get_claude_version()
+
+    if current_version == required_version:
+        logger.info(f"✓ Claude CLI version {required_version} is installed")
+        return True
+
+    if current_version:
+        logger.warning(f"Claude CLI version {current_version} found, but {required_version} is required")
+        logger.info(f"Updating to Claude CLI {required_version}...")
+    else:
+        logger.info(f"Claude CLI not found. Installing version {required_version}...")
+
+    # Install exact version via npm
+    try:
+        subprocess.run(
+            ["npm", "install", "-g", f"@anthropic-ai/claude-code@{required_version}"],
+            check=True,
+            capture_output=True,
+            text=True
+        )
+        logger.info(f"✓ Successfully installed Claude CLI {required_version}")
+
+        # Verify installation
+        installed_version = get_claude_version()
+        if installed_version != required_version:
+            logger.error(f"Installation verification failed: got {installed_version}, expected {required_version}")
+            return False
+
+        return True
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Failed to install Claude CLI {required_version}")
+        logger.error(f"Error: {e.stderr if e.stderr else e}")
         return False
 
 
@@ -48,6 +136,68 @@ def sync_dependencies(module_root: Path) -> bool:
         logger.error("uv sync failed")
         logger.error(synced.stderr)
         return False
+    return True
+
+
+def bootstrap_node_in_venv(module_root: Path) -> bool:
+    """Bootstrap Node.js and npm into the Python venv using nodeenv.
+
+    This integrates Node.js directly into the existing Python virtualenv.
+    License: nodeenv (BSD-3-Clause), Node.js (MIT), npm (Artistic License 2.0).
+    """
+    venv_path = module_root / ".venv"
+    if not venv_path.exists():
+        logger.error("Virtual environment not found at %s", venv_path)
+        return False
+
+    # Check if node is already installed in venv
+    node_bin = venv_path / "bin" / "node" if sys.platform != "win32" else venv_path / "Scripts" / "node.exe"
+    if node_bin.exists():
+        logger.info("✓ Node.js already bootstrapped in venv")
+        return True
+
+    logger.info("Bootstrapping Node.js into Python venv using nodeenv...")
+
+    # Use nodeenv -p to integrate into existing Python venv
+    # This installs node/npm into the same venv
+    nodeenv_cmd = [str(venv_path / "bin" / "nodeenv"), "-p", "--node=lts"]
+    result = subprocess.run(nodeenv_cmd, capture_output=True, text=True, check=False)
+
+    if result.returncode != 0:
+        logger.error("Failed to bootstrap Node.js into venv")
+        logger.error(result.stderr)
+        return False
+
+    logger.info("✓ Node.js and npm successfully bootstrapped into venv")
+    return True
+
+
+def sync_venv_platform(module_root: Path) -> bool:
+    """Replicate .venv to platform-specific copy (.venv-linux or .venv-windows).
+
+    This enables easy platform-specific backup/restore of virtual environments.
+    """
+    venv_path = module_root / ".venv"
+    if not venv_path.exists():
+        logger.warning(".venv does not exist, skipping platform sync")
+        return True
+
+    # Determine platform-specific target
+    platform_suffix = "windows" if sys.platform == "win32" else "linux"
+    target_venv = module_root / f".venv-{platform_suffix}"
+
+    logger.info(f"Syncing .venv → .venv-{platform_suffix}...")
+
+    # Remove old platform-specific venv if it exists
+    if target_venv.exists():
+        logger.info(f"Removing old .venv-{platform_suffix}...")
+        shutil.rmtree(target_venv)
+
+    # Copy .venv to platform-specific location
+    logger.info(f"Copying .venv to .venv-{platform_suffix}...")
+    shutil.copytree(venv_path, target_venv, symlinks=True)
+
+    logger.info(f"✓ Successfully synced .venv to .venv-{platform_suffix}")
     return True
 
 
@@ -154,6 +304,13 @@ def setup(module_root: Path, project_name: str | None) -> int:
 
     if not check_uv():
         return 1
+
+    # Load required Claude CLI version from .env
+    required_claude_version = load_env_var(module_root, "CLAUDE_CLI_VERSION", "2.0.10")
+    if not ensure_claude_version(required_claude_version):
+        logger.error(f"Claude CLI version {required_claude_version} is required but could not be installed")
+        return 1
+
     ensure_uv_python("3.12")
 
     pyproject = module_root / "pyproject.toml"
@@ -170,10 +327,18 @@ def setup(module_root: Path, project_name: str | None) -> int:
     if not sync_dependencies(module_root):
         return 1
 
+    # Bootstrap Node.js/npm into venv
+    if not bootstrap_node_in_venv(module_root):
+        logger.warning("Failed to bootstrap Node.js, continuing anyway...")
+
     install_precommit(module_root)
 
     # Setup direct child submodules recursively
     setup_child_submodules(module_root)
+
+    # Sync .venv to platform-specific copy
+    if not sync_venv_platform(module_root):
+        logger.warning("Failed to sync venv to platform-specific copy")
 
     logger.info("")
     logger.info("=" * 60)

@@ -6,5 +6,79 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(dirname "$SCRIPT_DIR")"
 
+# Load required Claude CLI version from .env (safe parsing, no sourcing)
+REQUIRED_VERSION="2.0.10"
+if [ -f "$ROOT_DIR/.env" ]; then
+    while IFS='=' read -r key value; do
+        # Skip comments and empty lines
+        [[ "$key" =~ ^#.*$ ]] && continue
+        [[ -z "$key" ]] && continue
+
+        if [ "$key" = "CLAUDE_CLI_VERSION" ]; then
+            REQUIRED_VERSION="$value"
+            break
+        fi
+    done < "$ROOT_DIR/.env"
+fi
+
+# Check Claude CLI version
+check_claude_version() {
+    if ! command -v claude &> /dev/null; then
+        return 1
+    fi
+
+    local current_version
+    current_version=$(claude --version 2>/dev/null | awk '{print $1}')
+
+    if [ "$current_version" != "$REQUIRED_VERSION" ]; then
+        return 2
+    fi
+
+    return 0
+}
+
+# Install Claude CLI using bootstrapped npm from venv
+install_claude_cli() {
+    local npm_bin="$ROOT_DIR/.venv/bin/npm"
+
+    if [ ! -f "$npm_bin" ]; then
+        echo "Error: npm not found in venv. Run module_setup.py first to bootstrap Node.js." >&2
+        return 1
+    fi
+
+    echo "Installing Claude CLI version $REQUIRED_VERSION using bootstrapped npm..." >&2
+    if "$npm_bin" install -g "@anthropic-ai/claude-code@$REQUIRED_VERSION"; then
+        echo "✓ Successfully installed Claude CLI $REQUIRED_VERSION" >&2
+        return 0
+    else
+        echo "✗ Failed to install Claude CLI" >&2
+        return 1
+    fi
+}
+
+# Verify Claude CLI version, offer to install if missing/wrong
+if ! check_claude_version; then
+    ret=$?
+    if [ $ret -eq 1 ]; then
+        echo "Error: Claude CLI not found." >&2
+        echo "Required version: $REQUIRED_VERSION" >&2
+    else
+        current=$(claude --version 2>/dev/null | awk '{print $1}')
+        echo "Error: Claude CLI version mismatch." >&2
+        echo "Required: $REQUIRED_VERSION, Found: $current" >&2
+    fi
+
+    read -p "Install Claude CLI $REQUIRED_VERSION now? (y/N) " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        if ! install_claude_cli; then
+            exit 1
+        fi
+    else
+        echo "Aborted. Please install Claude CLI version $REQUIRED_VERSION manually." >&2
+        exit 1
+    fi
+fi
+
 # Force root venv for scripts/automation/agent_main.py - it requires root dependencies
 exec "$ROOT_DIR/.venv/bin/python" "$SCRIPT_DIR/automation/agent_main.py" "$@"

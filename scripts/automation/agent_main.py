@@ -8,6 +8,8 @@ Called via ami-run wrapper (scripts/ami-agent).
 Usage:
     ami-agent                           # Interactive mode (default)
     ami-agent --interactive             # Interactive mode (explicit)
+    ami-agent --continue                # Continue most recent conversation
+    ami-agent --resume [SESSION_ID]     # Resume conversation (interactive or by ID)
     ami-agent --print <instruction>     # Non-interactive mode
     ami-agent --hook <validator>        # Hook validator mode
     ami-agent --audit <directory>       # Batch audit mode
@@ -18,6 +20,18 @@ Usage:
 Examples:
     # Interactive agent with hooks
     ami-agent
+
+    # Continue most recent conversation
+    ami-agent --continue
+
+    # Resume specific conversation
+    ami-agent --resume abc123
+
+    # Resume with interactive selection
+    ami-agent --resume
+
+    # Fork session when resuming
+    ami-agent --resume --fork-session
 
     # Non-interactive audit from stdin
     cat file.py | ami-agent --print config/prompts/audit.txt
@@ -133,8 +147,13 @@ def _create_settings_file(_config: Any) -> Path:
     return get_agent_cli()._create_full_hooks_file()
 
 
-def mode_interactive() -> int:
+def mode_interactive(continue_session: bool = False, resume: str | bool | None = None, fork_session: bool = False) -> int:
     """Interactive mode - Launch Claude Code with hooks.
+
+    Args:
+        continue_session: Continue the most recent conversation
+        resume: Resume a conversation (True for interactive selection, string for specific session ID)
+        fork_session: Create a new session ID when resuming
 
     Returns:
         Exit code (0=success, 1=failure)
@@ -177,6 +196,21 @@ def mode_interactive() -> int:
         cmd = [
             claude_cmd,
         ]
+
+        # Add resume/continue flags
+        if continue_session:
+            cmd.append("--continue")
+        elif resume:
+            if isinstance(resume, str):
+                # Specific session ID provided
+                cmd.extend(["--resume", resume])
+            else:
+                # Interactive selection
+                cmd.append("--resume")
+
+        # Add fork-session flag if requested
+        if fork_session:
+            cmd.append("--fork-session")
 
         # Add MCP config if enabled
         if mcp_config_file:
@@ -560,6 +594,29 @@ def main() -> int:
         help="Enable parallel execution (for --tasks, --docs, or --audit)",
     )
 
+    parser.add_argument(
+        "-c",
+        "--continue",
+        dest="continue_session",
+        action="store_true",
+        help="Continue the most recent conversation (interactive mode only)",
+    )
+
+    parser.add_argument(
+        "-r",
+        "--resume",
+        nargs="?",
+        const=True,
+        metavar="SESSION_ID",
+        help="Resume a conversation - provide a session ID or interactively select (interactive mode only)",
+    )
+
+    parser.add_argument(
+        "--fork-session",
+        action="store_true",
+        help="Create a new session ID when resuming (use with --resume or --continue)",
+    )
+
     args = parser.parse_args()
 
     # Route to appropriate mode using dispatch
@@ -580,7 +637,11 @@ def main() -> int:
             return handler()
 
     # Default to interactive
-    return mode_interactive()
+    return mode_interactive(
+        continue_session=args.continue_session,
+        resume=args.resume,
+        fork_session=args.fork_session,
+    )
 
 
 if __name__ == "__main__":

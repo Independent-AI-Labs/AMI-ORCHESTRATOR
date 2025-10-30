@@ -26,6 +26,9 @@ ENV/
 .venv/
 # EXCEPT root .venv which is our bootstrap
 !/.venv/
+# Platform-specific venv copies
+.venv-linux/
+.venv-windows/
 
 # Chrome/Selenium
 *.log
