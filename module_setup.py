@@ -22,6 +22,35 @@ from base.scripts.env.paths import setup_imports  # noqa: E402
 from base.scripts.env.venv import ensure_venv  # noqa: E402
 
 
+def bootstrap_venv_from_platform(module_root: Path) -> Path:
+    """Bootstrap .venv from platform-specific copy if missing.
+
+    Returns path to .venv directory.
+    Raises RuntimeError if bootstrap fails.
+    """
+    venv_path = module_root / ".venv"
+
+    # If venv exists, return it
+    if venv_path.exists():
+        return venv_path
+
+    # Determine platform
+    platform_suffix = "windows" if sys.platform == "win32" else "macos" if sys.platform == "darwin" else "linux"
+    source_venv = module_root / f".venv-{platform_suffix}"
+
+    if not source_venv.exists():
+        raise RuntimeError(
+            f"Cannot bootstrap .venv: source .venv-{platform_suffix} not found at {source_venv}. "
+            f"Run install.py first or manually create .venv-{platform_suffix}."
+        )
+
+    logger.info(f"Bootstrapping .venv from .venv-{platform_suffix}...")
+    shutil.copytree(source_venv, venv_path, symlinks=True)
+    logger.info(f"✓ Bootstrapped .venv from .venv-{platform_suffix}")
+
+    return venv_path
+
+
 def load_env_var(module_root: Path, var_name: str, default: str | None = None) -> str | None:
     """Load environment variable from .env file."""
     env_file = module_root / ".env"
@@ -44,25 +73,47 @@ def load_env_var(module_root: Path, var_name: str, default: str | None = None) -
     return default
 
 
-def check_uv() -> bool:
-    """Check if uv is installed."""
+def check_uv(venv_uv: Path) -> bool:
+    """Check if uv exists in venv.
+
+    Args:
+        venv_uv: Path to venv uv binary
+
+    Returns:
+        True if venv uv exists and is executable
+    """
+    if not venv_uv.exists():
+        logger.error(f"uv not found in venv at {venv_uv}")
+        logger.error("Bootstrap .venv from .venv-{platform} first")
+        return False
+
     try:
-        subprocess.run(["uv", "--version"], capture_output=True, check=True)
+        subprocess.run([str(venv_uv), "--version"], capture_output=True, check=True)
         return True
     except (subprocess.CalledProcessError, FileNotFoundError):
-        logger.error("uv is not installed or not on PATH.")
-        logger.info("Install uv: https://docs.astral.sh/uv/")
+        logger.error(f"uv at {venv_uv} is not executable")
         return False
 
 
-def check_npm() -> bool:
-    """Check if npm is installed."""
+def check_npm(venv_npm: Path) -> bool:
+    """Check if npm exists in venv.
+
+    Args:
+        venv_npm: Path to venv npm binary
+
+    Returns:
+        True if venv npm exists and is executable
+    """
+    if not venv_npm.exists():
+        logger.error(f"npm not found in venv at {venv_npm}")
+        logger.error("Run bootstrap_node_in_venv() first")
+        return False
+
     try:
-        subprocess.run(["npm", "--version"], capture_output=True, check=True)
+        subprocess.run([str(venv_npm), "--version"], capture_output=True, check=True)
         return True
     except (subprocess.CalledProcessError, FileNotFoundError):
-        logger.error("npm is not installed or not on PATH.")
-        logger.info("Install npm: https://nodejs.org/")
+        logger.error(f"npm at {venv_npm} is not executable")
         return False
 
 
@@ -84,16 +135,20 @@ def get_claude_version(claude_path: str = "claude") -> str | None:
         return None
 
 
-def ensure_claude_version(required_version: str = "2.0.10", venv_path: Path | None = None) -> bool:
+def ensure_claude_version(required_version: str, venv_path: Path | None, venv_npm: Path) -> bool:
     """Ensure Claude CLI is installed at exactly the required version.
 
-    Auto-installs via npm in venv if missing or wrong version.
+    Auto-installs via venv npm if missing or wrong version.
 
     Args:
         required_version: Claude CLI version required
         venv_path: Path to venv for local installation (uses global if None)
+        venv_npm: Path to venv npm binary
+
+    Returns:
+        True if installation succeeded
     """
-    if not check_npm():
+    if not check_npm(venv_npm):
         return False
 
     current_version = get_claude_version()
@@ -109,7 +164,7 @@ def ensure_claude_version(required_version: str = "2.0.10", venv_path: Path | No
         logger.info(f"Claude CLI not found. Installing version {required_version}...")
 
     # Install locally in venv if venv_path provided, otherwise attempt global (may fail without sudo)
-    install_cmd = ["npm", "install"]
+    install_cmd = [str(venv_npm), "install"]
     if venv_path:
         # Install locally in venv node_modules
         install_cmd.extend(["--prefix", str(venv_path)])
@@ -151,20 +206,33 @@ def ensure_claude_version(required_version: str = "2.0.10", venv_path: Path | No
         return False
 
 
-def ensure_uv_python(version: str = "3.12") -> None:
-    """Ensure Python version is installed via uv."""
-    find = subprocess.run(["uv", "python", "find", version], capture_output=True, text=True, check=False)
+def ensure_uv_python(version: str, venv_uv: Path) -> None:
+    """Ensure Python version is installed via venv uv.
+
+    Args:
+        version: Python version to ensure (e.g. "3.12")
+        venv_uv: Path to venv uv binary
+    """
+    find = subprocess.run([str(venv_uv), "python", "find", version], capture_output=True, text=True, check=False)
     if find.returncode != 0 or not find.stdout.strip():
-        logger.info(f"Installing Python {version} toolchain via uv...")
-        subprocess.run(["uv", "python", "install", version], check=False)
+        logger.info(f"Installing Python {version} toolchain via venv uv...")
+        subprocess.run([str(venv_uv), "python", "install", version], check=False)
 
 
-def sync_dependencies(module_root: Path) -> bool:
-    """Sync pyproject.toml dependencies with uv."""
-    logger.info("Syncing dependencies with uv (including dev)...")
-    synced = subprocess.run(["uv", "sync", "--dev"], cwd=module_root, capture_output=True, text=True, check=False)
+def sync_dependencies(module_root: Path, venv_uv: Path) -> bool:
+    """Sync pyproject.toml dependencies with venv uv.
+
+    Args:
+        module_root: Root directory of the module
+        venv_uv: Path to venv uv binary
+
+    Returns:
+        True if sync succeeded
+    """
+    logger.info("Syncing dependencies with venv uv (including dev)...")
+    synced = subprocess.run([str(venv_uv), "sync", "--dev"], cwd=module_root, capture_output=True, text=True, check=False)
     if synced.returncode != 0:
-        logger.error("uv sync failed")
+        logger.error("venv uv sync failed")
         logger.error(synced.stderr)
         return False
     return True
@@ -291,11 +359,15 @@ def install_precommit(module_root: Path) -> None:
         logger.info(f"Installed {installed} native git hooks from /base/scripts/hooks/")
 
 
-def setup_child_submodules(module_root: Path) -> None:
+def setup_child_submodules(module_root: Path, venv_python: Path) -> None:
     """Recursively setup direct child submodules with module_setup.py.
 
     Only processes immediate children, not deeper descendants.
     Each child's setup will handle its own children recursively.
+
+    Args:
+        module_root: Root directory of the module
+        venv_python: Path to venv python binary (NEVER use system python)
     """
     children_with_setup = []
     for child in module_root.iterdir():
@@ -318,7 +390,7 @@ def setup_child_submodules(module_root: Path) -> None:
     for child in children_with_setup:
         child_setup = child / "module_setup.py"
         logger.info(f"\nRunning setup for {child.name}...")
-        result = subprocess.run([sys.executable, str(child_setup)], cwd=child, check=False)
+        result = subprocess.run([str(venv_python), str(child_setup)], cwd=child, check=False)
         if result.returncode != 0:
             logger.warning(f"Setup for {child.name} failed with code {result.returncode}")
         else:
@@ -339,10 +411,22 @@ def setup(module_root: Path, project_name: str | None, claude_mode: str = "local
     logger.info(f"Module root: {module_root}")
     logger.info("=" * 60)
 
-    if not check_uv():
+    # Bootstrap .venv from platform-specific copy
+    try:
+        venv_path = bootstrap_venv_from_platform(module_root)
+    except RuntimeError as e:
+        logger.error(str(e))
         return 1
 
-    ensure_uv_python("3.12")
+    # Get venv binaries (NEVER use system binaries)
+    venv_uv = venv_path / "bin" / "uv"
+    venv_python = venv_path / "bin" / "python"
+    venv_npm = venv_path / "bin" / "npm"
+
+    if not check_uv(venv_uv):
+        return 1
+
+    ensure_uv_python("3.12", venv_uv)
 
     pyproject = module_root / "pyproject.toml"
     if not pyproject.exists():
@@ -355,7 +439,7 @@ def setup(module_root: Path, project_name: str | None, claude_mode: str = "local
     ensure_venv(module_root, python_version="3.12")
 
     # Sync dependencies from pyproject.toml
-    if not sync_dependencies(module_root):
+    if not sync_dependencies(module_root, venv_uv):
         return 1
 
     # Bootstrap Node.js/npm into venv
@@ -367,21 +451,21 @@ def setup(module_root: Path, project_name: str | None, claude_mode: str = "local
         logger.info("Skipping Claude CLI installation (--claude-mode skip)")
     else:
         required_claude_version = load_env_var(module_root, "CLAUDE_CLI_VERSION", "2.0.10")
-        venv_path = module_root / ".venv" if claude_mode == "local" else None
+        venv_path_for_claude = module_root / ".venv" if claude_mode == "local" else None
 
         if claude_mode == "local":
             logger.info(f"Installing Claude CLI {required_claude_version} to venv (local mode)")
         else:
             logger.info(f"Installing Claude CLI {required_claude_version} globally (system mode)")
 
-        if not ensure_claude_version(required_claude_version, venv_path):
+        if not ensure_claude_version(required_claude_version, venv_path_for_claude, venv_npm):
             logger.error(f"Claude CLI version {required_claude_version} is required but could not be installed")
             return 1
 
     install_precommit(module_root)
 
     # Setup direct child submodules recursively
-    setup_child_submodules(module_root)
+    setup_child_submodules(module_root, venv_python)
 
     # Sync .venv to platform-specific copy
     if not sync_venv_platform(module_root):
