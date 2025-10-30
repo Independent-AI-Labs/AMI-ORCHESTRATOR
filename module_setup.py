@@ -66,12 +66,19 @@ def check_npm() -> bool:
         return False
 
 
-def get_claude_version() -> str | None:
-    """Get installed Claude CLI version."""
+def get_claude_version(claude_path: str = "claude") -> str | None:
+    """Get installed Claude CLI version.
+
+    Args:
+        claude_path: Path to claude binary (default: "claude" to use PATH)
+
+    Returns:
+        Version string like "2.0.10" or None if not found
+    """
     try:
-        result = subprocess.run(["claude", "--version"], capture_output=True, text=True, check=True)
-        # Output format: "claude version X.Y.Z"
-        version = result.stdout.strip().split()[-1]
+        result = subprocess.run([claude_path, "--version"], capture_output=True, text=True, check=True)
+        # Output format: "X.Y.Z (Claude Code)"
+        version = result.stdout.strip().split()[0]
         return version
     except (subprocess.CalledProcessError, FileNotFoundError):
         return None
@@ -122,7 +129,17 @@ def ensure_claude_version(required_version: str = "2.0.10", venv_path: Path | No
         logger.info(f"✓ Successfully installed Claude CLI {required_version}")
 
         # Verify installation
-        installed_version = get_claude_version()
+        if venv_path:
+            # Check venv-local installation
+            claude_bin = venv_path / "node_modules" / ".bin" / "claude"
+            if not claude_bin.exists():
+                logger.error(f"Installation verification failed: {claude_bin} not found")
+                return False
+            installed_version = get_claude_version(str(claude_bin))
+        else:
+            # Check global installation
+            installed_version = get_claude_version()
+
         if installed_version != required_version:
             logger.error(f"Installation verification failed: got {installed_version}, expected {required_version}")
             return False
