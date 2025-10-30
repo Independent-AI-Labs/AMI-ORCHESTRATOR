@@ -44,3 +44,8 @@
 	url = https://github.com/google-gemini/gemini-cli.git
 	branch = main
 	update = checkout
+[submodule "learning"]
+	path = learning
+	url = git@github.com:Independent-AI-Labs/AMI-LEARNING.git
+	branch = main
+	update = checkout
