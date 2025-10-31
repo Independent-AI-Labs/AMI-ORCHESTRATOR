@@ -6,9 +6,10 @@ from __future__ import annotations
 import argparse
 import subprocess
 import sys
-from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
+
+from pydantic import BaseModel
 
 sys.path.insert(0, str(next(p for p in Path(__file__).resolve().parents if (p / "base").exists())))
 from base.scripts.env.paths import find_orchestrator_root
@@ -34,8 +35,7 @@ MIN_COMMIT_PARTS = 4
 MIN_NUMSTAT_PARTS = 2
 
 
-@dataclass
-class Commit:
+class Commit(BaseModel):
     """Represents a git commit."""
 
     hash: str

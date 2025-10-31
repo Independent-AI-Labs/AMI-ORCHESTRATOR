@@ -141,6 +141,33 @@ Patterns consolidated from comprehensive codebase audit of 217 Python files.
 - **Impact**: Type checking disabled, runtime type errors not caught by mypy, incorrect types passed causing crashes, refactoring unsafe, IDE autocomplete broken, documentation missing, maintenance nightmare
 - **Correct approach**: Use concrete types; `dict[str, Any]` instead of bare `dict`; `from __future__ import annotations` for forward references; `TypeVar`, `Protocol`, `TypedDict` for complex types; inline comment justifying each `Any`
 
+#### Using @dataclass Instead of Pydantic BaseModel
+- **Pattern**: ADDING `@dataclass` decorator or `from dataclasses import dataclass` in production code
+- **VIOLATION**: Using Python standard library dataclasses for data models
+- **Example VIOLATION**:
+  ```python
+  from dataclasses import dataclass
+
+  @dataclass
+  class UserConfig:  # VIOLATION - use Pydantic BaseModel
+      name: str
+      email: str
+  ```
+- **Required fix**:
+  ```python
+  from pydantic import BaseModel, Field
+
+  class UserConfig(BaseModel):
+      name: str
+      email: str
+
+      class Config:
+          arbitrary_types_allowed = True
+  ```
+- **Impact**: No runtime validation, no serialization/deserialization support, no JSON schema generation, inconsistent with codebase standard (59 files use Pydantic), missing Field() descriptions, no config validation, type coercion missing
+- **IMPORTANT**: This pattern ONLY applies to ADDING dataclasses. REMOVING dataclasses (converting to Pydantic) is ALWAYS allowed and encouraged
+- **Correct approach**: Use Pydantic BaseModel for all data models; use Field() for descriptions and validation; add Config class with arbitrary_types_allowed for Path types
+
 ---
 
 ### HIGH SEVERITY

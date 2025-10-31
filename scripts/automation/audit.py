@@ -11,10 +11,11 @@ import time
 import uuid
 from collections.abc import Iterator
 from concurrent.futures import ProcessPoolExecutor
-from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+
+from pydantic import BaseModel
 
 from .agent_cli import AgentConfigPresets, get_agent_cli
 from .config import get_config
@@ -25,8 +26,7 @@ MAX_FILE_SIZE = 1024 * 1024  # 1MB
 MAX_WORKERS = 8
 
 
-@dataclass
-class FileResult:
+class FileResult(BaseModel):
     """Audit result for a single file.
 
     Attributes:
@@ -40,6 +40,11 @@ class FileResult:
     status: str  # PASS/FAIL/ERROR
     violations: list[dict[str, Any]]
     execution_time: float
+
+    class Config:
+        """Pydantic config."""
+
+        arbitrary_types_allowed = True
 
 
 class AuditEngine:

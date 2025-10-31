@@ -45,14 +45,14 @@ max-branches = 16
 "conftest.py" = ["E402"]  # Bootstrap imports after path setup
 
 # Root-level scripts
-"scripts/**/*.py" = ["T201", "S603", "S607", "E402", "PLC0415", "C901", "PLR0912", "S110"]  # CLI tools - print() required for user output, subprocess, bootstrap imports, lazy imports, complexity allowed, bare except
-"scripts/automation/**/*.py" = ["T201", "S603", "S607", "PLC0415", "S108", "C901"]  # CLI automation tools - print, subprocess, lazy imports, temp files, complexity allowed
+"scripts/**/*.py" = ["T201", "S603", "S607", "E402", "PLC0415"]  # CLI tools - print() required for user output, subprocess, bootstrap imports, lazy imports
+"scripts/automation/**/*.py" = ["T201", "S603", "S607", "PLC0415", "S108"]  # CLI automation tools - print, subprocess, lazy imports, temp files
 "scripts/automation/tests/**/*.py" = ["S101", "PLR2004", "S603", "S607", "ARG002", "E402", "PLC0415", "S108", "T201", "B007"]  # Test files
 "scripts/run_tests.py" = ["T201", "S603", "S607", "E402", "PLC0415"]  # Test runner - CLI output, subprocess, bootstrap imports, lazy imports
 "module_setup.py" = ["S603", "S607", "E402"]  # UV subprocess calls in setup script, bootstrap imports
 
 # Root backend code
-"backend/**/*.py" = ["E402"]  # Bootstrap imports after path setup
+"backend/**/*.py" = ["E402", "S603", "S607"]  # Bootstrap imports after path setup, subprocess for git/system commands
 
 # Documentation and learning examples
 "docs/**/*.py" = ["T201", "S603", "S607", "E402"]  # Example code may use print/subprocess

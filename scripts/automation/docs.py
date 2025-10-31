@@ -10,10 +10,11 @@ import fnmatch
 import re
 import time
 import uuid
-from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Literal
+
+from pydantic import BaseModel, Field
 
 from base.backend.workers.manager import WorkerPoolManager
 from base.backend.workers.types import PoolConfig, PoolType
@@ -22,8 +23,7 @@ from scripts.automation.config import get_config
 from scripts.automation.logger import get_logger
 
 
-@dataclass
-class DocAttempt:
+class DocAttempt(BaseModel):
     """Single documentation maintenance attempt."""
 
     attempt_number: int
@@ -33,17 +33,21 @@ class DocAttempt:
     duration: float
 
 
-@dataclass
-class DocResult:
+class DocResult(BaseModel):
     """Result of documentation maintenance."""
 
     doc_file: Path
     status: Literal["completed", "feedback", "failed", "timeout"]
     action: Literal["UPDATE", "ARCHIVE", "DELETE"] | None
-    attempts: list[DocAttempt] = field(default_factory=list)
+    attempts: list[DocAttempt] = Field(default_factory=list)
     feedback: str | None = None
     total_duration: float = 0.0
     error: str | None = None
+
+    class Config:
+        """Pydantic config."""
+
+        arbitrary_types_allowed = True
 
 
 class DocsExecutor:

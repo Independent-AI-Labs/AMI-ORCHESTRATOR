@@ -10,17 +10,17 @@ Ensures git modules are fully committed and pushed upstream with zero tolerance 
 
 import time
 import uuid
-from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
+
+from pydantic import BaseModel, Field
 
 from .agent_cli import AgentConfigPresets, get_agent_cli
 from .config import get_config
 from .logger import get_logger
 
 
-@dataclass
-class SyncAttempt:
+class SyncAttempt(BaseModel):
     """Single sync attempt record."""
 
     attempt_num: int
@@ -29,15 +29,19 @@ class SyncAttempt:
     duration: float
 
 
-@dataclass
-class SyncResult:
+class SyncResult(BaseModel):
     """Sync operation result."""
 
     module_path: Path
     status: str  # "synced", "feedback", "failed", "timeout"
-    attempts: list[SyncAttempt] = field(default_factory=list)
+    attempts: list[SyncAttempt] = Field(default_factory=list)
     error: str | None = None
     total_duration: float = 0.0
+
+    class Config:
+        """Pydantic config."""
+
+        arbitrary_types_allowed = True
 
 
 class SyncExecutor:

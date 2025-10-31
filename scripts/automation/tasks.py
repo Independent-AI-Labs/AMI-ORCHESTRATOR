@@ -11,18 +11,18 @@ import re
 import subprocess
 import time
 import uuid
-from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, cast
+
+from pydantic import BaseModel, Field
 
 from .agent_cli import AgentConfigPresets, get_agent_cli
 from .config import get_config
 from .logger import get_logger
 
 
-@dataclass
-class TaskAttempt:
+class TaskAttempt(BaseModel):
     """Single task execution attempt."""
 
     attempt_number: int
@@ -32,16 +32,20 @@ class TaskAttempt:
     duration: float
 
 
-@dataclass
-class TaskResult:
+class TaskResult(BaseModel):
     """Result of task execution."""
 
     task_file: Path
     status: Literal["completed", "feedback", "failed", "timeout"]
-    attempts: list[TaskAttempt] = field(default_factory=list)
+    attempts: list[TaskAttempt] = Field(default_factory=list)
     feedback: str | None = None
     total_duration: float = 0.0
     error: str | None = None
+
+    class Config:
+        """Pydantic config."""
+
+        arbitrary_types_allowed = True
 
 
 class TaskExecutor:
@@ -536,6 +540,69 @@ Validate if the task was completed correctly."""
             with progress_file.open("a") as f:
                 f.write(f"\nCompleted: {datetime.now()}\n")
 
+    def _get_exclude_patterns(self) -> list[str]:
+        """Get task file exclude patterns from config."""
+        return cast(
+            list[str],
+            self.config.get(
+                "tasks.exclude_patterns",
+                [
+                    "**/README.md",
+                    "**/CLAUDE.md",
+                    "**/AGENTS.md",
+                    "**/feedback-*.md",
+                    "**/progress-*.md",
+                    "**/node_modules/**",
+                    "**/.git/**",
+                    "**/.venv/**",
+                    "**/venv/**",
+                    "**/__pycache__/**",
+                    "**/*.egg-info/**",
+                    "**/.cache/**",
+                    "**/.pytest_cache/**",
+                    "**/.mypy_cache/**",
+                    "**/.ruff_cache/**",
+                    "**/dist/**",
+                    "**/build/**",
+                    "**/ux/ui-concept/**",
+                    "**/.gcloud/**",
+                    "**/google-cloud-sdk/**",
+                ],
+            ),
+        )
+
+    def _is_file_excluded(self, file_path: Path, exclude_patterns: list[str]) -> bool:
+        """Check if file matches any exclude pattern.
+
+        Args:
+            file_path: Path to check
+            exclude_patterns: List of exclude patterns
+
+        Returns:
+            True if file should be excluded
+        """
+        return any(file_path.match(exclude_pattern) or fnmatch.fnmatch(str(file_path), exclude_pattern) for exclude_pattern in exclude_patterns)
+
+    def _find_files_in_directory(self, path: Path, exclude_patterns: list[str]) -> list[Path]:
+        """Find task files in directory.
+
+        Args:
+            path: Directory to search
+            exclude_patterns: Patterns to exclude
+
+        Returns:
+            List of task file paths
+        """
+        include_patterns = self.config.get("tasks.include_patterns", ["**/*.md"])
+        task_files = []
+
+        for pattern in include_patterns:
+            for file_path in path.glob(pattern):
+                if file_path.is_file() and not self._is_file_excluded(file_path, exclude_patterns):
+                    task_files.append(file_path)
+
+        return sorted(task_files)
+
     def _find_task_files(self, path: Path) -> list[Path]:
         """Find task file(s) from path.
 
@@ -545,68 +612,26 @@ Validate if the task was completed correctly."""
         Returns:
             List of task file paths
         """
-        exclude_patterns = self.config.get(
-            "tasks.exclude_patterns",
-            [
-                "**/README.md",
-                "**/CLAUDE.md",
-                "**/AGENTS.md",
-                "**/feedback-*.md",
-                "**/progress-*.md",
-                "**/node_modules/**",
-                "**/.git/**",
-                "**/.venv/**",
-                "**/venv/**",
-                "**/__pycache__/**",
-                "**/*.egg-info/**",
-                "**/.cache/**",
-                "**/.pytest_cache/**",
-                "**/.mypy_cache/**",
-                "**/.ruff_cache/**",
-                "**/dist/**",
-                "**/build/**",
-                "**/ux/ui-concept/**",
-                "**/.gcloud/**",
-                "**/google-cloud-sdk/**",
-            ],
-        )
+        exclude_patterns = self._get_exclude_patterns()
 
         # Handle single file
         if path.is_file():
-            if path.suffix == ".md":
-                # Check if file should be excluded
-                for exclude_pattern in exclude_patterns:
-                    if path.match(exclude_pattern) or fnmatch.fnmatch(str(path), exclude_pattern):
-                        self.logger.warning("task_file_excluded", file=str(path), pattern=exclude_pattern)
-                        return []
+            if path.suffix != ".md":
+                self.logger.warning("task_file_not_markdown", file=str(path))
+                return []
 
-                return [path]
+            if self._is_file_excluded(path, exclude_patterns):
+                self.logger.warning("task_file_excluded", file=str(path))
+                return []
 
-            self.logger.warning("task_file_not_markdown", file=str(path))
-            return []
+            return [path]
 
-        # Handle directory (existing logic)
+        # Handle directory
         if not path.is_dir():
             self.logger.error("invalid_path", path=str(path))
             return []
 
-        include_patterns = self.config.get("tasks.include_patterns", ["**/*.md"])
-        task_files = []
-
-        for pattern in include_patterns:
-            for file_path in path.glob(pattern):
-                # Check exclusions using Path.match() which handles ** correctly
-                excluded = False
-                for exclude_pattern in exclude_patterns:
-                    # Use Path.match for proper glob pattern matching
-                    if file_path.match(exclude_pattern) or fnmatch.fnmatch(str(file_path), exclude_pattern):
-                        excluded = True
-                        break
-
-                if not excluded and file_path.is_file():
-                    task_files.append(file_path)
-
-        return sorted(task_files)
+        return self._find_files_in_directory(path, exclude_patterns)
 
     def _parse_completion_marker(self, output: str) -> dict[str, Any]:
         """Parse completion marker from worker output.
