@@ -241,3 +241,34 @@ class TestTasksExecutionFlow:
         assert "Task Execution Progress: test-progress" in progress_content
         assert "Started:" in progress_content
         assert "Completed:" in progress_content
+
+    def test_single_file_execution(self, temp_task_dir, orchestrator_root):
+        """Execute single task file instead of directory."""
+        # Create single task file
+        task_file = temp_task_dir / "single-task.md"
+        task_file.write_text("Confirm you read this. Output WORK DONE.\n")
+
+        # Run ami-agent --tasks with single file path
+        result = subprocess.run(
+            [
+                str(orchestrator_root / "scripts" / "ami-agent"),
+                "--tasks",
+                str(task_file),  # Pass file path, not directory
+                "--root-dir",
+                str(temp_task_dir),
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+
+        # Should succeed
+        assert result.returncode == 0, f"Expected success.\nStdout: {result.stdout}\nStderr: {result.stderr}"
+
+        # Should process exactly 1 task
+        assert "Total: 1" in result.stdout
+
+        # Check progress file was created
+        progress_files = list(temp_task_dir.glob("progress-*-single-task.md"))
+        assert len(progress_files) > 0, "Expected progress file for single task"

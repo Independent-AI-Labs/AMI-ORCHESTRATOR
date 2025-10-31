@@ -122,6 +122,90 @@ class TestTaskExecutorFindTaskFiles:
             assert any(f.name == "task1.md" for f in task_files)
             assert any(f.name == "task2.md" for f in task_files)
 
+    def test_single_file_valid_md(self):
+        """Accept single .md file."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir_path = Path(tmpdir)
+
+            # Create single task file
+            task_file = tmpdir_path / "single-task.md"
+            task_file.write_text("This is a single task")
+
+            executor = TaskExecutor()
+            task_files = executor._find_task_files(task_file)
+
+            # Should return the single file
+            assert len(task_files) == 1
+            assert task_files[0] == task_file
+            assert task_files[0].name == "single-task.md"
+
+    def test_single_file_non_md(self):
+        """Reject single file that is not .md."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir_path = Path(tmpdir)
+
+            # Create non-md file
+            txt_file = tmpdir_path / "task.txt"
+            txt_file.write_text("This is not markdown")
+
+            executor = TaskExecutor()
+            task_files = executor._find_task_files(txt_file)
+
+            # Should return empty list
+            assert len(task_files) == 0
+
+    def test_single_file_excluded_by_pattern(self):
+        """Exclude single file if matches exclusion pattern."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir_path = Path(tmpdir)
+
+            # Create files that should be excluded
+            readme = tmpdir_path / "README.md"
+            readme.write_text("readme")
+
+            feedback = tmpdir_path / "feedback-123-task.md"
+            feedback.write_text("feedback")
+
+            progress = tmpdir_path / "progress-456-task.md"
+            progress.write_text("progress")
+
+            executor = TaskExecutor()
+
+            # All should be excluded
+            assert len(executor._find_task_files(readme)) == 0
+            assert len(executor._find_task_files(feedback)) == 0
+            assert len(executor._find_task_files(progress)) == 0
+
+    def test_single_file_not_excluded(self):
+        """Include single file if it does not match exclusion patterns."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir_path = Path(tmpdir)
+
+            # Create valid task file
+            task_file = tmpdir_path / "my-task.md"
+            task_file.write_text("valid task")
+
+            executor = TaskExecutor()
+            task_files = executor._find_task_files(task_file)
+
+            # Should return the file
+            assert len(task_files) == 1
+            assert task_files[0] == task_file
+
+    def test_single_file_nonexistent(self):
+        """Return empty list for nonexistent file."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir_path = Path(tmpdir)
+
+            # Create path to nonexistent file
+            nonexistent = tmpdir_path / "does-not-exist.md"
+
+            executor = TaskExecutor()
+            task_files = executor._find_task_files(nonexistent)
+
+            # Should return empty list
+            assert len(task_files) == 0
+
 
 class TestTaskExecutorParseCompletionMarker:
     """Tests for _parse_completion_marker method."""

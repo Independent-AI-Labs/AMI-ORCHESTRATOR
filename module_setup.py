@@ -271,6 +271,94 @@ def bootstrap_node_in_venv(module_root: Path) -> bool:
     return True
 
 
+def bootstrap_openssh_in_venv(module_root: Path) -> bool:
+    """Bootstrap OpenSSH server into the Python venv for git-only access.
+
+    This installs OpenSSH on non-privileged port 2222 for git repository hosting.
+    License: OpenSSH (BSD).
+    """
+    venv_path = module_root / ".venv"
+    if not venv_path.exists():
+        logger.error("Virtual environment not found at %s", venv_path)
+        return False
+
+    # Check if OpenSSH is already installed in venv
+    sshd_bin = venv_path / "openssh" / "sbin" / "sshd"
+    sshd_venv = venv_path / "bin" / "sshd-venv"
+    if sshd_bin.exists() and sshd_venv.exists():
+        logger.info("✓ OpenSSH already bootstrapped in venv")
+        return True
+
+    # Only bootstrap on Linux (OpenSSH bootstrap script is Linux-only)
+    if sys.platform != "linux":
+        logger.info("OpenSSH bootstrap only supported on Linux, skipping")
+        return True
+
+    logger.info("Bootstrapping OpenSSH server into venv...")
+
+    # Run bootstrap_openssh.sh script
+    bootstrap_script = module_root / "scripts" / "bootstrap_openssh.sh"
+    if not bootstrap_script.exists():
+        logger.warning("OpenSSH bootstrap script not found at %s, skipping", bootstrap_script)
+        return True
+
+    result = subprocess.run(["bash", str(bootstrap_script)], capture_output=True, text=True, check=False)
+
+    if result.returncode != 0:
+        logger.error("Failed to bootstrap OpenSSH into venv")
+        logger.error(result.stderr)
+        return False
+
+    logger.info("✓ OpenSSH server successfully bootstrapped into venv (port 2222)")
+    return True
+
+
+def bootstrap_git_in_venv(module_root: Path) -> bool:
+    """Bootstrap Git into the Python venv for self-contained git-daemon.
+
+    This installs Git binaries for git-daemon without system dependencies.
+    License: Git (GPLv2).
+    """
+    venv_path = module_root / ".venv"
+    if not venv_path.exists():
+        logger.error("Virtual environment not found at %s", venv_path)
+        return False
+
+    # Check if Git is already installed in venv
+    git_bin = venv_path / "git" / "bin" / "git"
+    if git_bin.exists():
+        logger.info("✓ Git already bootstrapped in venv")
+        return True
+
+    # Only bootstrap on Linux (Git bootstrap script is Linux-only)
+    if sys.platform != "linux":
+        logger.info("Git bootstrap only supported on Linux, skipping")
+        return True
+
+    logger.info("Bootstrapping Git into venv...")
+
+    # Run bootstrap_git.sh script
+    bootstrap_script = module_root / "scripts" / "bootstrap_git.sh"
+    if not bootstrap_script.exists():
+        logger.warning("Git bootstrap script not found at %s, skipping", bootstrap_script)
+        return True
+
+    result = subprocess.run(["bash", str(bootstrap_script)], capture_output=True, text=True, check=False)
+
+    if result.returncode != 0:
+        logger.error("Failed to bootstrap Git into venv")
+        logger.error(result.stderr)
+        return False
+
+    # Create symlink in .venv/bin
+    git_symlink = venv_path / "bin" / "git"
+    if not git_symlink.exists():
+        git_symlink.symlink_to("../git/bin/git")
+
+    logger.info("✓ Git successfully bootstrapped into venv")
+    return True
+
+
 def sync_venv_platform(module_root: Path) -> bool:
     """Replicate .venv to platform-specific copy (.venv-linux or .venv-windows).
 
@@ -445,6 +533,14 @@ def setup(module_root: Path, project_name: str | None, claude_mode: str = "local
     # Bootstrap Node.js/npm into venv
     if not bootstrap_node_in_venv(module_root):
         logger.warning("Failed to bootstrap Node.js, continuing anyway...")
+
+    # Bootstrap OpenSSH server into venv (for git repository hosting)
+    if not bootstrap_openssh_in_venv(module_root):
+        logger.warning("Failed to bootstrap OpenSSH, continuing anyway...")
+
+    # Bootstrap Git into venv (for self-contained git-daemon)
+    if not bootstrap_git_in_venv(module_root):
+        logger.warning("Failed to bootstrap Git, continuing anyway...")
 
     # Install Claude CLI based on mode
     if claude_mode == "skip":

@@ -33,7 +33,7 @@ Benefit from standartisation with reduced administrative overhead by automating 
 ### III. Provdes enterprise multi-cloud orchestration with **zero** vendor lock-in.
 ### IV. Built for safety, verifiability and regulatory compliance.
 
-*Hardware not included
+*Hardware not included. AMI-ORCHESTRATOR provides vendor-agnostic data processing, ML model training and inference capabilities, supporting **Intel**. **AMD**, and **nVidia** accelerators (both consumer and server-grade).
 
 ## What You Get
 

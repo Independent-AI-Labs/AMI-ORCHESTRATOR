@@ -344,11 +344,11 @@ def mode_audit(directory_path: str, retry_errors: bool = False) -> int:
     return 1 if (failed > 0 or errors > 0) else 0
 
 
-def mode_tasks(directory_path: str, root_dir: str | None = None, parallel: bool = False, user_instruction: str | None = None) -> int:
-    """Task execution mode - Execute all .md task files in directory.
+def mode_tasks(path: str, root_dir: str | None = None, parallel: bool = False, user_instruction: str | None = None) -> int:
+    """Task execution mode - Execute .md task file(s).
 
     Args:
-        directory_path: Path to directory containing task files
+        path: Path to .md task file OR directory containing task files
         root_dir: Root directory where tasks execute (defaults to current directory)
         parallel: Enable parallel task execution
         user_instruction: Optional prepended instruction for all tasks
@@ -356,10 +356,10 @@ def mode_tasks(directory_path: str, root_dir: str | None = None, parallel: bool 
     Returns:
         Exit code (0=success, 1=failure)
     """
-    directory = Path(directory_path)
+    target_path = Path(path)
 
-    if not directory.exists():
-        print(f"Directory not found: {directory_path}", file=sys.stderr)
+    if not target_path.exists():
+        print(f"Path not found: {path}", file=sys.stderr)
         return 1
 
     # Convert root_dir to Path if provided
@@ -373,8 +373,8 @@ def mode_tasks(directory_path: str, root_dir: str | None = None, parallel: bool 
 
     executor = TaskExecutor()
 
-    # Execute tasks
-    results = executor.execute_tasks(directory, parallel=parallel, root_dir=root_path, user_instruction=user_instruction)
+    # Execute tasks (handles both file and directory)
+    results = executor.execute_tasks(target_path, parallel=parallel, root_dir=root_path, user_instruction=user_instruction)
 
     # Print summary
     completed = sum(1 for r in results if r.status == "completed")
@@ -560,8 +560,8 @@ def main() -> int:
 
     parser.add_argument(
         "--tasks",
-        metavar="DIRECTORY",
-        help="Task execution mode - process all .md files as tasks",
+        metavar="PATH",
+        help="Task execution mode - process .md task file or all .md files in directory",
     )
 
     parser.add_argument(

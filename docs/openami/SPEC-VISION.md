@@ -33,7 +33,7 @@ Open AMI is a **research framework for self-evolving AI with formal safety assur
 
 Open AMI integrates three core research directions:
 
-1. **Trustworthy Architecture** (Four Pillars)
+1. **Trustworthy Architecture** (Four Design Principles)
    - Every AI operation designed for compliance, verification, transparency, and robustness
 
 2. **Verified Evolution** (Formal Methods)
@@ -185,20 +185,20 @@ Open AMI explores integration of established techniques:
 - **Status**: Production-ready, 60+ integration tests
 
 ### 🚧 Phase 1: Foundation (Q4 2025 - Q1 2026)
-- Formalize Layer 0 Axioms (Lean/Coq)
-- Implement SPN (Secure Process Node) abstraction
-- Deploy CSTs (Cryptographic State Tokens)
+- Formalize immutable safety constraints (Lean/Coq)
+- Implement isolated execution environment abstraction
+- Deploy cryptographically signed state snapshots
 - **Deliverable**: Verified execution environment
 
 ### 🚧 Phase 2: Self-Evolution (Q1-Q2 2026)
-- Meta-Compiler (AADL → AAL)
-- Proof generator integration
+- Transformation pipeline (high-level to low-level operations)
+- Formal verification tool integration
 - Byzantine consensus verification
 - **Deliverable**: First formally verified evolution
 
 ### 📋 Phase 3: Production Scale (Q2-Q3 2026)
-- Compliance Manifest backend
-- Full OAMI protocol
+- Compliance requirements specification backend
+- Full inter-component communication protocol
 - Enterprise integrations
 - **Deliverable**: Production-grade framework
 
@@ -242,7 +242,7 @@ Open AMI explores integration of established techniques:
 |------|-----------|--------|
 | Proof generation too slow | Hierarchical verification, proof caching, template-based proofs | 📋 Designed |
 | Scalability limits | Distributed architecture (operational), modular design (deployed) | ✅ Built-in |
-| Integration complexity | MCP protocol (operational), OAMI protocol (specification) | 🟡 Partial |
+| Integration complexity | MCP protocol (operational), documented integration patterns | 🟡 Partial |
 | Formal verification expertise gap | Academic partnerships, proof templates, automated tactics | 📋 Planned |
 
 ### Market Risks
@@ -263,14 +263,14 @@ Open AMI explores integration of established techniques:
 - ✅ Open source release (MIT)
 
 ### 2026 (Q1-Q2) - Framework Core
-- 🎯 Layer 0 Axioms formalized (Lean/Coq)
-- 🎯 SPN abstraction operational
+- 🎯 Immutable safety constraints formalized (Lean/Coq)
+- 🎯 Isolated execution environment abstraction operational
 - 🎯 First formally verified AI evolution
 - 🎯 1 published peer-reviewed paper
 
 ### 2026 (Q3-Q4) - Production Adoption
 - 🎯 3-5 pilot deployments
-- 🎯 Compliance Manifest backend complete
+- 🎯 Compliance requirements specification backend complete
 - 🎯 Community growth (500+ stars, 20+ contributors)
 
 ### 2027+ - Market Leadership
@@ -294,7 +294,7 @@ Open AMI explores integration of established techniques:
 
 **Next Steps:**
 1. Schedule technical deep-dive with your CTO/CISO
-2. Review [What is Open AMI?](./what-is-openami.md#real-world-applications) for applications
+2. Review [GUIDE-FRAMEWORK.md](./GUIDE-FRAMEWORK.md#real-world-applications) for applications
 3. Contact us: hello@independentailabs.com
 
 ### For Board Members / Advisors
@@ -351,7 +351,7 @@ Open AMI represents a research direction for AI development: applying formal met
 - **Technical Overview**: [GUIDE-FRAMEWORK.md](./GUIDE-FRAMEWORK.md) - Theoretical framework
 - **Architecture**: [SPEC-ARCHITECTURE.md](./SPEC-ARCHITECTURE.md) - System design
 - **Production Infrastructure**: [AMI-ORCHESTRATOR README](../../README.md)
-- **Compliance Research**: [Research Specifications](../../compliance/docs/research/OpenAMI/)
+- **Compliance Research**: [Research Specifications](https://github.com/Independent-AI-Labs/AMI-COMPLIANCE/tree/main/docs/research/OpenAMI/)
 - **Contact**: hello@independentailabs.com
 
 ---

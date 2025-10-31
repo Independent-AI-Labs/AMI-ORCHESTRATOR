@@ -1,0 +1,9 @@
+# Temporary test repositories
+test_repos/
+
+# Temporary SSH configs
+ssh_config_*
+
+# Generated during tests
+*.log
+*.tmp

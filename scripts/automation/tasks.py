@@ -80,15 +80,15 @@ class TaskExecutor:
 
     def execute_tasks(
         self,
-        directory: Path,
+        path: Path,
         parallel: bool = False,
         root_dir: Path | None = None,
         user_instruction: str | None = None,
     ) -> list[TaskResult]:
-        """Execute all task files in directory.
+        """Execute task file(s).
 
         Args:
-            directory: Directory containing .md task files
+            path: Path to .md task file OR directory containing task files
             parallel: Enable parallel execution (async mode)
             root_dir: Root directory where tasks execute (defaults to current directory)
             user_instruction: Optional prepended instruction for all tasks
@@ -97,25 +97,26 @@ class TaskExecutor:
             List of task results
         """
         if parallel:
-            return asyncio.run(self._execute_async(directory, root_dir, user_instruction))
-        return self._execute_sync(directory, root_dir, user_instruction)
+            return asyncio.run(self._execute_async(path, root_dir, user_instruction))
+        return self._execute_sync(path, root_dir, user_instruction)
 
-    def _execute_sync(self, directory: Path, root_dir: Path | None = None, user_instruction: str | None = None) -> list[TaskResult]:
+    def _execute_sync(self, path: Path, root_dir: Path | None = None, user_instruction: str | None = None) -> list[TaskResult]:
         """Execute tasks sequentially (sync mode).
 
         Args:
-            directory: Directory containing .md task files
+            path: Path to .md task file OR directory containing task files
             root_dir: Root directory where tasks execute (defaults to current directory)
             user_instruction: Optional prepended instruction for all tasks
 
         Returns:
             List of task results
         """
-        task_files = self._find_task_files(directory)
+        task_files = self._find_task_files(path)
 
         self.logger.info(
             "task_execution_started",
-            directory=str(directory),
+            path=str(path),
+            is_single_file=path.is_file(),
             task_count=len(task_files),
             mode="sync",
             root_dir=str(root_dir) if root_dir else None,
@@ -137,11 +138,11 @@ class TaskExecutor:
 
         return results
 
-    async def _execute_async(self, directory: Path, root_dir: Path | None = None, user_instruction: str | None = None) -> list[TaskResult]:
+    async def _execute_async(self, path: Path, root_dir: Path | None = None, user_instruction: str | None = None) -> list[TaskResult]:
         """Execute tasks in parallel (async mode).
 
         Args:
-            directory: Directory containing .md task files
+            path: Path to .md task file OR directory containing task files
             root_dir: Root directory where tasks execute (defaults to current directory)
             user_instruction: Optional prepended instruction for all tasks
 
@@ -151,12 +152,13 @@ class TaskExecutor:
         from base.backend.workers.manager import WorkerPoolManager
         from base.backend.workers.types import PoolConfig, PoolType
 
-        task_files = self._find_task_files(directory)
+        task_files = self._find_task_files(path)
         workers = self.config.get("tasks.workers", 4)
 
         self.logger.info(
             "task_execution_started",
-            directory=str(directory),
+            path=str(path),
+            is_single_file=path.is_file(),
             task_count=len(task_files),
             mode="async",
             workers=workers,
@@ -534,16 +536,15 @@ Validate if the task was completed correctly."""
             with progress_file.open("a") as f:
                 f.write(f"\nCompleted: {datetime.now()}\n")
 
-    def _find_task_files(self, directory: Path) -> list[Path]:
-        """Find all .md task files in directory.
+    def _find_task_files(self, path: Path) -> list[Path]:
+        """Find task file(s) from path.
 
         Args:
-            directory: Directory to search
+            path: Path to .md task file OR directory to search
 
         Returns:
             List of task file paths
         """
-        include_patterns = self.config.get("tasks.include_patterns", ["**/*.md"])
         exclude_patterns = self.config.get(
             "tasks.exclude_patterns",
             [
@@ -570,10 +571,30 @@ Validate if the task was completed correctly."""
             ],
         )
 
+        # Handle single file
+        if path.is_file():
+            if path.suffix == ".md":
+                # Check if file should be excluded
+                for exclude_pattern in exclude_patterns:
+                    if path.match(exclude_pattern) or fnmatch.fnmatch(str(path), exclude_pattern):
+                        self.logger.warning("task_file_excluded", file=str(path), pattern=exclude_pattern)
+                        return []
+
+                return [path]
+
+            self.logger.warning("task_file_not_markdown", file=str(path))
+            return []
+
+        # Handle directory (existing logic)
+        if not path.is_dir():
+            self.logger.error("invalid_path", path=str(path))
+            return []
+
+        include_patterns = self.config.get("tasks.include_patterns", ["**/*.md"])
         task_files = []
 
         for pattern in include_patterns:
-            for file_path in directory.glob(pattern):
+            for file_path in path.glob(pattern):
                 # Check exclusions using Path.match() which handles ** correctly
                 excluded = False
                 for exclude_pattern in exclude_patterns:
