@@ -10,11 +10,11 @@
 
 ## The 30-Second Answer
 
-**Open AMI** (Advanced Machine Intelligence) is a **research framework** and long-term roadmap for building AI systems that will be:
+**Open AMI** (Advanced Machine Intelligence) is a **research framework** and long-term roadmap for building AI systems that aim to be:
 
-- **Self-Evolving**: AI improves itself through formal, verifiable steps (like compilers) [TARGET]
-- **Provably Safe**: Mathematical proofs guarantee safety constraints are never violated [TARGET]
-- **Fully Accountable**: Every decision traces back to human-specified rules [PARTIAL]
+- **Self-Evolving**: AI improves itself through verified steps with formal validation [TARGET]
+- **Formally Assured**: Mathematical verification techniques applied to safety-critical constraints [TARGET]
+- **Fully Accountable**: Every decision traceable to human-specified rules [PARTIAL]
 - **Compliance-Ready**: Architecture designed for EU AI Act, ISO/IEC, NIST standards [MAPPED]
 - **Cryptographically Verified**: Tamper-evident audit trail for all operations [PARTIAL]
 
@@ -106,41 +106,41 @@ Open AMI is built on four inseparable pillars:
 
 **Dynamics**: Adaptive learning with stability guarantees, preventing catastrophic forgetting
 
-### Innovation 2: Self-Evolution via Bootstrapping
+### Innovation 2: Verified Evolution
 
-Open AMI uses the **compiler bootstrapping metaphor** for AI evolution:
+Open AMI proposes a **verification-first approach** to AI evolution:
 
 ```
-Compiler Bootstrapping:           Open AMI Bootstrapping:
+Traditional AI Evolution:        Open AMI Approach (Target):
 ┌──────────────────────┐          ┌──────────────────────┐
-│ Machine Code         │          │ Layer 0: Human Axioms│
-│ (hand-written)       │          │ (formal spec)        │
+│ Model v1             │          │ Layer 0: Axioms      │
+│ (train & deploy)     │          │ (formal safety spec) │
 └──────────┬───────────┘          └──────────┬───────────┘
            │                                  │
-           ↓                                  ↓
+           ↓ (hope)                          ↓ (validates against)
 ┌──────────────────────┐          ┌──────────────────────┐
-│ Assembler v1         │          │ AI Verifier v1       │
-│ (in machine code)    │          │ (proven by humans)   │
+│ Model v2             │          │ Model v1             │
+│ (retrain manually)   │          │ (formally verified)  │
 └──────────┬───────────┘          └──────────┬───────────┘
            │                                  │
-           ↓                                  ↓
+           ↓ (hope)                          ↓ (proposes improvement)
 ┌──────────────────────┐          ┌──────────────────────┐
-│ Assembler v2         │          │ AI Model v1          │
-│ (in assembly)        │          │ (verified by v1)     │
+│ Model v3             │          │ Model v2             │
+│ (test empirically)   │          │ (verified against v0)│
 └──────────┬───────────┘          └──────────┬───────────┘
            │                                  │
           ...                                ...
            │                                  │
-           ↓                                  ↓
+           ↓ (value drift?)                  ↓ (provable safety)
 ┌──────────────────────┐          ┌──────────────────────┐
-│ C Compiler (self-    │          │ AI Model v1000       │
-│ hosting, in C)       │          │ (still provably safe)│
+│ Model v100           │          │ Model v100           │
+│ (who knows?)         │          │ (still validated)    │
 └──────────────────────┘          └──────────────────────┘
 ```
 
-**Key Difference**: Compilers "jettison" assembly. Open AMI **NEVER** jettisons Layer 0 axioms.
+**Key Principle**: Each evolution step must validate against the original safety specification before deployment.
 
-### Innovation 3: Never-Jettison Guarantee
+### Innovation 3: Constraint Preservation (Monotonic Safety Properties)
 
 **The Problem with Traditional AI Evolution**:
 ```
@@ -153,19 +153,19 @@ AI_v100: Aligned ✓
 AI_v1000: Aligned? ❓ (value drift!)
 ```
 
-**Open AMI's Guarantee**:
+**Open AMI's Approach (Target)**:
 ```
-Layer 0 Axioms (immutable, human-specified)
-         ↓ (verifies)
-    AI_v1: Proves compliance with Layer 0 ✓
-         ↓ (evolves)
-    AI_v10: Proves compliance with Layer 0 ✓
-         ↓ (evolves)
-    AI_v100: Proves compliance with Layer 0 ✓
-         ↓ (evolves)
-    AI_v1000: Proves compliance with Layer 0 ✓
+Layer 0 Axioms (immutable, human-specified safety constraints)
+         ↓ (validates against)
+    AI_v1: Verified compliance with Layer 0 ✓
+         ↓ (evolves with proof)
+    AI_v10: Verified compliance with Layer 0 ✓
+         ↓ (evolves with proof)
+    AI_v100: Verified compliance with Layer 0 ✓
+         ↓ (evolves with proof)
+    AI_v1000: Verified compliance with Layer 0 ✓
 
-No matter how many generations, ALWAYS proves against ORIGINAL axioms!
+Safety constraints are preserved across all evolution steps (monotonic property).
 ```
 
 ---
@@ -183,12 +183,12 @@ The **proposed** Open AMI evolution protocol combines two research approaches ([
    └─ Formulate hypothesis
 
 2. DESIGN (Gemini DSE-AI approach)
-   ├─ Write change in AADL (high-level language) [NOT IMPLEMENTED]
+   ├─ Write change in high-level transformation language [NOT IMPLEMENTED]
    └─ Describe expected outcome
 
 3. COMPILE (Gemini DSE-AI approach)
-   ├─ AADL → AAL (low-level instructions) [NOT IMPLEMENTED]
-   ├─ AAL → Model binary [NOT IMPLEMENTED]
+   ├─ High-level spec → Low-level transformation [NOT IMPLEMENTED]
+   ├─ Transformation → Model binary [NOT IMPLEMENTED]
    └─ Execute in secure SPN [NOT IMPLEMENTED]
 
 4. TEST (Gemini DSE-AI approach)
@@ -207,7 +207,7 @@ The **proposed** Open AMI evolution protocol combines two research approaches ([
    └─ HSM cryptographic signing [NOT IMPLEMENTED]
 
 7. LOG (Audit trail)
-   ├─ Justification triad (hypothesis/trigger/results) [NOT IMPLEMENTED]
+   ├─ Evolution justification (hypothesis, trigger, results) [NOT IMPLEMENTED]
    ├─ Formal proof (hash + signatures) [NOT IMPLEMENTED]
    ├─ CST state snapshot [NOT IMPLEMENTED]
    └─ Append to immutable audit ledger [PARTIAL: base/backend/dataops/security/audit_trail.py]
@@ -238,9 +238,9 @@ The **proposed** Open AMI architecture organizes into four interconnected layers
 ┌─────────────────────────────────────────────────────────┐
 │  INTELLIGENCE LAYER                                     │
 │  • ML models & algorithms                               │
-│  • Self-evolution engine (Meta-Compiler)                │
+│  • Evolution engine (verified transformations)          │
 │  • Proof generators                                     │
-│  • ARUs (Atomic Reasoning Units)                        │
+│  • Verifiable reasoning steps                           │
 │  • Knowledge Graphs                                     │
 └───────────────────────┬─────────────────────────────────┘
                         ↕ (bidirectional)
@@ -255,8 +255,8 @@ The **proposed** Open AMI architecture organizes into four interconnected layers
                         ↕ (bidirectional)
 ┌─────────────────────────────────────────────────────────┐
 │  FOUNDATION LAYER                                       │
-│  • Layer 0 Axioms (immutable)                           │
-│  • Genesis Kernel (core principles)                     │
+│  • Layer 0 Axioms (immutable safety constraints)        │
+│  • Core safety principles (formal specification)        │
 │  • Process Theory (formal models)                       │
 │  • OAMI Protocol spec                                   │
 └─────────────────────────────────────────────────────────┘
@@ -273,16 +273,16 @@ The **proposed** Open AMI architecture organizes into four interconnected layers
 - Cryptographic operations
 - Defined in: [process_theory.md](../../../compliance/docs/research/OpenAMI/architecture/process_theory.md)
 
-**Meta-Processes** [NOT IMPLEMENTED]
+**Coordination Processes** [NOT IMPLEMENTED]
 - Coordinate groups of SPNs
 - Enforce system-wide policies
 - Aggregate verification results
 - Interface to governance layer
 
-**Compliance Manifest ($\mathcal{CM}$)** [NOT IMPLEMENTED]
-- Formal specification of all requirements
-- Includes Layer 0 axioms
-- Includes Genesis Kernel principles
+**Compliance Manifest** [NOT IMPLEMENTED]
+- Formal specification of safety and regulatory requirements
+- Includes Layer 0 axioms (foundational safety constraints)
+- Includes core safety principles
 - Cryptographically signed
 - Defined in: [compliance_manifest.md](../../../compliance/docs/research/OpenAMI/systems/compliance_manifest.md)
 
@@ -320,11 +320,11 @@ The **proposed** Open AMI architecture organizes into four interconnected layers
 
 | LLM + Tools | Open AMI (Target) |
 |-------------|----------|
-| LLM reasoning (opaque) | Formal reasoning (ARUs) [TARGET] |
+| LLM reasoning (opaque) | Verifiable reasoning steps [TARGET] |
 | External tool calls (unverified) | Verified computation (SPNs) [TARGET] |
 | Ad-hoc guardrails | Architectural constraints [PARTIAL] |
-| No evolution mechanism | Self-evolution with proofs [TARGET] |
-| Testing-based trust | Proof-based trust [TARGET] |
+| No evolution mechanism | Controlled evolution with verification [TARGET] |
+| Testing-based trust | Verification-supported trust [TARGET] |
 
 ### vs. Constitutional AI
 
@@ -357,9 +357,9 @@ The **proposed** Open AMI architecture organizes into four interconnected layers
 **Challenge**: Regulators demand accountability, risk management
 
 **Proposed Open AMI Solution**:
-- 🎯 Every trade justified with formal reasoning [TARGET]
+- 🎯 Every trade justified with verifiable reasoning [TARGET]
 - 🎯 Risk constraints enforced at architecture level [TARGET]
-- 🎯 Byzantine fault tolerance prevents manipulation [TARGET]
+- 🎯 Byzantine fault tolerance for distributed verification [TARGET]
 - 🔵 Immutable audit trail for compliance [PARTIAL: audit_trail.py]
 
 ### 3. Autonomous Vehicles [FUTURE]

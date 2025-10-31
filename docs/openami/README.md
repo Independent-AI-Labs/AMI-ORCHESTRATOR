@@ -10,10 +10,10 @@ Open AMI is a theoretical framework and long-term roadmap for self-evolving AI s
 
 ## Current Status
 
-**Theoretical work complete:**
-- Four Pillars architecture (Compliance, Integrity, Abstraction, Dynamics) - [specifications](../../compliance/docs/research/OpenAMI/)
+**Research framework documented:**
+- Four Pillars architecture: **Compliance** (regulatory mapping), **Integrity** (cryptographic audit trails), **Abstraction** (layered safety guarantees), **Dynamics** (controlled evolution) - [specifications](../../compliance/docs/research/OpenAMI/)
 - Bootstrapping approaches for safe self-evolution - [learning/](../../learning/)
-- Never-Jettison principle for constraint preservation
+- Constraint preservation mechanisms (monotonic safety properties across system evolution)
 - Compliance mapping: EU AI Act, ISO 42001, ISO 27001, NIST - [research docs](../../compliance/docs/research/)
 
 **Production infrastructure (AMI-ORCHESTRATOR):**
@@ -23,21 +23,20 @@ Open AMI is a theoretical framework and long-term roadmap for self-evolving AI s
 - ✅ 60+ integration tests, production-ready automation
 - See [main README](../../README.md) for complete capabilities
 
-**Research phase (Q4 2025 - Q2 2026):**
-- Secure Process Nodes (SPN) abstraction
-- Cryptographic State Tokens (CST) implementation
-- Formal verification integration (Lean/Coq)
-- Self-evolution engine (AAL/AADL compilers)
+**Research phase (estimated Q4 2025 - Q2 2026):**
+- Secure Process Nodes (SPN): sandboxed execution environments with cryptographic attestation
+- Cryptographic State Tokens (CST): tamper-proof state representation
+- Formal verification integration: proof systems (Lean, Coq, or similar)
+- Self-evolution engine: verified transformation pipelines
 - Compliance MCP server with governance tools
 
 ## Documentation
 
 **⚠️ Important**: OpenAMI documentation describes **theoretical/target architecture**, not current production code. For working capabilities, see [main README](../../README.md).
 
-- [What is Open AMI?](./overview/what-is-openami.md) - Theoretical framework overview
-- [Executive Summary](./overview/executive-summary.md) - Vision for decision makers
-- [System Architecture](./architecture/system-architecture.md) - Four-layer design (aspirational)
-- [Quick Start (ARCHIVED)](../archive/quickstart-openami-aspirational.md) - Aspirational examples (not yet implemented)
+- [**GUIDE-FRAMEWORK.md**](./GUIDE-FRAMEWORK.md) - Theoretical framework overview and research directions
+- [**SPEC-VISION.md**](./SPEC-VISION.md) - Vision for decision makers and advisors
+- [**SPEC-ARCHITECTURE.md**](./SPEC-ARCHITECTURE.md) - Four-layer design (research/target)
 
 ## Research Foundation
 
@@ -69,7 +68,7 @@ See [AMI-ORCHESTRATOR README](../../README.md) for:
 - Integration tests and quality gates
 
 **For OpenAMI research and vision:**
-Start with [What is Open AMI?](./overview/what-is-openami.md) to understand the theoretical framework, then explore:
-- [Executive Summary](./overview/executive-summary.md) - Business case and value proposition
-- [System Architecture](./architecture/system-architecture.md) - Technical design (aspirational)
-- [Research specifications](../../compliance/docs/research/OpenAMI/) - Complete framework docs
+Start with [GUIDE-FRAMEWORK.md](./GUIDE-FRAMEWORK.md) to understand the theoretical framework, then explore:
+- [SPEC-VISION.md](./SPEC-VISION.md) - Research value proposition and vision
+- [SPEC-ARCHITECTURE.md](./SPEC-ARCHITECTURE.md) - Technical design (research/target)
+- [Research specifications](../../compliance/docs/research/OpenAMI/) - Complete framework documentation
