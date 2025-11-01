@@ -294,7 +294,7 @@ Open AMI explores integration of established techniques:
 
 **Next Steps:**
 1. Schedule technical deep-dive with your CTO/CISO
-2. Review GUIDE-FRAMEWORK.md for applications
+2. Review [GUIDE-FRAMEWORK.md](./GUIDE-FRAMEWORK.md) for applications
 3. Contact us: hello@independentailabs.com
 
 ### For Board Members / Advisors

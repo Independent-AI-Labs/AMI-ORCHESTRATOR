@@ -126,7 +126,7 @@ Traditional ISMS capabilities described below map to these OpenAMI primitives.
 - [Compliance Backend Specification](https://github.com/Independent-AI-Labs/AMI-COMPLIANCE/blob/main/docs/research/COMPLIANCE_BACKEND_SPEC.md) - Technical architecture
 - [ISMS-Matrix Integration Plan](https://github.com/Independent-AI-Labs/AMI-COMPLIANCE/blob/main/docs/research/ISMS-MATRIX-INTEGRATION-PLAN.md) - Communications backbone
 - [Current Implementation Status](https://github.com/Independent-AI-Labs/AMI-COMPLIANCE/blob/main/docs/research/CURRENT_IMPLEMENTATION_STATUS.md) - Progress tracking (0% complete as of 2025-10-27)
-- OpenAMI System Architecture - 4-layer architecture
+- [OpenAMI System Architecture](../openami/SPEC-ARCHITECTURE.md) - 4-layer architecture
 - [Executive Action Plan](https://github.com/Independent-AI-Labs/AMI-COMPLIANCE/blob/main/docs/research/EXECUTIVE_ACTION_PLAN.md) - Implementation roadmap
 
 ---
