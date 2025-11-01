@@ -247,9 +247,9 @@ class TestSyncExecutor:
 
         start_time = time.time()
 
-        def slow_worker(*_args: object, **_kwargs: object) -> str:
+        def slow_worker(*_args: object, **_kwargs: object) -> tuple[str, None]:
             time.sleep(0.1)
-            return "Working..."
+            return ("Working...", None)
 
         executor.cli.run_print = Mock(side_effect=slow_worker)
 
