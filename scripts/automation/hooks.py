@@ -481,7 +481,7 @@ class CodeQualityValidator(HookValidator):
         try:
             audit_diff_config = AgentConfigPresets.audit_diff(hook_input.session_id)
             audit_diff_config.enable_streaming = True
-            output = cli.run_print(
+            output, _ = cli.run_print(
                 instruction_file=audit_diff_instruction,
                 stdin=diff_context,
                 agent_config=audit_diff_config,
@@ -764,7 +764,7 @@ class ResponseScanner(HookValidator):
             cli = get_agent_cli()
             completion_moderator_config = AgentConfigPresets.completion_moderator(session_id)
             completion_moderator_config.enable_streaming = True
-            output = cli.run_print(
+            output, _ = cli.run_print(
                 instruction_file=moderator_prompt,
                 stdin=conversation_context,
                 agent_config=completion_moderator_config,

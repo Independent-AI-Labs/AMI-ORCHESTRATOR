@@ -30,6 +30,8 @@ class TaskAttempt(BaseModel):
     moderator_output: str | None
     timestamp: datetime
     duration: float
+    worker_metadata: dict[str, Any] | None = None  # Claude execution metadata for worker
+    moderator_metadata: dict[str, Any] | None = None  # Claude execution metadata for moderator
 
 
 class TaskResult(BaseModel):
@@ -140,6 +142,9 @@ class TaskExecutor:
                 duration=result.total_duration,
             )
 
+            # Display metadata
+            self._display_task_metadata(task_file.stem, result.attempts)
+
         return results
 
     async def _execute_async(self, path: Path, root_dir: Path | None = None, user_instruction: str | None = None) -> list[TaskResult]:
@@ -202,6 +207,9 @@ class TaskExecutor:
                         attempts=len(result.attempts),
                         duration=result.total_duration,
                     )
+
+                    # Display metadata
+                    self._display_task_metadata(result.task_file.stem, result.attempts)
                 except Exception as e:
                     self.logger.error(
                         "task_result_retrieval_error",
@@ -224,6 +232,7 @@ class TaskExecutor:
         attempts: list[TaskAttempt],
         attempt_num: int,
         worker_output: str,
+        worker_metadata: dict[str, Any] | None,
         attempt_duration: float,
         start_time: float,
     ) -> TaskResult:
@@ -253,6 +262,8 @@ class TaskExecutor:
                 moderator_output=None,
                 timestamp=datetime.now(),
                 duration=attempt_duration,
+                worker_metadata=worker_metadata,
+                moderator_metadata=None,
             )
         )
 
@@ -272,7 +283,7 @@ class TaskExecutor:
         progress_file: Path,
         root_dir: Path | None,
         attempt_num: int,
-    ) -> tuple[dict[str, str], str]:
+    ) -> tuple[dict[str, Any], str, dict[str, Any] | None]:
         """Run moderator validation on worker output.
 
         Args:
@@ -284,7 +295,7 @@ class TaskExecutor:
             attempt_num: Current attempt number
 
         Returns:
-            Tuple of (moderator_result dict, moderator_output text)
+            Tuple of (moderator_result dict, moderator_output text, moderator_metadata dict or None)
         """
         moderator_start = time.time()
         self.logger.info("moderator_check_started", task=task_name, attempt=attempt_num)
@@ -303,7 +314,7 @@ Validate if the task was completed correctly."""
 
         moderator_config = AgentConfigPresets.task_moderator(self.session_id)
         moderator_config.enable_streaming = True
-        moderator_output = self.cli.run_print(
+        moderator_output, moderator_metadata = self.cli.run_print(
             instruction_file=moderator_prompt,
             stdin=validation_context,
             agent_config=moderator_config,
@@ -323,7 +334,7 @@ Validate if the task was completed correctly."""
         with progress_file.open("a") as f:
             f.write(f"Moderator output:\n```\n{moderator_output}\n```\n\n")
 
-        return moderator_result, moderator_output
+        return moderator_result, moderator_output, moderator_metadata
 
     def _execute_worker_attempt(
         self,
@@ -334,7 +345,7 @@ Validate if the task was completed correctly."""
         root_dir: Path | None,
         progress_file: Path,
         attempt_num: int,
-    ) -> str:
+    ) -> tuple[str, dict[str, Any] | None]:
         """Execute single worker attempt.
 
         Args:
@@ -347,7 +358,7 @@ Validate if the task was completed correctly."""
             attempt_num: Current attempt number
 
         Returns:
-            Worker output text
+            Tuple of (worker output text, execution metadata or None)
         """
         self.logger.info("worker_attempt", task=task_name, attempt=attempt_num)
 
@@ -366,12 +377,13 @@ Validate if the task was completed correctly."""
         worker_prompt = self.prompts_dir / "task_worker.txt"
         worker_config = AgentConfigPresets.task_worker(self.session_id)
         worker_config.enable_streaming = True
-        return self.cli.run_print(
+        worker_output, worker_metadata = self.cli.run_print(
             instruction_file=worker_prompt,
             stdin=worker_context,
             agent_config=worker_config,
             cwd=root_dir,
         )
+        return worker_output, worker_metadata
 
     def _execute_single_task(self, task_file: Path, root_dir: Path | None = None, user_instruction: str | None = None) -> TaskResult:
         """Execute a single task with retry loop.
@@ -419,7 +431,7 @@ Validate if the task was completed correctly."""
                 attempt_start = time.time()
 
                 # Execute worker
-                worker_output = self._execute_worker_attempt(
+                worker_output, worker_metadata = self._execute_worker_attempt(
                     task_name, task_content, user_instruction, additional_context, root_dir, progress_file, attempt_num
                 )
 
@@ -434,7 +446,16 @@ Validate if the task was completed correctly."""
 
                 if completion_marker["type"] == "feedback":
                     return self._handle_feedback_result(
-                        task_file, task_name, timestamp_str, completion_marker, attempts, attempt_num, worker_output, attempt_duration, start_time
+                        task_file,
+                        task_name,
+                        timestamp_str,
+                        completion_marker,
+                        attempts,
+                        attempt_num,
+                        worker_output,
+                        worker_metadata,
+                        attempt_duration,
+                        start_time,
                     )
 
                 if completion_marker["type"] == "work_done":
@@ -447,6 +468,8 @@ Validate if the task was completed correctly."""
                                 moderator_output=None,
                                 timestamp=datetime.now(),
                                 duration=attempt_duration,
+                                worker_metadata=worker_metadata,
+                                moderator_metadata=None,
                             )
                         )
                         return TaskResult(
@@ -457,7 +480,7 @@ Validate if the task was completed correctly."""
                         )
 
                     # Validate with moderator
-                    moderator_result, moderator_output = self._validate_with_moderator(
+                    moderator_result, moderator_output, moderator_metadata = self._validate_with_moderator(
                         task_name, task_content, worker_output, progress_file, root_dir, attempt_num
                     )
 
@@ -468,6 +491,8 @@ Validate if the task was completed correctly."""
                             moderator_output=moderator_output,
                             timestamp=datetime.now(),
                             duration=attempt_duration,
+                            worker_metadata=worker_metadata,
+                            moderator_metadata=moderator_metadata,
                         )
                     )
 
@@ -495,6 +520,8 @@ Validate if the task was completed correctly."""
                         moderator_output=None,
                         timestamp=datetime.now(),
                         duration=attempt_duration,
+                        worker_metadata=worker_metadata,
+                        moderator_metadata=None,
                     )
                 )
 
@@ -654,6 +681,44 @@ Validate if the task was completed correctly."""
 
         # No marker found
         return {"type": "none", "content": None}
+
+    def _display_task_metadata(self, task_name: str, attempts: list[TaskAttempt]) -> None:
+        """Display aggregated metadata for a task.
+
+        Args:
+            task_name: Name of the task
+            attempts: List of task attempts with metadata
+        """
+        total_cost = 0.0
+        total_duration_ms = 0.0
+        total_api_ms = 0.0
+        total_turns = 0
+
+        for attempt in attempts:
+            # Worker metadata
+            if attempt.worker_metadata:
+                total_cost += attempt.worker_metadata.get("cost_usd", 0) or 0
+                total_duration_ms += attempt.worker_metadata.get("duration_ms", 0) or 0
+                total_api_ms += attempt.worker_metadata.get("duration_api_ms", 0) or 0
+                total_turns += attempt.worker_metadata.get("num_turns", 0) or 0
+
+            # Moderator metadata
+            if attempt.moderator_metadata:
+                total_cost += attempt.moderator_metadata.get("cost_usd", 0) or 0
+                total_duration_ms += attempt.moderator_metadata.get("duration_ms", 0) or 0
+                total_api_ms += attempt.moderator_metadata.get("duration_api_ms", 0) or 0
+                total_turns += attempt.moderator_metadata.get("num_turns", 0) or 0
+
+        # Only display if we have any metadata
+        if total_cost > 0 or total_turns > 0:
+            print(f"\n{'=' * 60}")
+            print(f"Task Metadata: {task_name}")
+            print(f"{'=' * 60}")
+            print(f"Total Cost:         ${total_cost:.4f}")
+            print(f"Total Duration:     {total_duration_ms / 1000:.1f}s")
+            print(f"API Duration:       {total_api_ms / 1000:.1f}s")
+            print(f"Total Turns:        {total_turns}")
+            print(f"{'=' * 60}\n")
 
     def _parse_moderator_result(self, output: str) -> dict[str, Any]:
         """Parse moderator validation result.

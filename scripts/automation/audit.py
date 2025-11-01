@@ -338,7 +338,7 @@ class AuditEngine:
 
             audit_config = AgentConfigPresets.audit(self.session_id)
             audit_config.enable_streaming = True
-            output = cli.run_print(
+            output, _ = cli.run_print(
                 instruction_file=audit_instruction,
                 stdin=audit_prompt,
                 agent_config=audit_config,
@@ -641,7 +641,7 @@ File path: `{report_path}`
         # If we reach this line, execution was successful
         consolidate_config = AgentConfigPresets.consolidate(session_id=self.session_id)
         consolidate_config.enable_streaming = True
-        output = cli.run_print(
+        output, _ = cli.run_print(
             instruction_file=consolidate_instruction,
             stdin=context,
             agent_config=consolidate_config,

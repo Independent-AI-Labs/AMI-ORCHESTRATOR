@@ -238,7 +238,7 @@ class DocsExecutor:
                 # Execute worker with streaming enabled
                 worker_config = AgentConfigPresets.task_worker(self.session_id)
                 worker_config.enable_streaming = True
-                worker_output: str = self.cli.run_print(
+                worker_output, _ = self.cli.run_print(
                     instruction=full_instruction,
                     stdin="",
                     agent_config=worker_config,
@@ -317,7 +317,7 @@ class DocsExecutor:
                     # Moderator uses streaming too for consistency
                     moderator_config = AgentConfigPresets.task_moderator(self.session_id)
                     moderator_config.enable_streaming = True
-                    moderator_output: str = self.cli.run_print(
+                    moderator_output, _ = self.cli.run_print(
                         instruction=moderator_instruction,
                         stdin="",
                         agent_config=moderator_config,

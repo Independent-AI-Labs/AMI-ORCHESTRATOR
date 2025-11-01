@@ -116,7 +116,7 @@ Signal completion:
             worker_prompt = prompts_dir / "sync_worker.txt"
             worker_config = AgentConfigPresets.sync_worker(self.session_id)
             worker_config.enable_streaming = True
-            worker_output = self.cli.run_print(
+            worker_output, _ = self.cli.run_print(
                 instruction_file=worker_prompt,
                 stdin=worker_instruction,
                 agent_config=worker_config,
@@ -149,7 +149,7 @@ WORKER STATUS: {worker_status}
 
             moderator_config = AgentConfigPresets.sync_moderator(self.session_id)
             moderator_config.enable_streaming = True
-            moderator_output = self.cli.run_print(
+            moderator_output, _ = self.cli.run_print(
                 instruction_file=moderator_prompt,
                 stdin=validation_context,
                 agent_config=moderator_config,

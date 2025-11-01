@@ -292,7 +292,7 @@ class AgentCLI(ABC):
         stdin: str | TextIO | None = None,
         agent_config: AgentConfig | None = None,
         cwd: Path | None = None,
-    ) -> str:
+    ) -> tuple[str, dict[str, Any] | None]:
         """Run agent in non-interactive (print) mode.
 
         Args:
@@ -303,7 +303,7 @@ class AgentCLI(ABC):
             cwd: Working directory for agent execution (defaults to current directory)
 
         Returns:
-            Agent output
+            Tuple of (agent output text, execution metadata dict or None)
 
         Raises:
             AgentTimeoutError: Execution exceeded timeout
@@ -585,8 +585,8 @@ class ClaudeAgentCLI(AgentCLI):
 
         return line, False
 
-    def _parse_stream_message(self, line: str, cmd: list[str], line_count: int, agent_config: AgentConfig) -> str:
-        """Parse streaming JSON message and extract assistant text.
+    def _parse_stream_message(self, line: str, cmd: list[str], line_count: int, agent_config: AgentConfig) -> tuple[str, dict[str, Any] | None]:
+        """Parse streaming JSON message and extract assistant text and metadata.
 
         Args:
             line: JSON line from stream
@@ -595,7 +595,7 @@ class ClaudeAgentCLI(AgentCLI):
             agent_config: Agent configuration
 
         Returns:
-            Extracted assistant text (empty string if none)
+            Tuple of (extracted assistant text, metadata dict or None)
 
         Raises:
             AgentExecutionError: If JSON parsing fails
@@ -619,6 +619,18 @@ class ClaudeAgentCLI(AgentCLI):
 
         self.logger.info("agent_stream_message", session_id=agent_config.session_id, msg_type=msg.get("type"))
 
+        # Extract metadata from result message
+        if msg.get("type") == "result":
+            metadata = {
+                "cost_usd": msg.get("total_cost_usd"),
+                "duration_ms": msg.get("duration_ms"),
+                "duration_api_ms": msg.get("duration_api_ms"),
+                "num_turns": msg.get("num_turns"),
+                "usage": msg.get("usage"),
+                "model_usage": msg.get("modelUsage"),
+            }
+            return "", metadata
+
         # Extract assistant text
         if msg.get("type") == "assistant":
             text_parts = []
@@ -627,9 +639,9 @@ class ClaudeAgentCLI(AgentCLI):
                     text = content.get("text", "")
                     if text:
                         text_parts.append(text)
-            return "".join(text_parts)
+            return "".join(text_parts), None
 
-        return ""
+        return "", None
 
     def _calculate_stream_timeout(
         self, agent_config: AgentConfig, last_log_time: float, line_count: int, elapsed: float, iterations: int
@@ -676,7 +688,7 @@ class ClaudeAgentCLI(AgentCLI):
         stdin_data: str | None,
         agent_config: AgentConfig,
         cwd: Path | None,
-    ) -> str:
+    ) -> tuple[str, dict[str, Any] | None]:
         """Execute command with streaming JSON output parsing.
 
         Args:
@@ -686,7 +698,7 @@ class ClaudeAgentCLI(AgentCLI):
             cwd: Working directory
 
         Returns:
-            Accumulated assistant text content
+            Tuple of (accumulated assistant text, metadata dict or None)
 
         Raises:
             AgentTimeoutError: Execution exceeded timeout
@@ -695,6 +707,7 @@ class ClaudeAgentCLI(AgentCLI):
         start_time = time.time()
         process = None
         assistant_text: list[str] = []
+        metadata: dict[str, Any] | None = None
 
         try:
             process = self._start_streaming_process(cmd, stdin_data, cwd)
@@ -722,9 +735,11 @@ class ClaudeAgentCLI(AgentCLI):
 
                 if line:
                     line_count += 1
-                    text = self._parse_stream_message(line, cmd, line_count, agent_config)
+                    text, msg_metadata = self._parse_stream_message(line, cmd, line_count, agent_config)
                     if text:
                         assistant_text.append(text)
+                    if msg_metadata:
+                        metadata = msg_metadata
 
             # Wait for process completion
             process.wait(timeout=10)
@@ -746,7 +761,7 @@ class ClaudeAgentCLI(AgentCLI):
                 )
 
             self.logger.info("agent_print_complete", exit_code=process.returncode, duration=round(duration, 1))
-            return "".join(assistant_text)
+            return "".join(assistant_text), metadata
 
         except subprocess.TimeoutExpired as timeout_err:
             duration = time.time() - start_time
@@ -769,7 +784,7 @@ class ClaudeAgentCLI(AgentCLI):
         stdin_data: str | None,
         agent_config: AgentConfig,
         cwd: Path | None,
-    ) -> str:
+    ) -> tuple[str, dict[str, Any] | None]:
         """Execute command with timeout handling.
 
         Args:
@@ -779,7 +794,7 @@ class ClaudeAgentCLI(AgentCLI):
             cwd: Working directory
 
         Returns:
-            Command stdout
+            Tuple of (command stdout, metadata dict or None)
 
         Raises:
             AgentTimeoutError: Execution exceeded timeout
@@ -846,7 +861,7 @@ class ClaudeAgentCLI(AgentCLI):
                 duration=round(duration, 1),
             )
 
-            return stdout
+            return stdout, None  # No metadata in non-streaming mode
 
         except subprocess.TimeoutExpired as timeout_err:
             duration = time.time() - start_time
@@ -893,7 +908,7 @@ class ClaudeAgentCLI(AgentCLI):
         stdin: str | TextIO | None = None,
         agent_config: AgentConfig | None = None,
         cwd: Path | None = None,
-    ) -> str:
+    ) -> tuple[str, dict[str, Any] | None]:
         """Run Claude Code in --print mode (non-interactive).
 
         Args:
@@ -904,7 +919,7 @@ class ClaudeAgentCLI(AgentCLI):
             cwd: Working directory for agent execution (defaults to current directory)
 
         Returns:
-            Agent output (stdout)
+            Tuple of (agent output text, execution metadata dict or None)
 
         Raises:
             AgentTimeoutError: Execution exceeded timeout

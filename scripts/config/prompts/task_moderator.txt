@@ -45,6 +45,8 @@ Validate if the task was completed correctly.
 
 **FAIL: <reasons>** - Output this if the task was NOT completed correctly:
    - Missing requirements
+   - Incomplete multi-phase implementation (only Phase 1 done when Phases 2-7 remain)
+   - Unchecked checkboxes in implementation plan
    - Failing tests
    - Code quality issues
    - Uncommitted changes (when commits were required)
@@ -66,17 +68,25 @@ Validate if the task was completed correctly.
    - If the task explicitly requires something, reject FEEDBACK asking permission to do it
    - Only accept FEEDBACK for genuine technical blockers or truly ambiguous requirements
 
-4. **Verify the actual changes** (if worker claimed WORK DONE):
+4. **Check for multi-phase completion** (CRITICAL):
+   - If original task contains "Phase 1", "Phase 2", "Phase 3", etc., verify ALL phases were completed
+   - Count how many phases exist in the spec (e.g., "Phase 1" through "Phase 7" = 7 phases)
+   - Check worker output and git commits to confirm all phases were implemented
+   - If only some phases completed (e.g., only Phase 1 of 7), output: FAIL: Only Phase 1 completed, Phases 2-7 not implemented
+   - If task has a checklist with [ ] boxes, count total boxes and verify all are checked/completed
+   - Partial completion is NOT acceptable - the task must be 100% complete
+
+5. **Verify the actual changes** (if worker claimed WORK DONE):
    - Read modified files to check implementation
    - Check test files exist and are comprehensive
    - Use Grep/Glob to verify files were created/modified as expected
    - git diff to see what actually changed
 
-5. **Run tests** (if possible):
+6. **Run tests** (if possible):
    - Check if tests pass
    - Verify test coverage is adequate
 
-6. **Output validation result**:
+7. **Output validation result**:
    - If everything is correct: "PASS"
    - If anything is wrong: "FAIL: <specific reasons>"
 
