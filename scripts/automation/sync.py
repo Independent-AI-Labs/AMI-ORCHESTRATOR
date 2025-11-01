@@ -101,6 +101,8 @@ class SyncExecutor:
 
 MODULE: {module_path}
 
+IMPORTANT: Always check progress first - assume work has already been done on this task. Check git status, recent commits, and push status before taking action.
+
 Your task is to ensure this git module is fully committed and pushed upstream.
 
 Requirements:

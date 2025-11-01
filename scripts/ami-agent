@@ -6,8 +6,9 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(dirname "$SCRIPT_DIR")"
 
-# Load required Claude CLI version from .env (safe parsing, no sourcing)
-REQUIRED_VERSION="2.0.10"
+# Load required CLI versions from .env (safe parsing, no sourcing)
+CLAUDE_REQUIRED_VERSION="2.0.10"
+GEMINI_REQUIRED_VERSION="0.11.3"
 if [ -f "$ROOT_DIR/.env" ]; then
     while IFS='=' read -r key value; do
         # Skip comments and empty lines
@@ -15,8 +16,9 @@ if [ -f "$ROOT_DIR/.env" ]; then
         [[ -z "$key" ]] && continue
 
         if [ "$key" = "CLAUDE_CLI_VERSION" ]; then
-            REQUIRED_VERSION="$value"
-            break
+            CLAUDE_REQUIRED_VERSION="$value"
+        elif [ "$key" = "GEMINI_CLI_VERSION" ]; then
+            GEMINI_REQUIRED_VERSION="$value"
         fi
     done < "$ROOT_DIR/.env"
 fi
@@ -32,7 +34,7 @@ check_claude_version() {
     local current_version
     current_version=$("$claude_path" --version 2>/dev/null | awk '{print $1}')
 
-    if [ "$current_version" != "$REQUIRED_VERSION" ]; then
+    if [ "$current_version" != "$CLAUDE_REQUIRED_VERSION" ]; then
         return 2
     fi
 
@@ -72,9 +74,9 @@ install_claude_cli() {
         return 1
     fi
 
-    echo "Installing Claude CLI version $REQUIRED_VERSION to venv using bootstrapped npm..." >&2
-    if "$npm_bin" install --prefix "$ROOT_DIR/.venv" "@anthropic-ai/claude-code@$REQUIRED_VERSION"; then
-        echo "✓ Successfully installed Claude CLI $REQUIRED_VERSION to .venv/node_modules/" >&2
+    echo "Installing Claude CLI version $CLAUDE_REQUIRED_VERSION to venv using bootstrapped npm..." >&2
+    if "$npm_bin" install --prefix "$ROOT_DIR/.venv" "@anthropic-ai/claude-code@$CLAUDE_REQUIRED_VERSION"; then
+        echo "✓ Successfully installed Claude CLI $CLAUDE_REQUIRED_VERSION to .venv/node_modules/" >&2
         return 0
     else
         echo "✗ Failed to install Claude CLI" >&2
@@ -86,10 +88,10 @@ install_claude_cli() {
 CLAUDE_BIN=$(find_claude_binary)
 if [ -z "$CLAUDE_BIN" ]; then
     echo "Error: Claude CLI not found." >&2
-    echo "Required version: $REQUIRED_VERSION" >&2
+    echo "Required version: $CLAUDE_REQUIRED_VERSION" >&2
     echo "Searched: CLAUDE_CLI_PATH env var, .venv/node_modules/.bin/claude, system PATH" >&2
 
-    read -p "Install Claude CLI $REQUIRED_VERSION to venv now? (y/N) " -n 1 -r
+    read -p "Install Claude CLI $CLAUDE_REQUIRED_VERSION to venv now? (y/N) " -n 1 -r
     echo
     if [[ $REPLY =~ ^[Yy]$ ]]; then
         if ! install_claude_cli; then
@@ -101,7 +103,7 @@ if [ -z "$CLAUDE_BIN" ]; then
             exit 1
         fi
     else
-        echo "Aborted. Please install Claude CLI version $REQUIRED_VERSION manually." >&2
+        echo "Aborted. Please install Claude CLI version $CLAUDE_REQUIRED_VERSION manually." >&2
         exit 1
     fi
 fi
@@ -112,10 +114,10 @@ if ! check_claude_version "$CLAUDE_BIN"; then
     if [ $ret -eq 2 ]; then
         current=$("$CLAUDE_BIN" --version 2>/dev/null | awk '{print $1}')
         echo "Error: Claude CLI version mismatch." >&2
-        echo "Required: $REQUIRED_VERSION, Found: $current" >&2
+        echo "Required: $CLAUDE_REQUIRED_VERSION, Found: $current" >&2
         echo "Using: $CLAUDE_BIN" >&2
 
-        read -p "Install correct version $REQUIRED_VERSION to venv now? (y/N) " -n 1 -r
+        read -p "Install correct version $CLAUDE_REQUIRED_VERSION to venv now? (y/N) " -n 1 -r
         echo
         if [[ $REPLY =~ ^[Yy]$ ]]; then
             if ! install_claude_cli; then
@@ -127,12 +129,98 @@ if ! check_claude_version "$CLAUDE_BIN"; then
                 exit 1
             fi
         else
-            echo "Aborted. Please install Claude CLI version $REQUIRED_VERSION manually." >&2
+            echo "Aborted. Please install Claude CLI version $CLAUDE_REQUIRED_VERSION manually." >&2
             exit 1
         fi
     else
         echo "Error: Claude CLI check failed" >&2
         exit 1
+    fi
+fi
+
+# === Gemini CLI Bootstrap ===
+
+# Check Gemini CLI version
+check_gemini_version() {
+    local gemini_path="$1"
+
+    if [ ! -x "$gemini_path" ]; then
+        return 1
+    fi
+
+    local current_version
+    current_version=$("$gemini_path" --version 2>/dev/null | grep -oP '^\d+\.\d+\.\d+')
+
+    if [ "$current_version" != "$GEMINI_REQUIRED_VERSION" ]; then
+        return 2
+    fi
+
+    return 0
+}
+
+# Determine which gemini binary to use (priority order)
+find_gemini_binary() {
+    # Priority 1: GEMINI_CLI_PATH env var (explicit override)
+    if [ -n "${GEMINI_CLI_PATH:-}" ] && [ -x "${GEMINI_CLI_PATH:-}" ]; then
+        echo "$GEMINI_CLI_PATH"
+        return 0
+    fi
+
+    # Priority 2: venv-local gemini (npm installed)
+    local venv_gemini="$ROOT_DIR/.venv/node_modules/.bin/gemini"
+    if [ -x "$venv_gemini" ]; then
+        echo "$venv_gemini"
+        return 0
+    fi
+
+    # Priority 3: system gemini (PATH)
+    if command -v gemini &> /dev/null; then
+        command -v gemini
+        return 0
+    fi
+
+    return 1
+}
+
+# Install Gemini CLI using bootstrapped npm from venv
+install_gemini_cli() {
+    local npm_bin="$ROOT_DIR/.venv/bin/npm"
+
+    if [ ! -f "$npm_bin" ]; then
+        echo "Error: npm not found in venv. Run module_setup.py first to bootstrap Node.js." >&2
+        return 1
+    fi
+
+    echo "Installing Gemini CLI version $GEMINI_REQUIRED_VERSION to venv using bootstrapped npm..." >&2
+    if "$npm_bin" install --prefix "$ROOT_DIR/.venv" "@google/gemini-cli@$GEMINI_REQUIRED_VERSION"; then
+        echo "✓ Successfully installed Gemini CLI $GEMINI_REQUIRED_VERSION to .venv/node_modules/" >&2
+        return 0
+    else
+        echo "✗ Failed to install Gemini CLI" >&2
+        return 1
+    fi
+}
+
+# Find and verify Gemini CLI (optional - warn if not found but don't fail)
+GEMINI_BIN=$(find_gemini_binary)
+if [ -z "$GEMINI_BIN" ]; then
+    echo "Warning: Gemini CLI not found (optional)." >&2
+    echo "Required version: $GEMINI_REQUIRED_VERSION" >&2
+    echo "Searched: GEMINI_CLI_PATH env var, .venv/node_modules/.bin/gemini, system PATH" >&2
+    echo "Note: Gemini CLI is only required if automation.yaml uses cli_agent.type: gemini" >&2
+else
+    # Verify version if found
+    if ! check_gemini_version "$GEMINI_BIN"; then
+        ret=$?
+        if [ $ret -eq 2 ]; then
+            current=$("$GEMINI_BIN" --version 2>/dev/null | grep -oP '^\d+\.\d+\.\d+')
+            echo "Warning: Gemini CLI version mismatch." >&2
+            echo "Required: $GEMINI_REQUIRED_VERSION, Found: $current" >&2
+            echo "Using: $GEMINI_BIN" >&2
+            echo "Note: Mismatched Gemini CLI version may cause issues if used by automation" >&2
+        else
+            echo "Warning: Gemini CLI check failed" >&2
+        fi
     fi
 fi
 
