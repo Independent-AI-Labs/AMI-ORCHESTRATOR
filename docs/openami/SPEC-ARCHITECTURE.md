@@ -387,7 +387,7 @@ Every verifier would sign with cryptographic keys, creating an accountability ch
    - Browser server (11 families): navigation, interaction, scraping
    - Files server (27 tools): file operations, search, metadata
    - Tool invocations logged with timestamps
-   - See [README.md](../../README.md#mcp-integration)
+   - See README.md
 
 3. **Audit Trail** (✅ PARTIAL)
    - Basic immutable logging with UUID v7
@@ -553,9 +553,9 @@ See [SECURITY-MODEL.md](https://github.com/Independent-AI-Labs/AMI-LEARNING/blob
 ### Production Infrastructure
 
 - [AMI-ORCHESTRATOR README](../../README.md) - Current production capabilities
-- [DataOps Documentation](../../base/backend/dataops/README.md) - Storage abstraction
-- [MCP Integration Guide](../../README.md#mcp-integration) - MCP servers
-- [Audit Trail Implementation](../../base/backend/dataops/security/audit_trail.py) - Current audit logging
+- [DataOps Documentation](https://github.com/Independent-AI-Labs/AMI-BASE/blob/main/backend/dataops/README.md) - Storage abstraction
+- MCP Integration Guide - MCP servers
+- [Audit Trail Implementation](https://github.com/Independent-AI-Labs/AMI-BASE/blob/main/backend/dataops/security/audit_trail.py) - Current audit logging
 
 ---
 

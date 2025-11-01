@@ -9,7 +9,7 @@
 
 Define the built-in Information Security Management System (ISMS) capabilities the AMI Orchestrator platform must provide so organisations can operate and evidence an ISO/IEC 27001-aligned ISMS without relying on external tooling.
 
-**Current Implementation Status**: The compliance module is in specification phase with no backend implementation yet. See [compliance/docs/research/CURRENT_IMPLEMENTATION_STATUS.md](../../compliance/docs/research/CURRENT_IMPLEMENTATION_STATUS.md) for detailed progress tracking.
+**Current Implementation Status**: The compliance module is in specification phase with no backend implementation yet. See [compliance/docs/research/CURRENT_IMPLEMENTATION_STATUS.md](https://github.com/Independent-AI-Labs/AMI-COMPLIANCE/blob/main/docs/research/CURRENT_IMPLEMENTATION_STATUS.md) for detailed progress tracking.
 
 ## Scope
 
@@ -23,7 +23,7 @@ This ISMS functionality will be implemented as part of **Layer 4: Governance** i
 - **Compliance Manifest ($\mathcal{CM}$)**: Authoritative policy and control specification
 - **SPN Integration**: Secure Process Nodes enforce controls at execution boundaries
 - **CST Provenance**: Cryptographic State Tokens provide immutable evidence chains
-- **Matrix Protocol**: Secure communications backbone for incident response and human oversight (see [compliance/docs/research/ISMS-MATRIX-INTEGRATION-PLAN.md](../../compliance/docs/research/ISMS-MATRIX-INTEGRATION-PLAN.md))
+- **Matrix Protocol**: Secure communications backbone for incident response and human oversight (see [compliance/docs/research/ISMS-MATRIX-INTEGRATION-PLAN.md](https://github.com/Independent-AI-Labs/AMI-COMPLIANCE/blob/main/docs/research/ISMS-MATRIX-INTEGRATION-PLAN.md))
 
 Traditional ISMS capabilities described below map to these OpenAMI primitives.
 
@@ -102,7 +102,7 @@ Traditional ISMS capabilities described below map to these OpenAMI primitives.
   - Controls enforced through SPN pre/post checks
   - Evidence collected via CST provenance chains
   - Risk register integrated with Layer 0 Axiom violation tracking
-* **Matrix Protocol Integration**: Incident response, human oversight approvals, and audit communications via end-to-end encrypted Matrix rooms (see [compliance/docs/research/ISMS-MATRIX-INTEGRATION-PLAN.md](../../compliance/docs/research/ISMS-MATRIX-INTEGRATION-PLAN.md))
+* **Matrix Protocol Integration**: Incident response, human oversight approvals, and audit communications via end-to-end encrypted Matrix rooms (see [compliance/docs/research/ISMS-MATRIX-INTEGRATION-PLAN.md](https://github.com/Independent-AI-Labs/AMI-COMPLIANCE/blob/main/docs/research/ISMS-MATRIX-INTEGRATION-PLAN.md))
 * **DataOps Foundation**: Reuse base module's UnifiedCRUD with 9 storage backend options (Postgres, Dgraph, MongoDB, Redis, Vault, Prometheus, pgvector, File, REST)
 * **Migration Tooling**: Import legacy risk registers and policies (CSV/JSON) and bulk-link evidence files during Q2 2026 implementation
 
@@ -123,11 +123,11 @@ Traditional ISMS capabilities described below map to these OpenAMI primitives.
 
 ## Related Documentation
 
-- [Compliance Backend Specification](../../compliance/docs/research/COMPLIANCE_BACKEND_SPEC.md) - Technical architecture
-- [ISMS-Matrix Integration Plan](../../compliance/docs/research/ISMS-MATRIX-INTEGRATION-PLAN.md) - Communications backbone
-- [Current Implementation Status](../../compliance/docs/research/CURRENT_IMPLEMENTATION_STATUS.md) - Progress tracking (0% complete as of 2025-10-27)
-- [OpenAMI System Architecture](../openami/architecture/system-architecture.md) - 4-layer architecture
-- [Executive Action Plan](../../compliance/docs/research/EXECUTIVE_ACTION_PLAN.md) - Implementation roadmap
+- [Compliance Backend Specification](https://github.com/Independent-AI-Labs/AMI-COMPLIANCE/blob/main/docs/research/COMPLIANCE_BACKEND_SPEC.md) - Technical architecture
+- [ISMS-Matrix Integration Plan](https://github.com/Independent-AI-Labs/AMI-COMPLIANCE/blob/main/docs/research/ISMS-MATRIX-INTEGRATION-PLAN.md) - Communications backbone
+- [Current Implementation Status](https://github.com/Independent-AI-Labs/AMI-COMPLIANCE/blob/main/docs/research/CURRENT_IMPLEMENTATION_STATUS.md) - Progress tracking (0% complete as of 2025-10-27)
+- OpenAMI System Architecture - 4-layer architecture
+- [Executive Action Plan](https://github.com/Independent-AI-Labs/AMI-COMPLIANCE/blob/main/docs/research/EXECUTIVE_ACTION_PLAN.md) - Implementation roadmap
 
 ---
 

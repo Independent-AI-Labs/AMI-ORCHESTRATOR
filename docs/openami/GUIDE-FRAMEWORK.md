@@ -321,7 +321,7 @@ The **proposed** Open AMI architecture would organize into four interconnected l
 - Authentication via mTLS
 - Integrity via signatures
 - Defined in: [oami_protocol.md](https://github.com/Independent-AI-Labs/AMI-COMPLIANCE/blob/main/docs/research/OpenAMI/systems/oami_protocol.md)
-- Current: MCP servers use stdio/HTTP transport (see [README.md](../../README.md#mcp-integration))
+- Current: MCP servers use stdio/HTTP transport (see README.md)
 
 ---
 
@@ -472,8 +472,8 @@ See external research: [incremental.md](https://github.com/Independent-AI-Labs/A
 
 **Production Infrastructure** (available now):
 1. [AMI-ORCHESTRATOR README](../../README.md) - Production capabilities
-2. [MCP Servers](../../README.md#mcp-integration) - DataOps, SSH, Browser, Files (50+ tools)
-3. [Audit Trail Implementation](../../base/backend/dataops/security/audit_trail.py) - Current foundation
+2. MCP Servers - DataOps, SSH, Browser, Files (50+ tools)
+3. [Audit Trail Implementation](https://github.com/Independent-AI-Labs/AMI-BASE/blob/main/backend/dataops/security/audit_trail.py) - Current foundation
 4. Module setup: `python module_setup.py`
 
 **Research Framework** (future):
@@ -518,7 +518,7 @@ See external research: [Research Specifications](https://github.com/Independent-
 
 ### Q: Is Open AMI open source?
 
-**A**: Yes. AMI-ORCHESTRATOR is MIT licensed (see [LICENSE](../../LICENSE)). The codebase is open-source with no commercial licensing.
+**A**: Yes. AMI-ORCHESTRATOR is MIT licensed (see LICENSE). The codebase is open-source with no commercial licensing.
 
 ---
 
@@ -537,9 +537,9 @@ Ready to dive deeper into the **research framework**? Choose your path:
 Want to work with the **operational system**? Start here:
 
 - **Developers** → [AMI-ORCHESTRATOR README](../../README.md) (production capabilities)
-- **Audit Trail** → [base/backend/dataops/security/audit_trail.py](../../base/backend/dataops/security/audit_trail.py) (current implementation)
-- **Quick Start** → `git clone` + `python module_setup.py` + [setup guide](../../README.md#quick-start)
-- **MCP Servers** → [MCP Integration](../../README.md#mcp-integration) (50+ production tools)
+- **Audit Trail** → [base/backend/dataops/security/audit_trail.py](https://github.com/Independent-AI-Labs/AMI-BASE/blob/main/backend/dataops/security/audit_trail.py) (current implementation)
+- **Quick Start** → `git clone` + `python module_setup.py` + setup guide
+- **MCP Servers** → MCP Integration (50+ production tools)
 
 ### Contributing
 

@@ -20,7 +20,7 @@ Safely integrates with **any** **web**, **data** or **API** service.
 
 ### The AMI project is ✔️**ISO**, ✔️**NIST**, and ✔️**EU AI Act** compliant by design.
 
-Benefit from standartisation with reduced administrative overhead by automating audit and compliance procedures. 
+- Benefit from standartisation with reduced administrative overhead by automating audit and compliance procedures. 
 
 ![AMI Orchestrator Screenshot](docs/AMI-PORTAL.png)
 
@@ -336,8 +336,8 @@ MIT License - Copyright © 2025 Independent AI Labs
 
 ### 🛡️ Compliance & Security
 - **[OpenAMI Framework](docs/openami/README.md)** - Self-evolving AI with formal safety guarantees
-- **[Executive Summary](docs/openami/overview/executive-summary.md)** - Business case for trustworthy AI
-- **[System Architecture](docs/openami/architecture/system-architecture.md)** - Four-layer compliance architecture
+- **Executive Summary** - Business case for trustworthy AI
+- **System Architecture** - Four-layer compliance architecture
 
 ### 🚀 Getting Started
 1. **Clone**: `git clone https://github.com/independent-ai-labs/ami-orchestrator`

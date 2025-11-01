@@ -16,6 +16,8 @@ sys.path.insert(0, str(scripts_dir))
 
 from ami_repo import GitRepoManager
 
+from backend.git_server.results import RepositoryError, SSHKeyError
+
 
 class TestGitRepoManagerInit:
     """Test GitRepoManager initialization."""
@@ -120,7 +122,7 @@ class TestKeyValidation:
         key_file = tmp_path / "invalid_key.pub"
         key_file.write_text("not-a-valid-ssh-key")
 
-        with pytest.raises(SystemExit):
+        with pytest.raises(SSHKeyError):
             manager.add_ssh_key(key_file, "invalid-key")
 
     def test_rejects_missing_key_file(self, tmp_path):
@@ -130,7 +132,7 @@ class TestKeyValidation:
 
         missing_key = tmp_path / "nonexistent.pub"
 
-        with pytest.raises(SystemExit):
+        with pytest.raises(SSHKeyError):
             manager.add_ssh_key(missing_key, "missing-key")
 
 
@@ -194,7 +196,7 @@ class TestErrorHandling:
         """Operations fail gracefully when server not initialized."""
         manager = GitRepoManager(base_path=tmp_path)
 
-        with pytest.raises(SystemExit):
+        with pytest.raises(RepositoryError):
             manager.create_repo("test")
 
     def test_duplicate_repository_creation(self, tmp_path):
@@ -207,7 +209,7 @@ class TestErrorHandling:
         repo_path.mkdir()
 
         # Try to create duplicate
-        with pytest.raises(SystemExit):
+        with pytest.raises(RepositoryError):
             manager.create_repo("test")
 
     def test_list_repos_empty_server(self, tmp_path):
@@ -230,7 +232,7 @@ class TestErrorHandling:
         manager = GitRepoManager(base_path=tmp_path)
         manager.repos_path.mkdir(parents=True)
 
-        with pytest.raises(SystemExit):
+        with pytest.raises(RepositoryError):
             manager.delete_repo("nonexistent", force=True)
 
     def test_repo_info_nonexistent_repo(self, tmp_path):
@@ -238,7 +240,7 @@ class TestErrorHandling:
         manager = GitRepoManager(base_path=tmp_path)
         manager.repos_path.mkdir(parents=True)
 
-        with pytest.raises(SystemExit):
+        with pytest.raises(RepositoryError):
             manager.repo_info("nonexistent")
 
 
@@ -288,7 +290,7 @@ class TestSSHKeyManagement:
         manager.add_ssh_key(key_file, "test-key")
 
         # Try to add same key again
-        with pytest.raises(SystemExit):
+        with pytest.raises(SSHKeyError):
             manager.add_ssh_key(key_file, "duplicate-key")
 
     def test_list_keys_empty(self, tmp_path):
@@ -328,7 +330,7 @@ class TestSSHKeyManagement:
         manager.base_path.mkdir(exist_ok=True)
         manager.keys_path.touch()
 
-        with pytest.raises(SystemExit):
+        with pytest.raises(SSHKeyError):
             manager.remove_ssh_key("nonexistent-key")
 
 

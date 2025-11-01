@@ -37,85 +37,85 @@ From `.gitmodules`:
 
 **Line 14:**
 ```markdown
-Current: [specifications](../../compliance/docs/research/OpenAMI/)
+Current: [specifications](https://github.com/Independent-AI-Labs/AMI-COMPLIANCE/blob/main/docs/research/OpenAMI)
 Correct: [specifications](https://github.com/Independent-AI-Labs/AMI-COMPLIANCE/tree/main/docs/research/OpenAMI/)
 ```
 
 **Line 15:**
 ```markdown
-Current: [learning/](../../learning/)
+Current: [learning/](https://github.com/Independent-AI-Labs/AMI-LEARNING)
 Correct: [learning/](https://github.com/Independent-AI-Labs/AMI-LEARNING)
 ```
 
 **Line 17:**
 ```markdown
-Current: [research docs](../../compliance/docs/research/)
+Current: [research docs](https://github.com/Independent-AI-Labs/AMI-COMPLIANCE/blob/main/docs/research)
 Correct: [research docs](https://github.com/Independent-AI-Labs/AMI-COMPLIANCE/tree/main/docs/research/)
 ```
 
 **Line 46:**
 ```markdown
-Current: [SYNTHESIS-OPENAMI-BOOTSTRAP.md](../../learning/SYNTHESIS-OPENAMI-BOOTSTRAP.md)
+Current: [SYNTHESIS-OPENAMI-BOOTSTRAP.md](https://github.com/Independent-AI-Labs/AMI-LEARNING/blob/main/SYNTHESIS-OPENAMI-BOOTSTRAP.md)
 Correct: [SYNTHESIS-OPENAMI-BOOTSTRAP.md](https://github.com/Independent-AI-Labs/AMI-LEARNING/blob/main/SYNTHESIS-OPENAMI-BOOTSTRAP.md)
 ```
 
 **Line 47:**
 ```markdown
-Current: [bootstrap.md](../../learning/bootstrap.md)
+Current: [bootstrap.md](https://github.com/Independent-AI-Labs/AMI-LEARNING/blob/main/bootstrap.md)
 Correct: [bootstrap.md](https://github.com/Independent-AI-Labs/AMI-LEARNING/blob/main/bootstrap.md)
 ```
 
 **Line 48:**
 ```markdown
-Current: [incremental.md](../../learning/incremental.md)
+Current: [incremental.md](https://github.com/Independent-AI-Labs/AMI-LEARNING/blob/main/incremental.md)
 Correct: [incremental.md](https://github.com/Independent-AI-Labs/AMI-LEARNING/blob/main/incremental.md)
 ```
 
 **Line 49:**
 ```markdown
-Current: [SECURITY-MODEL.md](../../learning/SECURITY-MODEL.md)
+Current: [SECURITY-MODEL.md](https://github.com/Independent-AI-Labs/AMI-LEARNING/blob/main/SECURITY-MODEL.md)
 Correct: [SECURITY-MODEL.md](https://github.com/Independent-AI-Labs/AMI-LEARNING/blob/main/SECURITY-MODEL.md)
 ```
 
 **Line 52:**
 ```markdown
-Current: [Architecture pillars](../../compliance/docs/research/OpenAMI/architecture/pillars.md)
+Current: [Architecture pillars](https://github.com/Independent-AI-Labs/AMI-COMPLIANCE/blob/main/docs/research/OpenAMI/architecture/pillars.md)
 Correct: [Architecture pillars](https://github.com/Independent-AI-Labs/AMI-COMPLIANCE/blob/main/docs/research/OpenAMI/architecture/pillars.md)
 ```
 
 **Line 53:**
 ```markdown
-Current: [Compliance manifest](../../compliance/docs/research/OpenAMI/systems/compliance_manifest.md)
+Current: [Compliance manifest](https://github.com/Independent-AI-Labs/AMI-COMPLIANCE/blob/main/docs/research/OpenAMI/systems/compliance_manifest.md)
 Correct: [Compliance manifest](https://github.com/Independent-AI-Labs/AMI-COMPLIANCE/blob/main/docs/research/OpenAMI/systems/compliance_manifest.md)
 ```
 
 **Line 54:**
 ```markdown
-Current: [OAMI protocol](../../compliance/docs/research/OpenAMI/systems/oami_protocol.md)
+Current: [OAMI protocol](https://github.com/Independent-AI-Labs/AMI-COMPLIANCE/blob/main/docs/research/OpenAMI/systems/oami_protocol.md)
 Correct: [OAMI protocol](https://github.com/Independent-AI-Labs/AMI-COMPLIANCE/blob/main/docs/research/OpenAMI/systems/oami_protocol.md)
 ```
 
 **Line 55:**
 ```markdown
-Current: [Governance alignment](../../compliance/docs/research/OpenAMI/compliance/governance_alignment.md)
+Current: [Governance alignment](https://github.com/Independent-AI-Labs/AMI-COMPLIANCE/blob/main/docs/research/OpenAMI/compliance/governance_alignment.md)
 Correct: [Governance alignment](https://github.com/Independent-AI-Labs/AMI-COMPLIANCE/blob/main/docs/research/OpenAMI/compliance/governance_alignment.md)
 ```
 
 **Line 58:**
 ```markdown
-Current: [OPENAMI-COMPLIANCE-MAPPING.md](../../compliance/docs/research/OPENAMI-COMPLIANCE-MAPPING.md)
+Current: [OPENAMI-COMPLIANCE-MAPPING.md](https://github.com/Independent-AI-Labs/AMI-COMPLIANCE/blob/main/docs/research/OPENAMI-COMPLIANCE-MAPPING.md)
 Correct: [OPENAMI-COMPLIANCE-MAPPING.md](https://github.com/Independent-AI-Labs/AMI-COMPLIANCE/blob/main/docs/research/OPENAMI-COMPLIANCE-MAPPING.md)
 ```
 
 **Line 59:**
 ```markdown
-Current: [EXECUTIVE_ACTION_PLAN.md](../../compliance/docs/research/EXECUTIVE_ACTION_PLAN.md)
+Current: [EXECUTIVE_ACTION_PLAN.md](https://github.com/Independent-AI-Labs/AMI-COMPLIANCE/blob/main/docs/research/EXECUTIVE_ACTION_PLAN.md)
 Correct: [EXECUTIVE_ACTION_PLAN.md](https://github.com/Independent-AI-Labs/AMI-COMPLIANCE/blob/main/docs/research/EXECUTIVE_ACTION_PLAN.md)
 ```
 
 **Line 74:**
 ```markdown
-Current: [Research specifications](../../compliance/docs/research/OpenAMI/)
+Current: [Research specifications](https://github.com/Independent-AI-Labs/AMI-COMPLIANCE/blob/main/docs/research/OpenAMI)
 Correct: [Research specifications](https://github.com/Independent-AI-Labs/AMI-COMPLIANCE/tree/main/docs/research/OpenAMI/)
 ```
 
@@ -123,7 +123,7 @@ Correct: [Research specifications](https://github.com/Independent-AI-Labs/AMI-CO
 
 **Line 354:**
 ```markdown
-Current: [Research Specifications](../../compliance/docs/research/OpenAMI/)
+Current: [Research Specifications](https://github.com/Independent-AI-Labs/AMI-COMPLIANCE/blob/main/docs/research/OpenAMI)
 Correct: [Research Specifications](https://github.com/Independent-AI-Labs/AMI-COMPLIANCE/tree/main/docs/research/OpenAMI/)
 ```
 
@@ -131,121 +131,121 @@ Correct: [Research Specifications](https://github.com/Independent-AI-Labs/AMI-CO
 
 **Line 175:**
 ```markdown
-Current: [Gemini DSE-AI](../../../learning/bootstrap.md)
+Current: [Gemini DSE-AI](https://github.com/Independent-AI-Labs/AMI-LEARNING/blob/main/bootstrap.md)
 Correct: [Gemini DSE-AI](https://github.com/Independent-AI-Labs/AMI-LEARNING/blob/main/bootstrap.md)
 ```
 
 **Line 176:**
 ```markdown
-Current: [Claude Formal Bootstrap](../../../learning/incremental.md)
+Current: [Claude Formal Bootstrap](https://github.com/Independent-AI-Labs/AMI-LEARNING/blob/main/incremental.md)
 Correct: [Claude Formal Bootstrap](https://github.com/Independent-AI-Labs/AMI-LEARNING/blob/main/incremental.md)
 ```
 
 **Line 177:**
 ```markdown
-Current: [SYNTHESIS-OPENAMI-BOOTSTRAP.md](../../../learning/SYNTHESIS-OPENAMI-BOOTSTRAP.md)
+Current: [SYNTHESIS-OPENAMI-BOOTSTRAP.md](https://github.com/Independent-AI-Labs/AMI-LEARNING/blob/main/SYNTHESIS-OPENAMI-BOOTSTRAP.md)
 Correct: [SYNTHESIS-OPENAMI-BOOTSTRAP.md](https://github.com/Independent-AI-Labs/AMI-LEARNING/blob/main/SYNTHESIS-OPENAMI-BOOTSTRAP.md)
 ```
 
 **Line 221:**
 ```markdown
-Current: [EXECUTIVE_ACTION_PLAN.md](../../../compliance/docs/research/EXECUTIVE_ACTION_PLAN.md)
+Current: [EXECUTIVE_ACTION_PLAN.md](https://github.com/Independent-AI-Labs/AMI-COMPLIANCE/blob/main/docs/research/EXECUTIVE_ACTION_PLAN.md)
 Correct: [EXECUTIVE_ACTION_PLAN.md](https://github.com/Independent-AI-Labs/AMI-COMPLIANCE/blob/main/docs/research/EXECUTIVE_ACTION_PLAN.md)
 ```
 
 **Line 274:**
 ```markdown
-Current: [process_theory.md](../../../compliance/docs/research/OpenAMI/architecture/process_theory.md)
+Current: [process_theory.md](https://github.com/Independent-AI-Labs/AMI-COMPLIANCE/blob/main/docs/research/OpenAMI/architecture/process_theory.md)
 Correct: [process_theory.md](https://github.com/Independent-AI-Labs/AMI-COMPLIANCE/blob/main/docs/research/OpenAMI/architecture/process_theory.md)
 ```
 
 **Line 287:**
 ```markdown
-Current: [compliance_manifest.md](../../../compliance/docs/research/OpenAMI/systems/compliance_manifest.md)
+Current: [compliance_manifest.md](https://github.com/Independent-AI-Labs/AMI-COMPLIANCE/blob/main/docs/research/OpenAMI/systems/compliance_manifest.md)
 Correct: [compliance_manifest.md](https://github.com/Independent-AI-Labs/AMI-COMPLIANCE/blob/main/docs/research/OpenAMI/systems/compliance_manifest.md)
 ```
 
 **Line 300:**
 ```markdown
-Current: [oami_protocol.md](../../../compliance/docs/research/OpenAMI/systems/oami_protocol.md)
+Current: [oami_protocol.md](https://github.com/Independent-AI-Labs/AMI-COMPLIANCE/blob/main/docs/research/OpenAMI/systems/oami_protocol.md)
 Correct: [oami_protocol.md](https://github.com/Independent-AI-Labs/AMI-COMPLIANCE/blob/main/docs/research/OpenAMI/systems/oami_protocol.md)
 ```
 
 **Line 403:**
 ```markdown
-Current: [incremental.md](../../../learning/incremental.md)
+Current: [incremental.md](https://github.com/Independent-AI-Labs/AMI-LEARNING/blob/main/incremental.md)
 Correct: [incremental.md](https://github.com/Independent-AI-Labs/AMI-LEARNING/blob/main/incremental.md)
 ```
 
 **Line 426:**
 ```markdown
-Current: [learning/bootstrap.md](../../../learning/bootstrap.md)
+Current: [learning/bootstrap.md](https://github.com/Independent-AI-Labs/AMI-LEARNING/blob/main/bootstrap.md)
 Correct: [learning/bootstrap.md](https://github.com/Independent-AI-Labs/AMI-LEARNING/blob/main/bootstrap.md)
 ```
 
 **Line 446:**
 ```markdown
-Current: [architecture/pillars.md](../../../compliance/docs/research/OpenAMI/architecture/pillars.md)
+Current: [architecture/pillars.md](https://github.com/Independent-AI-Labs/AMI-COMPLIANCE/blob/main/docs/research/OpenAMI/architecture/pillars.md)
 Correct: [architecture/pillars.md](https://github.com/Independent-AI-Labs/AMI-COMPLIANCE/blob/main/docs/research/OpenAMI/architecture/pillars.md)
 ```
 
 **Line 447:**
 ```markdown
-Current: [learning/SYNTHESIS-OPENAMI-BOOTSTRAP.md](../../../learning/SYNTHESIS-OPENAMI-BOOTSTRAP.md)
+Current: [learning/SYNTHESIS-OPENAMI-BOOTSTRAP.md](https://github.com/Independent-AI-Labs/AMI-LEARNING/blob/main/SYNTHESIS-OPENAMI-BOOTSTRAP.md)
 Correct: [learning/SYNTHESIS-OPENAMI-BOOTSTRAP.md](https://github.com/Independent-AI-Labs/AMI-LEARNING/blob/main/SYNTHESIS-OPENAMI-BOOTSTRAP.md)
 ```
 
 **Line 448:**
 ```markdown
-Current: [EXECUTIVE_ACTION_PLAN.md](../../../compliance/docs/research/EXECUTIVE_ACTION_PLAN.md)
+Current: [EXECUTIVE_ACTION_PLAN.md](https://github.com/Independent-AI-Labs/AMI-COMPLIANCE/blob/main/docs/research/EXECUTIVE_ACTION_PLAN.md)
 Correct: [EXECUTIVE_ACTION_PLAN.md](https://github.com/Independent-AI-Labs/AMI-COMPLIANCE/blob/main/docs/research/EXECUTIVE_ACTION_PLAN.md)
 ```
 
 **Line 461:**
 ```markdown
-Current: [Research Specifications](../../../compliance/docs/research/OpenAMI/)
+Current: [Research Specifications](https://github.com/Independent-AI-Labs/AMI-COMPLIANCE/blob/main/docs/research/OpenAMI)
 Correct: [Research Specifications](https://github.com/Independent-AI-Labs/AMI-COMPLIANCE/tree/main/docs/research/OpenAMI/)
 ```
 
 **Line 463:**
 ```markdown
-Current: [CURRENT_IMPLEMENTATION_STATUS.md](../../../compliance/docs/research/CURRENT_IMPLEMENTATION_STATUS.md)
+Current: [CURRENT_IMPLEMENTATION_STATUS.md](https://github.com/Independent-AI-Labs/AMI-COMPLIANCE/blob/main/docs/research/CURRENT_IMPLEMENTATION_STATUS.md)
 Correct: [CURRENT_IMPLEMENTATION_STATUS.md](https://github.com/Independent-AI-Labs/AMI-COMPLIANCE/blob/main/docs/research/CURRENT_IMPLEMENTATION_STATUS.md)
 ```
 
 **Line 469:**
 ```markdown
-Current: [Research Specifications](../../../compliance/docs/research/OpenAMI/)
+Current: [Research Specifications](https://github.com/Independent-AI-Labs/AMI-COMPLIANCE/blob/main/docs/research/OpenAMI)
 Correct: [Research Specifications](https://github.com/Independent-AI-Labs/AMI-COMPLIANCE/tree/main/docs/research/OpenAMI/)
 ```
 
 **Line 470:**
 ```markdown
-Current: [learning/](../../../learning/)
+Current: [learning/](https://github.com/Independent-AI-Labs/AMI-LEARNING)
 Correct: [learning/](https://github.com/Independent-AI-Labs/AMI-LEARNING)
 ```
 
 **Line 471:**
 ```markdown
-Current: [OPENAMI-COMPLIANCE-MAPPING.md](../../../compliance/docs/research/OPENAMI-COMPLIANCE-MAPPING.md)
+Current: [OPENAMI-COMPLIANCE-MAPPING.md](https://github.com/Independent-AI-Labs/AMI-COMPLIANCE/blob/main/docs/research/OPENAMI-COMPLIANCE-MAPPING.md)
 Correct: [OPENAMI-COMPLIANCE-MAPPING.md](https://github.com/Independent-AI-Labs/AMI-COMPLIANCE/blob/main/docs/research/OPENAMI-COMPLIANCE-MAPPING.md)
 ```
 
 **Line 472:**
 ```markdown
-Current: [Open AMI Chapters I-IV Peer Review Draft 3.tex](../../../compliance/docs/research/Open%20AMI%20Chapters%20I-IV%20Peer%20Review%20Draft%203.tex)
+Current: [Open AMI Chapters I-IV Peer Review Draft 3.tex](https://github.com/Independent-AI-Labs/AMI-COMPLIANCE/blob/main/docs/research/Open%20AMI%20Chapters%20I-IV%20Peer%20Review%20Draft%203.tex)
 Correct: [Open AMI Chapters I-IV Peer Review Draft 3.tex](https://github.com/Independent-AI-Labs/AMI-COMPLIANCE/blob/main/docs/research/Open%20AMI%20Chapters%20I-IV%20Peer%20Review%20Draft%203.tex)
 ```
 
 **Line 511:**
 ```markdown
-Current: [Research Specifications](../../../compliance/docs/research/OpenAMI/)
+Current: [Research Specifications](https://github.com/Independent-AI-Labs/AMI-COMPLIANCE/blob/main/docs/research/OpenAMI)
 Correct: [Research Specifications](https://github.com/Independent-AI-Labs/AMI-COMPLIANCE/tree/main/docs/research/OpenAMI/)
 ```
 
 **Line 542:**
 ```markdown
-Current: [CURRENT_IMPLEMENTATION_STATUS.md](../../../compliance/docs/research/CURRENT_IMPLEMENTATION_STATUS.md)
+Current: [CURRENT_IMPLEMENTATION_STATUS.md](https://github.com/Independent-AI-Labs/AMI-COMPLIANCE/blob/main/docs/research/CURRENT_IMPLEMENTATION_STATUS.md)
 Correct: [CURRENT_IMPLEMENTATION_STATUS.md](https://github.com/Independent-AI-Labs/AMI-COMPLIANCE/blob/main/docs/research/CURRENT_IMPLEMENTATION_STATUS.md)
 ```
 
@@ -253,85 +253,85 @@ Correct: [CURRENT_IMPLEMENTATION_STATUS.md](https://github.com/Independent-AI-La
 
 **Line 125:**
 ```markdown
-Current: [compliance/docs/research/OpenAMI/architecture/pillars.md](../../compliance/docs/research/OpenAMI/architecture/pillars.md)
+Current: [compliance/docs/research/OpenAMI/architecture/pillars.md](https://github.com/Independent-AI-Labs/AMI-COMPLIANCE/blob/main/docs/research/OpenAMI/architecture/pillars.md)
 Correct: [compliance/docs/research/OpenAMI/architecture/pillars.md](https://github.com/Independent-AI-Labs/AMI-COMPLIANCE/blob/main/docs/research/OpenAMI/architecture/pillars.md)
 ```
 
 **Line 149:**
 ```markdown
-Current: [compliance/docs/research/OpenAMI/architecture/process_theory.md](../../compliance/docs/research/OpenAMI/architecture/process_theory.md)
+Current: [compliance/docs/research/OpenAMI/architecture/process_theory.md](https://github.com/Independent-AI-Labs/AMI-COMPLIANCE/blob/main/docs/research/OpenAMI/architecture/process_theory.md)
 Correct: [compliance/docs/research/OpenAMI/architecture/process_theory.md](https://github.com/Independent-AI-Labs/AMI-COMPLIANCE/blob/main/docs/research/OpenAMI/architecture/process_theory.md)
 ```
 
 **Line 197:**
 ```markdown
-Current: [process_theory.md](../../compliance/docs/research/OpenAMI/architecture/process_theory.md)
+Current: [process_theory.md](https://github.com/Independent-AI-Labs/AMI-COMPLIANCE/blob/main/docs/research/OpenAMI/architecture/process_theory.md)
 Correct: [process_theory.md](https://github.com/Independent-AI-Labs/AMI-COMPLIANCE/blob/main/docs/research/OpenAMI/architecture/process_theory.md)
 ```
 
 **Line 249:**
 ```markdown
-Current: [SYNTHESIS-OPENAMI-BOOTSTRAP.md](../../learning/SYNTHESIS-OPENAMI-BOOTSTRAP.md)
+Current: [SYNTHESIS-OPENAMI-BOOTSTRAP.md](https://github.com/Independent-AI-Labs/AMI-LEARNING/blob/main/SYNTHESIS-OPENAMI-BOOTSTRAP.md)
 Correct: [SYNTHESIS-OPENAMI-BOOTSTRAP.md](https://github.com/Independent-AI-Labs/AMI-LEARNING/blob/main/SYNTHESIS-OPENAMI-BOOTSTRAP.md)
 ```
 
 **Line 299:**
 ```markdown
-Current: [compliance_manifest.md](../../compliance/docs/research/OpenAMI/systems/compliance_manifest.md)
+Current: [compliance_manifest.md](https://github.com/Independent-AI-Labs/AMI-COMPLIANCE/blob/main/docs/research/OpenAMI/systems/compliance_manifest.md)
 Correct: [compliance_manifest.md](https://github.com/Independent-AI-Labs/AMI-COMPLIANCE/blob/main/docs/research/OpenAMI/systems/compliance_manifest.md)
 ```
 
 **Line 404:**
 ```markdown
-Current: [SECURITY-MODEL.md](../../learning/SECURITY-MODEL.md)
+Current: [SECURITY-MODEL.md](https://github.com/Independent-AI-Labs/AMI-LEARNING/blob/main/SECURITY-MODEL.md)
 Correct: [SECURITY-MODEL.md](https://github.com/Independent-AI-Labs/AMI-LEARNING/blob/main/SECURITY-MODEL.md)
 ```
 
 **Line 494:**
 ```markdown
-Current: [compliance/docs/research/OpenAMI/](../../compliance/docs/research/OpenAMI/)
+Current: [compliance/docs/research/OpenAMI/](https://github.com/Independent-AI-Labs/AMI-COMPLIANCE/blob/main/docs/research/OpenAMI)
 Correct: [compliance/docs/research/OpenAMI/](https://github.com/Independent-AI-Labs/AMI-COMPLIANCE/tree/main/docs/research/OpenAMI/)
 ```
 
 **Line 497:**
 ```markdown
-Current: [SYNTHESIS-OPENAMI-BOOTSTRAP.md](../../learning/SYNTHESIS-OPENAMI-BOOTSTRAP.md)
+Current: [SYNTHESIS-OPENAMI-BOOTSTRAP.md](https://github.com/Independent-AI-Labs/AMI-LEARNING/blob/main/SYNTHESIS-OPENAMI-BOOTSTRAP.md)
 Correct: [SYNTHESIS-OPENAMI-BOOTSTRAP.md](https://github.com/Independent-AI-Labs/AMI-LEARNING/blob/main/SYNTHESIS-OPENAMI-BOOTSTRAP.md)
 ```
 
 **Line 498:**
 ```markdown
-Current: [bootstrap.md](../../learning/bootstrap.md)
+Current: [bootstrap.md](https://github.com/Independent-AI-Labs/AMI-LEARNING/blob/main/bootstrap.md)
 Correct: [bootstrap.md](https://github.com/Independent-AI-Labs/AMI-LEARNING/blob/main/bootstrap.md)
 ```
 
 **Line 499:**
 ```markdown
-Current: [incremental.md](../../learning/incremental.md)
+Current: [incremental.md](https://github.com/Independent-AI-Labs/AMI-LEARNING/blob/main/incremental.md)
 Correct: [incremental.md](https://github.com/Independent-AI-Labs/AMI-LEARNING/blob/main/incremental.md)
 ```
 
 **Line 500:**
 ```markdown
-Current: [SECURITY-MODEL.md](../../learning/SECURITY-MODEL.md)
+Current: [SECURITY-MODEL.md](https://github.com/Independent-AI-Labs/AMI-LEARNING/blob/main/SECURITY-MODEL.md)
 Correct: [SECURITY-MODEL.md](https://github.com/Independent-AI-Labs/AMI-LEARNING/blob/main/SECURITY-MODEL.md)
 ```
 
 **Line 504:**
 ```markdown
-Current: [OPENAMI-COMPLIANCE-MAPPING.md](../../compliance/docs/research/OPENAMI-COMPLIANCE-MAPPING.md)
+Current: [OPENAMI-COMPLIANCE-MAPPING.md](https://github.com/Independent-AI-Labs/AMI-COMPLIANCE/blob/main/docs/research/OPENAMI-COMPLIANCE-MAPPING.md)
 Correct: [OPENAMI-COMPLIANCE-MAPPING.md](https://github.com/Independent-AI-Labs/AMI-COMPLIANCE/blob/main/docs/research/OPENAMI-COMPLIANCE-MAPPING.md)
 ```
 
 **Line 505:**
 ```markdown
-Current: [EXECUTIVE_ACTION_PLAN.md](../../compliance/docs/research/EXECUTIVE_ACTION_PLAN.md)
+Current: [EXECUTIVE_ACTION_PLAN.md](https://github.com/Independent-AI-Labs/AMI-COMPLIANCE/blob/main/docs/research/EXECUTIVE_ACTION_PLAN.md)
 Correct: [EXECUTIVE_ACTION_PLAN.md](https://github.com/Independent-AI-Labs/AMI-COMPLIANCE/blob/main/docs/research/EXECUTIVE_ACTION_PLAN.md)
 ```
 
 **Line 522:**
 ```markdown
-Current: [compliance/docs/research/OpenAMI/](../../compliance/docs/research/OpenAMI/)
+Current: [compliance/docs/research/OpenAMI/](https://github.com/Independent-AI-Labs/AMI-COMPLIANCE/blob/main/docs/research/OpenAMI)
 Correct: [compliance/docs/research/OpenAMI/](https://github.com/Independent-AI-Labs/AMI-COMPLIANCE/tree/main/docs/research/OpenAMI/)
 ```
 
@@ -346,7 +346,7 @@ These links point to files that were renamed during the recent documentation ref
 **Line 297:**
 ```markdown
 Current: [What is Open AMI?](./what-is-openami.md#real-world-applications)
-Correct: [What is Open AMI?](./GUIDE-FRAMEWORK.md#real-world-applications)
+Correct: What is Open AMI?
 Note: File was renamed from what-is-openami.md to GUIDE-FRAMEWORK.md
 ```
 
@@ -390,7 +390,7 @@ These links point to directories or files that don't exist.
 
 **Line 462:**
 ```markdown
-Current: [Guides README](../guides/README.md)
+Current: Guides README
 Status: BROKEN - docs/openami/guides/ directory does not exist
 Action: Either remove this link or create the guides directory with README.md
 ```
