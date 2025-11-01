@@ -354,20 +354,21 @@ Validate if the task was completed correctly."""
         with progress_file.open("a") as f:
             f.write(f"## Attempt {attempt_num} ({datetime.now()})\n\n")
 
-        # Build worker instruction
-        worker_instruction = ""
+        # Build worker context (task content passed via stdin, just like moderator)
+        worker_context = ""
         if user_instruction:
-            worker_instruction = f"{user_instruction}\n\n"
-        worker_instruction += task_content
+            worker_context = f"{user_instruction}\n\n"
+        worker_context += task_content
         if additional_context:
-            worker_instruction += f"\n\n{additional_context}"
+            worker_context += f"\n\n{additional_context}"
 
-        # Execute worker
+        # Execute worker with prompt file (matches moderator pattern)
+        worker_prompt = self.prompts_dir / "task_worker.txt"
         worker_config = AgentConfigPresets.task_worker(self.session_id)
         worker_config.enable_streaming = True
         return self.cli.run_print(
-            instruction=worker_instruction,
-            stdin="",
+            instruction_file=worker_prompt,
+            stdin=worker_context,
             agent_config=worker_config,
             cwd=root_dir,
         )

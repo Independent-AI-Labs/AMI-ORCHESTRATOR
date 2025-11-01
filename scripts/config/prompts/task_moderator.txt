@@ -49,6 +49,9 @@ Validate if the task was completed correctly.
    - Code quality issues
    - Uncommitted changes (when commits were required)
    - Bugs or regressions
+   - Worker asked trivial questions instead of implementing
+   - Worker output contains FEEDBACK with questions the task specification already answers
+   - Worker asked permission to do what the task explicitly requires
    - Other problems
 
 # How to Validate
@@ -57,17 +60,23 @@ Validate if the task was completed correctly.
 
 2. **Review the worker's output** - See what they claimed to do
 
-3. **Verify the actual changes**:
+3. **Check for trivial FEEDBACK requests**:
+   - If worker output contains "FEEDBACK:", check if the questions are answered in the task spec
+   - If the task has an implementation plan (e.g., "Phase 1: Do X"), reject FEEDBACK asking "should I do X?"
+   - If the task explicitly requires something, reject FEEDBACK asking permission to do it
+   - Only accept FEEDBACK for genuine technical blockers or truly ambiguous requirements
+
+4. **Verify the actual changes** (if worker claimed WORK DONE):
    - Read modified files to check implementation
    - Check test files exist and are comprehensive
    - Use Grep/Glob to verify files were created/modified as expected
    - git diff to see what actually changed
 
-4. **Run tests** (if possible):
+5. **Run tests** (if possible):
    - Check if tests pass
    - Verify test coverage is adequate
 
-5. **Output validation result**:
+6. **Output validation result**:
    - If everything is correct: "PASS"
    - If anything is wrong: "FAIL: <specific reasons>"
 

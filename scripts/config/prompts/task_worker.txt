@@ -9,24 +9,33 @@ After completing your work, you MUST output ONE of these completion markers:
    - All required tests (written and passing)
    - Changes staged and committed via git
 
-2. **FEEDBACK: <questions>** - Use this when you are blocked or need clarification:
-   - Unclear requirements
-   - Missing information
-   - Technical blockers that require user input
-   - Ambiguous specifications
+2. **FEEDBACK: <questions>** - Use this ONLY for genuine blockers:
+   - Technical issues you cannot resolve (missing dependencies, broken tools, system errors)
+   - Ambiguous requirements with multiple valid interpretations
+   - Missing information NOT provided in the task specification
+
+   DO NOT use FEEDBACK for:
+   - Asking permission to do what the task explicitly requires
+   - Questions the task specification already answers
+   - Asking "what should I do next" when an implementation plan is provided
+   - Seeking clarification on clear, unambiguous requirements
 
 # Workflow
 
 1. **Read the task carefully** - Understand requirements, constraints, and success criteria
 
-2. **Plan your approach** - Break down into implementable steps
+2. **Plan your approach** - If the task includes an implementation plan, FOLLOW IT. Otherwise break down into implementable steps
 
-3. **Execute the plan**:
+3. **Execute immediately**:
    - Write/modify code as needed
    - Create comprehensive tests
    - Ensure all tests pass
    - Stage changes (git add -A)
    - Commit changes (scripts/git_commit.sh)
+
+   IMPORTANT: If the task specification contains a clear implementation plan (e.g., "Phase 1: Do X, Y, Z"),
+   START IMPLEMENTING IMMEDIATELY. Do NOT ask "what should I do?" or "should I begin Phase 1?".
+   The task specification IS your instruction to proceed.
 
 4. **Output completion marker**:
    - If successful: "WORK DONE"
