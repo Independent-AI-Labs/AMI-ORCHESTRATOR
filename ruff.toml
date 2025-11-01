@@ -46,7 +46,7 @@ max-branches = 16
 
 # Root-level scripts
 "scripts/**/*.py" = ["T201", "S603", "S607", "E402", "PLC0415"]  # CLI tools - print() required for user output, subprocess, bootstrap imports, lazy imports
-"scripts/automation/**/*.py" = ["T201", "S603", "S607", "PLC0415", "S108"]  # CLI automation tools - print, subprocess, lazy imports, temp files
+"scripts/automation/**/*.py" = ["T201", "S603", "S607", "PLC0415", "S108", "PLW1509"]  # CLI automation tools - print, subprocess, lazy imports, temp files, preexec_fn for privilege drop
 "scripts/automation/tests/**/*.py" = ["S101", "PLR2004", "S603", "S607", "ARG002", "E402", "PLC0415", "S108", "T201", "B007"]  # Test files
 "scripts/run_tests.py" = ["T201", "S603", "S607", "E402", "PLC0415"]  # Test runner - CLI output, subprocess, bootstrap imports, lazy imports
 "module_setup.py" = ["S603", "S607", "E402"]  # UV subprocess calls in setup script, bootstrap imports

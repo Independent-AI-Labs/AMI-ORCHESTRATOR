@@ -7,6 +7,7 @@ AgentConfig provides type-safe configuration.
 
 import json
 import os
+import pwd
 import select
 import signal
 import subprocess
@@ -439,6 +440,49 @@ class ClaudeAgentCLI(AgentCLI):
         cmd.extend(["--", instruction_text])
         return cmd
 
+    def _drop_privileges(self) -> None:
+        """Drop root privileges to original sudo user.
+
+        This allows ami-agent to run with sudo for file locking while
+        Claude CLI subprocess runs as the original user to avoid
+        --dangerously-skip-permissions blocking.
+        """
+        sudo_user = os.environ.get("SUDO_USER")
+        if sudo_user and os.geteuid() == 0:
+            try:
+                pw_record = pwd.getpwnam(sudo_user)
+                os.setgid(pw_record.pw_gid)
+                os.setuid(pw_record.pw_uid)
+                self.logger.info(
+                    "privileges_dropped",
+                    from_user="root",
+                    to_user=sudo_user,
+                    uid=pw_record.pw_uid,
+                    gid=pw_record.pw_gid,
+                )
+            except (KeyError, OSError) as e:
+                self.logger.warning("privilege_drop_failed", error=str(e))
+
+    def _get_unprivileged_env(self) -> dict[str, str] | None:
+        """Get environment variables for unprivileged user.
+
+        Returns:
+            Environment dict with corrected HOME/USER/LOGNAME if running as sudo, None otherwise
+        """
+        sudo_user = os.environ.get("SUDO_USER")
+        if not sudo_user or os.geteuid() != 0:
+            return None
+
+        try:
+            pw_record = pwd.getpwnam(sudo_user)
+            env = os.environ.copy()
+            env["HOME"] = pw_record.pw_dir
+            env["USER"] = sudo_user
+            env["LOGNAME"] = sudo_user
+            return env
+        except (KeyError, OSError):
+            return None
+
     def _start_streaming_process(self, cmd: list[str], stdin_data: str | None, cwd: Path | None) -> subprocess.Popen[str]:
         """Start subprocess for streaming execution.
 
@@ -455,6 +499,10 @@ class ClaudeAgentCLI(AgentCLI):
         """
         self.logger.info("agent_streaming_subprocess_starting")
 
+        # Drop privileges if running as root via sudo
+        preexec_fn = self._drop_privileges if os.environ.get("SUDO_USER") and os.geteuid() == 0 else None
+        env = self._get_unprivileged_env()
+
         process = subprocess.Popen(
             cmd,
             stdin=subprocess.PIPE,
@@ -463,6 +511,8 @@ class ClaudeAgentCLI(AgentCLI):
             text=True,
             cwd=cwd,
             start_new_session=True,
+            preexec_fn=preexec_fn,
+            env=env,
         )
 
         self.logger.info("agent_streaming_subprocess_started", pid=process.pid)
@@ -748,6 +798,10 @@ class ClaudeAgentCLI(AgentCLI):
         process = None
 
         try:
+            # Drop privileges if running as root via sudo
+            preexec_fn = self._drop_privileges if os.environ.get("SUDO_USER") and os.geteuid() == 0 else None
+            env = self._get_unprivileged_env()
+
             # Use Popen directly to get process handle for cleanup
             process = subprocess.Popen(
                 cmd,
@@ -757,6 +811,8 @@ class ClaudeAgentCLI(AgentCLI):
                 text=True,
                 cwd=cwd,
                 start_new_session=True,  # Create process group for forceful termination
+                preexec_fn=preexec_fn,
+                env=env,
             )
 
             # Communicate with timeout
