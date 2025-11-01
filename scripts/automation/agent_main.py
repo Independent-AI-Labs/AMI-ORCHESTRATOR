@@ -300,12 +300,13 @@ def mode_hook(validator_name: str) -> int:
     return validator.run()
 
 
-def mode_audit(directory_path: str, retry_errors: bool = False) -> int:
+def mode_audit(directory_path: str, retry_errors: bool = False, user_instruction: str | None = None) -> int:
     """Batch audit mode - Audit directory for code quality issues.
 
     Args:
         directory_path: Path to directory to audit
         retry_errors: If True, only re-audit files with ERROR status from previous run
+        user_instruction: Optional prepended instruction for the audit workers
 
     Returns:
         Exit code (0=success, 1=failure)
@@ -319,7 +320,7 @@ def mode_audit(directory_path: str, retry_errors: bool = False) -> int:
     engine = AuditEngine()
 
     # Run audit
-    results = engine.audit_directory(directory, parallel=True, max_workers=4, retry_errors=retry_errors)
+    results = engine.audit_directory(directory, parallel=True, max_workers=4, retry_errors=retry_errors, user_instruction=user_instruction)
 
     # Print summary
     passed = sum(1 for r in results if r.status == "PASS")
@@ -406,11 +407,12 @@ def mode_tasks(path: str, root_dir: str | None = None, parallel: bool = False, u
     return 1 if (failed > 0 or timeout > 0) else 0
 
 
-def mode_sync(module_path: str) -> int:
+def mode_sync(module_path: str, user_instruction: str | None = None) -> int:
     """Git sync mode - Ensure module is fully committed and pushed.
 
     Args:
         module_path: Path to git module directory
+        user_instruction: Optional prepended instruction for the sync worker
 
     Returns:
         Exit code (0=success, 1=failure)
@@ -430,7 +432,7 @@ def mode_sync(module_path: str) -> int:
     executor = SyncExecutor()
 
     # Sync module
-    result = executor.sync_module(module)
+    result = executor.sync_module(module, user_instruction=user_instruction)
 
     # Print result
     print(f"\nSync Result: {result.status.upper()}")
@@ -447,13 +449,14 @@ def mode_sync(module_path: str) -> int:
     return 0 if result.status == "synced" else 1
 
 
-def mode_docs(directory_path: str, root_dir: str | None = None, parallel: bool = False) -> int:
+def mode_docs(directory_path: str, root_dir: str | None = None, parallel: bool = False, user_instruction: str | None = None) -> int:
     """Documentation maintenance mode - Maintain all .md docs in directory.
 
     Args:
         directory_path: Path to directory containing documentation files
         root_dir: Root directory for codebase inspection (defaults to current directory)
         parallel: Enable parallel doc maintenance
+        user_instruction: Optional prepended instruction for the docs worker
 
     Returns:
         Exit code (0=success, 1=failure)
@@ -476,7 +479,7 @@ def mode_docs(directory_path: str, root_dir: str | None = None, parallel: bool =
     executor = DocsExecutor()
 
     # Execute docs maintenance
-    results = executor.execute_docs(directory, parallel=parallel, root_dir=root_path)
+    results = executor.execute_docs(directory, parallel=parallel, root_dir=root_path, user_instruction=user_instruction)
 
     # Print summary
     completed = sum(1 for r in results if r.status == "completed")
@@ -585,7 +588,7 @@ def main() -> int:
     parser.add_argument(
         "--user-instruction",
         metavar="TEXT",
-        help="Prepend instruction to all tasks (for --tasks mode)",
+        help="Prepend instruction to all workers (for --tasks, --sync, --docs, --audit modes)",
     )
 
     parser.add_argument(
@@ -623,13 +626,13 @@ def main() -> int:
     mode_handlers: list[tuple[str | bool | None, Callable[[], int]]] = [
         (args.print, lambda: mode_print(args.print) if args.print else 1),
         (args.hook, lambda: mode_hook(args.hook) if args.hook else 1),
-        (args.audit, lambda: mode_audit(args.audit, retry_errors=args.retry_errors) if args.audit else 1),
+        (args.audit, lambda: mode_audit(args.audit, retry_errors=args.retry_errors, user_instruction=args.user_instruction) if args.audit else 1),
         (
             args.tasks,
             lambda: mode_tasks(args.tasks, root_dir=args.root_dir, parallel=args.parallel, user_instruction=args.user_instruction) if args.tasks else 1,
         ),
-        (args.sync, lambda: mode_sync(args.sync) if args.sync else 1),
-        (args.docs, lambda: mode_docs(args.docs, root_dir=args.root_dir, parallel=args.parallel) if args.docs else 1),
+        (args.sync, lambda: mode_sync(args.sync, user_instruction=args.user_instruction) if args.sync else 1),
+        (args.docs, lambda: mode_docs(args.docs, root_dir=args.root_dir, parallel=args.parallel, user_instruction=args.user_instruction) if args.docs else 1),
     ]
 
     for condition, handler in mode_handlers:

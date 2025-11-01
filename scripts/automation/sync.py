@@ -54,11 +54,12 @@ class SyncExecutor:
         self.logger = get_logger("sync", session_id=self.session_id)
         self.cli = get_agent_cli()
 
-    def sync_module(self, module_path: Path) -> SyncResult:
+    def sync_module(self, module_path: Path, user_instruction: str | None = None) -> SyncResult:
         """Sync a single git module.
 
         Args:
             module_path: Path to git module directory
+            user_instruction: Optional prepended instruction for the sync worker
 
         Returns:
             Sync result
@@ -92,7 +93,11 @@ class SyncExecutor:
                 f.write(f"## Attempt {attempt_num} ({datetime.now()})\n\n")
 
             # Worker instruction
-            worker_instruction = f"""# Git Sync Task
+            worker_instruction = ""
+            if user_instruction:
+                worker_instruction = f"{user_instruction}\n\n"
+
+            worker_instruction += f"""# Git Sync Task
 
 MODULE: {module_path}
 

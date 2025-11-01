@@ -73,6 +73,7 @@ class AuditEngine:
         parallel: bool = True,
         max_workers: int = 4,
         retry_errors: bool = False,
+        user_instruction: str | None = None,
     ) -> list[FileResult]:
         """Audit all files in directory.
 
@@ -81,6 +82,7 @@ class AuditEngine:
             parallel: Enable parallel processing
             max_workers: Max worker processes (default 4, max 8)
             retry_errors: If True, only audit files with ERROR status from previous run
+            user_instruction: Optional prepended instruction for the audit workers
 
         Returns:
             List of file audit results
@@ -117,8 +119,11 @@ class AuditEngine:
         results = []
 
         if parallel:
+            from functools import partial
+
+            audit_func = partial(self._audit_file, user_instruction=user_instruction)
             with ProcessPoolExecutor(max_workers=max_workers) as executor:
-                for i, result in enumerate(executor.map(self._audit_file, files), 1):
+                for i, result in enumerate(executor.map(audit_func, files), 1):
                     results.append(result)
 
                     # Print progress to stderr so it's visible in logs
@@ -144,7 +149,7 @@ class AuditEngine:
                         self._consolidate_patterns(result, directory, output_dir, consolidated_file)
         else:
             for i, file_path in enumerate(files, 1):
-                result = self._audit_file(file_path)
+                result = self._audit_file(file_path, user_instruction=user_instruction)
                 results.append(result)
 
                 # Print progress to stderr so it's visible in logs
@@ -293,11 +298,64 @@ class AuditEngine:
 
         return any(fnmatch.fnmatch(path_str, pattern) for pattern in exclude_patterns)
 
-    def _audit_file(self, file_path: Path) -> FileResult:
+    def _parse_audit_output(
+        self, output: str, file_path: Path
+    ) -> tuple[str, list[dict[str, Any]]]:  # Any: violation dicts have mixed types (line: int, message: str, severity: str, pattern_id: str)
+        """Parse audit output from LLM into status and violations.
+
+        Args:
+            output: Raw output from audit agent
+            file_path: File path being audited (for logging)
+
+        Returns:
+            Tuple of (status, violations list)
+        """
+        output_stripped = output.strip()
+
+        # Check for PASS (exact match)
+        if output_stripped == "PASS":
+            return "PASS", []
+
+        # Check for FAIL anywhere in output (extract from LLM preamble if needed)
+        if "FAIL:" in output_stripped:
+            # Extract FAIL line (may be buried in preamble)
+            fail_line = None
+            for line in output_stripped.split("\n"):
+                if line.startswith("FAIL:"):
+                    fail_line = line
+                    break
+
+            if fail_line:
+                violations = [{"line": 0, "pattern_id": "llm_audit", "severity": "CRITICAL", "message": fail_line}]
+            else:
+                # FAIL: found but not at line start, use full output
+                violations = [{"line": 0, "pattern_id": "llm_audit", "severity": "CRITICAL", "message": output_stripped}]
+            return "FAIL", violations
+
+        # Check for ERROR
+        if "ERROR:" in output_stripped:
+            violations = [{"line": 0, "pattern_id": "audit_error", "severity": "ERROR", "message": output_stripped}]
+            return "ERROR", violations
+
+        # Non-compliant output format - treat as ERROR
+        first_line = output_stripped.split("\n")[0] if output_stripped else ""
+        violations = [
+            {
+                "line": 0,
+                "pattern_id": "audit_format_violation",
+                "severity": "ERROR",
+                "message": f"Audit agent violated output format. Expected 'PASS' or 'FAIL: <reasons>', got: {first_line[:200]}",
+            }
+        ]
+        self.logger.error("audit_output_format_violation", file=str(file_path), first_line=first_line[:100])
+        return "ERROR", violations
+
+    def _audit_file(self, file_path: Path, user_instruction: str | None = None) -> FileResult:
         """Audit a single file using LLM-based analysis.
 
         Args:
             file_path: Path to file to audit
+            user_instruction: Optional prepended instruction for the audit worker
 
         Returns:
             Audit result with status and violations
@@ -329,7 +387,11 @@ class AuditEngine:
             audit_instruction = prompts_dir / self.config.get("prompts.audit")
 
             # Build audit prompt
-            audit_prompt = f"""## CODE TO ANALYZE
+            audit_prompt = ""
+            if user_instruction:
+                audit_prompt = f"{user_instruction}\n\n"
+
+            audit_prompt += f"""## CODE TO ANALYZE
 
 ```
 {code}
@@ -344,70 +406,8 @@ class AuditEngine:
                 agent_config=audit_config,
             )
 
-            # Parse result - extract PASS/FAIL from output
-            output_stripped = output.strip()
-
-            # Check for PASS (exact match)
-            if output_stripped == "PASS":
-                status = "PASS"
-                violations = []
-            # Check for FAIL anywhere in output (extract from LLM preamble if needed)
-            elif "FAIL:" in output_stripped:
-                status = "FAIL"
-                # Extract FAIL line (may be buried in preamble)
-                fail_line = None
-                for line in output_stripped.split("\n"):
-                    if line.startswith("FAIL:"):
-                        fail_line = line
-                        break
-
-                if fail_line:
-                    violations = [
-                        {
-                            "line": 0,
-                            "pattern_id": "llm_audit",
-                            "severity": "CRITICAL",
-                            "message": fail_line,
-                        }
-                    ]
-                else:
-                    # FAIL: found but not at line start, use full output
-                    violations = [
-                        {
-                            "line": 0,
-                            "pattern_id": "llm_audit",
-                            "severity": "CRITICAL",
-                            "message": output_stripped,
-                        }
-                    ]
-            # Check for ERROR
-            elif "ERROR:" in output_stripped:
-                status = "ERROR"
-                violations = [
-                    {
-                        "line": 0,
-                        "pattern_id": "audit_error",
-                        "severity": "ERROR",
-                        "message": output_stripped,
-                    }
-                ]
-            else:
-                # Non-compliant output format - treat as ERROR
-                status = "ERROR"
-                first_line = output_stripped.split("\n")[0] if output_stripped else ""
-                violations = [
-                    {
-                        "line": 0,
-                        "pattern_id": "audit_format_violation",
-                        "severity": "ERROR",
-                        "message": f"Audit agent violated output format. Expected 'PASS' or 'FAIL: <reasons>', got: {first_line[:200]}",
-                    }
-                ]
-                self.logger.error(
-                    "audit_output_format_violation",
-                    file=str(file_path),
-                    first_line=first_line[:100],
-                )
+            # Parse result
+            status, violations = self._parse_audit_output(output, file_path)
 
             result = FileResult(
                 file_path=file_path,

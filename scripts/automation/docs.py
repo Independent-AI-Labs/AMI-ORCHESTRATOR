@@ -66,6 +66,7 @@ class DocsExecutor:
         directory: Path,
         parallel: bool = False,
         root_dir: Path | None = None,
+        user_instruction: str | None = None,
     ) -> list[DocResult]:
         """Execute documentation maintenance for all .md files in directory.
 
@@ -73,20 +74,22 @@ class DocsExecutor:
             directory: Directory containing .md documentation files
             parallel: Enable parallel execution (async mode)
             root_dir: Root directory for codebase inspection (defaults to current directory)
+            user_instruction: Optional prepended instruction for all docs workers
 
         Returns:
             List of doc results
         """
         if parallel:
-            return asyncio.run(self._execute_async(directory, root_dir))
-        return self._execute_sync(directory, root_dir)
+            return asyncio.run(self._execute_async(directory, root_dir, user_instruction))
+        return self._execute_sync(directory, root_dir, user_instruction)
 
-    def _execute_sync(self, directory: Path, root_dir: Path | None = None) -> list[DocResult]:
+    def _execute_sync(self, directory: Path, root_dir: Path | None = None, user_instruction: str | None = None) -> list[DocResult]:
         """Execute docs maintenance sequentially (sync mode).
 
         Args:
             directory: Directory containing .md documentation files
             root_dir: Root directory for codebase inspection (defaults to current directory)
+            user_instruction: Optional prepended instruction for all docs workers
 
         Returns:
             List of doc results
@@ -99,11 +102,12 @@ class DocsExecutor:
             doc_count=len(doc_files),
             mode="sync",
             root_dir=str(root_dir) if root_dir else None,
+            user_instruction=bool(user_instruction),
         )
 
         results: list[DocResult] = []
         for doc_file in doc_files:
-            result: DocResult = self._execute_single_doc(doc_file, root_dir)
+            result: DocResult = self._execute_single_doc(doc_file, root_dir, user_instruction)
             results.append(result)
 
             self.logger.info(
@@ -117,12 +121,13 @@ class DocsExecutor:
 
         return results
 
-    async def _execute_async(self, directory: Path, root_dir: Path | None = None) -> list[DocResult]:
+    async def _execute_async(self, directory: Path, root_dir: Path | None = None, user_instruction: str | None = None) -> list[DocResult]:
         """Execute docs maintenance in parallel (async mode).
 
         Args:
             directory: Directory containing .md documentation files
             root_dir: Root directory for codebase inspection (defaults to current directory)
+            user_instruction: Optional prepended instruction for all docs workers
 
         Returns:
             List of doc results
@@ -137,6 +142,7 @@ class DocsExecutor:
             mode="async",
             workers=workers,
             root_dir=str(root_dir) if root_dir else None,
+            user_instruction=bool(user_instruction),
         )
 
         # Create thread pool for I/O-bound doc maintenance execution
@@ -154,7 +160,7 @@ class DocsExecutor:
             # Submit all docs
             task_ids: list[str] = []
             for doc_file in doc_files:
-                task_id: str = await pool.submit(self._execute_single_doc, doc_file, root_dir)
+                task_id: str = await pool.submit(self._execute_single_doc, doc_file, root_dir, user_instruction)
                 task_ids.append(task_id)
 
             # Collect results
@@ -185,12 +191,13 @@ class DocsExecutor:
         finally:
             await pool.shutdown()
 
-    def _execute_single_doc(self, doc_file: Path, root_dir: Path | None = None) -> DocResult:
+    def _execute_single_doc(self, doc_file: Path, root_dir: Path | None = None, user_instruction: str | None = None) -> DocResult:
         """Execute documentation maintenance for a single doc with retry loop.
 
         Args:
             doc_file: Path to .md documentation file
             root_dir: Root directory for codebase inspection (defaults to current directory)
+            user_instruction: Optional prepended instruction for the docs worker
 
         Returns:
             Doc result
@@ -211,7 +218,11 @@ class DocsExecutor:
             worker_prompt_template: str = worker_prompt_file.read_text()
 
             # Replace template variables in worker prompt
-            worker_instruction: str = worker_prompt_template.format(
+            worker_instruction: str = ""
+            if user_instruction:
+                worker_instruction = f"{user_instruction}\n\n"
+
+            worker_instruction += worker_prompt_template.format(
                 doc_path=str(doc_file),
             )
             worker_instruction += f"\n{doc_content}\n"
