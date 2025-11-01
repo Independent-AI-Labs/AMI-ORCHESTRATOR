@@ -122,7 +122,7 @@ class TestCompletionModeratorIntegration:
 
         with patch("scripts.automation.hooks.get_agent_cli") as mock_get_cli:
             mock_cli = Mock()
-            mock_cli.run_print.return_value = "ALLOW"
+            mock_cli.run_print.return_value = ("ALLOW", None)
             mock_get_cli.return_value = mock_cli
 
             result = scanner._validate_completion("test-session", test_transcript)
@@ -143,7 +143,7 @@ class TestCompletionModeratorIntegration:
 
         with patch("scripts.automation.hooks.get_agent_cli") as mock_get_cli:
             mock_cli = Mock()
-            mock_cli.run_print.return_value = "BLOCK: Tests are failing, bug still present"
+            mock_cli.run_print.return_value = ("BLOCK: Tests are failing, bug still present", None)
             mock_get_cli.return_value = mock_cli
 
             result = scanner._validate_completion("test-session", test_transcript)
@@ -165,7 +165,7 @@ class TestCompletionModeratorIntegration:
 
         with patch("scripts.automation.hooks.get_agent_cli") as mock_get_cli:
             mock_cli = Mock()
-            mock_cli.run_print.return_value = "Some unclear output with no decision"
+            mock_cli.run_print.return_value = ("Some unclear output with no decision", None)
             mock_get_cli.return_value = mock_cli
 
             result = scanner._validate_completion("test-session", test_transcript)
@@ -275,7 +275,7 @@ class TestCompletionModeratorIntegration:
         with patch("scripts.automation.hooks.get_agent_cli") as mock_get_cli:
             mock_cli = Mock()
             # Moderator output wrapped in code blocks
-            mock_cli.run_print.return_value = "```\nALLOW\n```"
+            mock_cli.run_print.return_value = ("```\nALLOW\n```", None)
             mock_get_cli.return_value = mock_cli
 
             result = scanner._validate_completion("test-session", test_transcript)

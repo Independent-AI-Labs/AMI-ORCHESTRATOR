@@ -325,7 +325,7 @@ class TestResponseScanner:
         try:
             # Mock agent CLI to return ALLOW
             mock_agent_cli = mocker.MagicMock()
-            mock_agent_cli.run_print.return_value = "ALLOW"
+            mock_agent_cli.run_print.return_value = ("ALLOW", None)
             mocker.patch("scripts.automation.hooks.get_agent_cli", return_value=mock_agent_cli)
 
             validator = ResponseScanner()
@@ -358,7 +358,7 @@ class TestResponseScanner:
         try:
             # Mock agent CLI to return ALLOW
             mock_agent_cli = mocker.MagicMock()
-            mock_agent_cli.run_print.return_value = "ALLOW"
+            mock_agent_cli.run_print.return_value = ("ALLOW", None)
             mocker.patch("scripts.automation.hooks.get_agent_cli", return_value=mock_agent_cli)
 
             validator = ResponseScanner()
@@ -638,7 +638,7 @@ class TestResponseScannerSessionIdLogging:
         try:
             # Mock the agent CLI to avoid actual agent execution
             mock_agent_cli = mocker.MagicMock()
-            mock_agent_cli.run_print.return_value = "ALLOW"
+            mock_agent_cli.run_print.return_value = ("ALLOW", None)
             mocker.patch("scripts.automation.hooks.get_agent_cli", return_value=mock_agent_cli)
 
             # Mock the logger
@@ -690,7 +690,7 @@ class TestResponseScannerSessionIdLogging:
         try:
             # Mock agent CLI
             mock_agent_cli = mocker.MagicMock()
-            mock_agent_cli.run_print.return_value = "ALLOW"
+            mock_agent_cli.run_print.return_value = ("ALLOW", None)
             mocker.patch("scripts.automation.hooks.get_agent_cli", return_value=mock_agent_cli)
 
             mock_logger = mocker.MagicMock()
@@ -738,7 +738,7 @@ class TestResponseScannerSessionIdLogging:
 
         try:
             mock_agent_cli = mocker.MagicMock()
-            mock_agent_cli.run_print.return_value = "ALLOW"
+            mock_agent_cli.run_print.return_value = ("ALLOW", None)
             mocker.patch("scripts.automation.hooks.get_agent_cli", return_value=mock_agent_cli)
 
             mock_logger = mocker.MagicMock()
@@ -788,7 +788,7 @@ class TestResponseScannerSessionIdLogging:
 
         try:
             mock_agent_cli = mocker.MagicMock()
-            mock_agent_cli.run_print.return_value = "BLOCK: Work incomplete"
+            mock_agent_cli.run_print.return_value = ("BLOCK: Work incomplete", None)
             mocker.patch("scripts.automation.hooks.get_agent_cli", return_value=mock_agent_cli)
 
             mock_logger = mocker.MagicMock()

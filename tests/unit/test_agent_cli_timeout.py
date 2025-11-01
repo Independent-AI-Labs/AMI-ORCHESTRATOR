@@ -37,7 +37,7 @@ class TestTimeoutEnforcement:
             # Verify start_new_session=True for process group
             assert mock_popen.call_args[1]["start_new_session"] is True
             # Verify stdout returned on success
-            assert result == "success"
+            assert result == ("success", None)
 
     @pytest.mark.skipif(ClaudeAgentCLI is None, reason="ClaudeAgentCLI not implemented yet")
     def test_timeout_triggers_sigkill(self):
@@ -81,7 +81,7 @@ class TestTimeoutEnforcement:
 
             # Verify timeout parameter passed to communicate()
             assert mock_process.communicate.call_args[1]["timeout"] == 180
-            assert result == "ok"
+            assert result == ("ok", None)
 
     @pytest.mark.skipif(ClaudeAgentCLI is None, reason="ClaudeAgentCLI not implemented yet")
     def test_none_timeout_allows_unlimited_runtime(self):
@@ -99,7 +99,7 @@ class TestTimeoutEnforcement:
 
             # Verify no timeout passed to communicate()
             assert mock_process.communicate.call_args[1]["timeout"] is None
-            assert result == "ok"
+            assert result == ("ok", None)
 
 
 class TestTimeoutLogging:

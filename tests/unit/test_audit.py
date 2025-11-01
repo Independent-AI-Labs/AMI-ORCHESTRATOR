@@ -318,7 +318,7 @@ class TestAuditEngine:
 
             # Mock agent CLI to return PASS
             mock_cli = MagicMock()
-            mock_cli.run_print.return_value = "PASS"
+            mock_cli.run_print.return_value = ("PASS", None)
             mock_get_cli.return_value = mock_cli
 
             engine = AuditEngine()
@@ -339,7 +339,7 @@ class TestAuditEngine:
 
             # Mock agent CLI to return FAIL
             mock_cli = MagicMock()
-            mock_cli.run_print.return_value = "FAIL: Bad code"
+            mock_cli.run_print.return_value = ("FAIL: Bad code", None)
             mock_get_cli.return_value = mock_cli
 
             engine = AuditEngine()

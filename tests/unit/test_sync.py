@@ -109,8 +109,8 @@ class TestSyncExecutor:
         # Mock worker output with WORK DONE
         executor.cli.run_print = Mock(
             side_effect=[
-                "All changes committed and pushed.\n\nWORK DONE",
-                "PASS: Module is fully synced",
+                ("All changes committed and pushed.\n\nWORK DONE", None),
+                ("PASS: Module is fully synced", None),
             ]
         )
 
@@ -131,10 +131,10 @@ class TestSyncExecutor:
         # First attempt: feedback, second attempt: success
         executor.cli.run_print = Mock(
             side_effect=[
-                "FEEDBACK: Tests are failing, need to fix",
-                "FAIL: Tests still failing",
-                "Fixed tests.\n\nWORK DONE",
-                "PASS: All tests passing, module synced",
+                ("FEEDBACK: Tests are failing, need to fix", None),
+                ("FAIL: Tests still failing", None),
+                ("Fixed tests.\n\nWORK DONE", None),
+                ("PASS: All tests passing, module synced", None),
             ]
         )
 
@@ -159,9 +159,9 @@ class TestSyncExecutor:
         }.get(key, default)
 
         # Worker never completes
-        def slow_worker(*_args: object, **_kwargs: object) -> str:
+        def slow_worker(*_args: object, **_kwargs: object) -> tuple[str, None]:
             time.sleep(0.05)
-            return "Still working..."
+            return ("Still working...", None)
 
         executor.cli.run_print = Mock(side_effect=slow_worker)
 
@@ -180,10 +180,10 @@ class TestSyncExecutor:
         # First attempt fails, second succeeds
         executor.cli.run_print = Mock(
             side_effect=[
-                "WORK DONE",
-                "FAIL: Uncommitted changes detected",
-                "Committed changes.\n\nWORK DONE",
-                "PASS: All changes committed",
+                ("WORK DONE", None),
+                ("FAIL: Uncommitted changes detected", None),
+                ("Committed changes.\n\nWORK DONE", None),
+                ("PASS: All changes committed", None),
             ]
         )
 
@@ -199,8 +199,8 @@ class TestSyncExecutor:
 
         executor.cli.run_print = Mock(
             side_effect=[
-                "WORK DONE",
-                "PASS",
+                ("WORK DONE", None),
+                ("PASS", None),
             ]
         )
 
@@ -221,10 +221,10 @@ class TestSyncExecutor:
         # Worker doesn't signal completion initially
         executor.cli.run_print = Mock(
             side_effect=[
-                "Working on it...",  # No WORK DONE or FEEDBACK
-                "FAIL: No completion marker",
-                "Done.\n\nWORK DONE",
-                "PASS",
+                ("Working on it...", None),  # No WORK DONE or FEEDBACK
+                ("FAIL: No completion marker", None),
+                ("Done.\n\nWORK DONE", None),
+                ("PASS", None),
             ]
         )
 
