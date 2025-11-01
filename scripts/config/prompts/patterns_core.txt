@@ -312,6 +312,12 @@
 
 **Fallback Chain**: `try: return primary(); except: try: return fallback(); except: return default()`
 
+**Script/Executable Not Found → Fallback**: `except (RuntimeError, FileNotFoundError): logger.warning("Falling back"); basic_impl()` - defeats purpose of required scripts/tools
+
+**Orchestrator Root Not Found → Fallback**: `except RuntimeError: logger.warning("Cannot find orchestrator root"); return basic_operation()` - silently degrades functionality
+
+**Logger Warning + Fallback Code**: `logger.warning(f"Falling back to {fallback}"); return fallback_impl()` - masks missing dependencies
+
 **Health Check → False**: `try: service.ping(); return True; except: return False`
 
 **Distributed → Local Fallback**: `except RedisError: return local_cache.get(key)` - loses guarantees

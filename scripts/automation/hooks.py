@@ -18,6 +18,7 @@ from scripts.automation.agent_cli import AgentConfigPresets, AgentError, AgentEx
 from scripts.automation.config import get_config
 from scripts.automation.logger import get_logger
 from scripts.automation.transcript import format_messages_for_prompt, get_last_n_messages, is_actual_user_message
+from scripts.automation.validators import parse_code_fence_output, validate_python_full
 
 # Resource limits (DoS protection)
 MAX_HOOK_INPUT_SIZE = 10 * 1024 * 1024  # 10MB
@@ -379,23 +380,11 @@ class CommandValidator(HookValidator):
 class CodeQualityValidator(HookValidator):
     """Validates code changes for quality regressions using LLM-based audit."""
 
-    def _parse_code_fence_output(self, output: str) -> str:
-        """Parse output, removing markdown code fences if present.
-
-        Args:
-            output: Raw output from LLM
-
-        Returns:
-            Cleaned output with code fences removed
-        """
-        cleaned = output.strip()
-        if cleaned.startswith("```"):
-            lines = cleaned.split("\n")
-            if len(lines) > MIN_CODE_FENCE_LINES and lines[-1] == "```":
-                cleaned = "\n".join(lines[1:-1]).strip()
-            elif len(lines) > 1:
-                cleaned = "\n".join(lines[1:]).strip()
-        return cleaned
+    # Files exempt from pattern checks (contain error messages with forbidden patterns)
+    PATTERN_CHECK_EXEMPTIONS = {
+        "scripts/automation/hooks.py",
+        "scripts/automation/validators.py",
+    }
 
     def _extract_old_new_code(self, hook_input: HookInput) -> tuple[str, str]:
         """Extract old and new code from hook input.
@@ -439,92 +428,28 @@ class CodeQualityValidator(HookValidator):
         # Extract old/new code
         old_code, new_code = self._extract_old_new_code(hook_input)
 
-        # Reject non-empty __init__.py files
-        if file_path.endswith("__init__.py") and new_code.strip():
-            return HookResult.deny("❌ NON-EMPTY __init__.py FILE\n\n__init__.py files MUST be empty.\nRemove all content from this file.")
+        # Check if file is exempt from pattern checks
+        is_pattern_exempt = any(file_path.endswith(exempt) for exempt in self.PATTERN_CHECK_EXEMPTIONS)
 
-        # Reject parent.parent path manipulation patterns
-        if ".parent.parent" in new_code:
-            return HookResult.deny(
-                "❌ FORBIDDEN CODE PATTERN: .parent.parent\n\n"
-                "NEVER use Path(__file__).parent.parent.parent or similar patterns.\n\n"
-                "Use the _ensure_repo_on_path() pattern from scripts/run_tests.py:\n\n"
-                "def _ensure_repo_on_path() -> Path:\n"
-                "    current = Path(__file__).resolve().parent\n"
-                "    while current != current.parent:\n"
-                '        if (current / ".git").exists() and (current / "base").exists():\n'
-                "            sys.path.insert(0, str(current))\n"
-                "            return current\n"
-                "        current = current.parent\n"
-                '    raise RuntimeError("Unable to locate AMI orchestrator root")\n'
-            )
+        # Skip validation for exempt files
+        if is_pattern_exempt:
+            return HookResult.allow()
 
-        # Build diff context for LLM audit
-        diff_context = f"""FILE: {file_path}
+        # Use shared validation logic (eliminates duplication with files/backend validators)
+        is_valid, reason = validate_python_full(
+            file_path=file_path,
+            old_content=old_code,
+            new_content=new_code,
+            session_id=hook_input.session_id,
+        )
 
-## OLD CODE
-```
-{old_code}
-```
-
-## NEW CODE
-```
-{new_code}
-```
-"""
-
-        # Run LLM-based diff audit
-        cli = get_agent_cli()
-        prompts_dir = self.config.root / self.config.get("prompts.dir")
-        audit_diff_instruction = prompts_dir / self.config.get("prompts.audit_diff")
-
-        try:
-            audit_diff_config = AgentConfigPresets.audit_diff(hook_input.session_id)
-            audit_diff_config.enable_streaming = True
-            output, _ = cli.run_print(
-                instruction_file=audit_diff_instruction,
-                stdin=diff_context,
-                agent_config=audit_diff_config,
-            )
-
-            # Check result - parse output for PASS/FAIL
-            cleaned_output = self._parse_code_fence_output(output)
-
-            # Check if PASS appears in the cleaned output
-            if re.search(r"\bPASS\b", cleaned_output, re.IGNORECASE):
-                return HookResult.allow()
-            # Extract failure reason from output
-            reason = output if output else "Code quality regression detected"
-            return HookResult.deny(f"❌ CODE QUALITY CHECK FAILED\n\n{reason}\n\nZero-tolerance policy: NO regression allowed.")
-
-        except Exception as e:
-            # On agent errors (timeout, execution failure), allow the edit
-            # This prevents infrastructure failures from blocking legitimate work
-            if isinstance(e, AgentError):
-                return HookResult.allow()
-            raise
+        if is_valid:
+            return HookResult.allow()
+        return HookResult.deny(reason)
 
 
 class ResponseScanner(HookValidator):
     """Scans responses for communication violations and completion markers."""
-
-    def _parse_code_fence_output(self, output: str) -> str:
-        """Parse output, removing markdown code fences if present.
-
-        Args:
-            output: Raw output from LLM
-
-        Returns:
-            Cleaned output with code fences removed
-        """
-        cleaned = output.strip()
-        if cleaned.startswith("```"):
-            lines = cleaned.split("\n")
-            if len(lines) > MIN_CODE_FENCE_LINES and lines[-1] == "```":
-                cleaned = "\n".join(lines[1:-1]).strip()
-            elif len(lines) > 1:
-                cleaned = "\n".join(lines[1:]).strip()
-        return cleaned
 
     PROHIBITED_PATTERNS = [
         (r"\byou'?re\s+(absolutely|completely|totally|entirely|definitely)?\s*(correct|right|spot-on)\b", "you're right variations"),
@@ -641,7 +566,7 @@ class ResponseScanner(HookValidator):
         Returns:
             HookResult based on moderator decision
         """
-        cleaned_output = self._parse_code_fence_output(output)
+        cleaned_output = parse_code_fence_output(output)
 
         # Check for ALLOW decision
         if re.search(r"\bALLOW\b", cleaned_output, re.IGNORECASE):
