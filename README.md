@@ -336,8 +336,8 @@ MIT License - Copyright © 2025 Independent AI Labs
 
 ### 🛡️ Compliance & Security
 - **[OpenAMI Framework](docs/openami/README.md)** - Self-evolving AI with formal safety guarantees
-- **Executive Summary** - Business case for trustworthy AI
-- **System Architecture** - Four-layer compliance architecture
+- **[Executive Summary](docs/openami/SPEC-VISION.md)** - Business case for trustworthy AI
+- **[System Architecture](docs/openami/SPEC-ARCHITECTURE.md)** - Four-layer compliance architecture
 
 ### 🚀 Getting Started
 1. **Clone**: `git clone https://github.com/independent-ai-labs/ami-orchestrator`
