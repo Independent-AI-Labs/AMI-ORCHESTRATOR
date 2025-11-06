@@ -169,56 +169,28 @@ class AgentConfigPresets:
 
     @staticmethod
     def worker(session_id: str) -> AgentConfig:
-        """General worker agent: Most tools except Task/TodoWrite, hooks enabled.
+        """General worker agent: All tools, hooks enabled.
 
         Used for: General automation, --print mode with hooks
         """
         return AgentConfig(
             model="claude-sonnet-4-5",
             session_id=session_id,
-            allowed_tools=[
-                "Bash",
-                "BashOutput",
-                "Edit",
-                "ExitPlanMode",
-                "Glob",
-                "Grep",
-                "KillShell",
-                "NotebookEdit",
-                "Read",
-                "SlashCommand",
-                "WebFetch",
-                "WebSearch",
-                "Write",
-            ],
+            allowed_tools=None,  # All tools
             enable_hooks=True,
             timeout=180,
         )
 
     @staticmethod
     def interactive(session_id: str, mcp_servers: dict[str, Any] | None = None) -> AgentConfig:
-        """Interactive agent: Most tools except Task/TodoWrite, hooks enabled, MCP servers.
+        """Interactive agent: All tools, hooks enabled, MCP servers.
 
         Used for: Interactive sessions with user
         """
         return AgentConfig(
             model="claude-sonnet-4-5",
             session_id=session_id,
-            allowed_tools=[
-                "Bash",
-                "BashOutput",
-                "Edit",
-                "ExitPlanMode",
-                "Glob",
-                "Grep",
-                "KillShell",
-                "NotebookEdit",
-                "Read",
-                "SlashCommand",
-                "WebFetch",
-                "WebSearch",
-                "Write",
-            ],
+            allowed_tools=None,
             enable_hooks=True,
             timeout=None,  # No timeout
             mcp_servers=mcp_servers,
@@ -226,28 +198,14 @@ class AgentConfigPresets:
 
     @staticmethod
     def task_worker(session_id: str) -> AgentConfig:
-        """Task execution worker: Most tools except Task/TodoWrite, hooks enabled, no timeout.
+        """Task execution worker: All tools, hooks enabled, no timeout.
 
         Used for: Executing .md task files with full capabilities
         """
         return AgentConfig(
             model="claude-sonnet-4-5",
             session_id=session_id,
-            allowed_tools=[
-                "Bash",
-                "BashOutput",
-                "Edit",
-                "ExitPlanMode",
-                "Glob",
-                "Grep",
-                "KillShell",
-                "NotebookEdit",
-                "Read",
-                "SlashCommand",
-                "WebFetch",
-                "WebSearch",
-                "Write",
-            ],
+            allowed_tools=None,  # All tools
             enable_hooks=True,
             timeout=None,  # Task-level timeout instead
         )
@@ -268,28 +226,14 @@ class AgentConfigPresets:
 
     @staticmethod
     def sync_worker(session_id: str) -> AgentConfig:
-        """Git sync worker: Most tools except Task/TodoWrite, hooks enabled, no timeout.
+        """Git sync worker: All tools, hooks enabled, no timeout.
 
         Used for: Executing git commit/push operations with full capabilities
         """
         return AgentConfig(
             model="claude-sonnet-4-5",
             session_id=session_id,
-            allowed_tools=[
-                "Bash",
-                "BashOutput",
-                "Edit",
-                "ExitPlanMode",
-                "Glob",
-                "Grep",
-                "KillShell",
-                "NotebookEdit",
-                "Read",
-                "SlashCommand",
-                "WebFetch",
-                "WebSearch",
-                "Write",
-            ],
+            allowed_tools=None,  # All tools
             enable_hooks=True,
             timeout=None,  # Sync-level timeout instead
         )

@@ -43,45 +43,39 @@ else
     MODULE_NAME="root"
 fi
 
-# Check if SKIP_TESTS is set
-if [ "${SKIP_TESTS:-}" = "1" ]; then
-    echo "⚠️  WARNING: Skipping tests (SKIP_TESTS=1)"
-    echo "=========================================="
-else
-    echo "Running tests for ${MODULE_NAME} before push..."
-    echo "=========================================="
+echo "Running tests for ${MODULE_NAME} before push..."
+echo "=========================================="
 
-    # Find orchestrator root
-    ORCHESTRATOR_ROOT="$MODULE_ROOT"
-    while [ ! -d "$ORCHESTRATOR_ROOT/base" ] && [ "$ORCHESTRATOR_ROOT" != "/" ]; do
-        ORCHESTRATOR_ROOT="$(dirname "$ORCHESTRATOR_ROOT")"
-    done
+# Find orchestrator root
+ORCHESTRATOR_ROOT="$MODULE_ROOT"
+while [ ! -d "$ORCHESTRATOR_ROOT/base" ] && [ "$ORCHESTRATOR_ROOT" != "/" ]; do
+    ORCHESTRATOR_ROOT="$(dirname "$ORCHESTRATOR_ROOT")"
+done
 
-    if [ ! -d "$ORCHESTRATOR_ROOT/base" ]; then
-        echo "✗ Cannot find orchestrator root (base/ directory)"
+if [ ! -d "$ORCHESTRATOR_ROOT/base" ]; then
+    echo "✗ Cannot find orchestrator root (base/ directory)"
+    exit 1
+fi
+
+# Run centralized test runner
+# For root: explicitly test only tests/ directory to avoid submodule tests
+# For submodules: discover all tests in module
+if [ "$MODULE_NAME" = "root" ]; then
+    # Pass "tests/" as explicit pytest argument to only test root's tests/
+    if ! "$ORCHESTRATOR_ROOT/scripts/ami-run.sh" "$ORCHESTRATOR_ROOT/base/scripts/run_tests.py" "$MODULE_ROOT" -- tests/; then
+        echo "✗ Tests failed - push aborted"
         exit 1
     fi
-
-    # Run centralized test runner
-    # For root: explicitly test only tests/ directory to avoid submodule tests
-    # For submodules: discover all tests in module
-    if [ "$MODULE_NAME" = "root" ]; then
-        # Pass "tests/" as explicit pytest argument to only test root's tests/
-        if ! "$ORCHESTRATOR_ROOT/scripts/ami-run.sh" "$ORCHESTRATOR_ROOT/base/scripts/run_tests.py" "$MODULE_ROOT" -- tests/; then
-            echo "✗ Tests failed - push aborted"
-            exit 1
-        fi
-    else
-        # Submodules: discover all tests
-        if ! "$ORCHESTRATOR_ROOT/scripts/ami-run.sh" "$ORCHESTRATOR_ROOT/base/scripts/run_tests.py" "$MODULE_ROOT"; then
-            echo "✗ Tests failed - push aborted"
-            exit 1
-        fi
+else
+    # Submodules: discover all tests
+    if ! "$ORCHESTRATOR_ROOT/scripts/ami-run.sh" "$ORCHESTRATOR_ROOT/base/scripts/run_tests.py" "$MODULE_ROOT"; then
+        echo "✗ Tests failed - push aborted"
+        exit 1
     fi
-
-    echo "=========================================="
-    echo "✓ All tests passed!"
 fi
+
+echo "=========================================="
+echo "✓ All tests passed!"
 echo ""
 echo "Pushing to remote..."
 
