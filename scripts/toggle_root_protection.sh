@@ -6,17 +6,17 @@ DRY_RUN=false
 
 show_usage() {
     cat << EOF
-Usage: sudo $0 [lock|unlock|status|lock-file|unlock-file] [path] [--dry-run]
+Usage: sudo $0 <command> [path] [--dry-run]
 
 Toggle immutable protection for source code files and config files across the repository.
 Uses chattr +i (immutable flag) to prevent ANY modification, even by root.
 
 Commands:
-  lock            - Make all source code and config files immutable
-  unlock          - Remove immutable flag from all source code and config files
+  lock [path]     - Lock all files, or specific file/directory if path provided
+  unlock [path]   - Unlock all files, or specific file/directory if path provided
+  lock-file PATH  - Lock a single file or all files in a directory (explicit)
+  unlock-file PATH- Unlock a single file or all files in a directory (explicit)
   status          - Show current protection status
-  lock-file PATH  - Lock a single file or all files in a directory
-  unlock-file PATH- Unlock a single file or all files in a directory
   test            - Run dry-run test without root (shows what would happen)
 
 Options:
@@ -30,9 +30,11 @@ Protected files:
 Examples:
   sudo $0 lock                              # Lock all source and config files
   sudo $0 unlock                            # Unlock all source and config files
-  sudo $0 lock-file scripts/ami-agent       # Lock single file
-  sudo $0 unlock-file base/scripts/env      # Unlock directory
-  sudo $0 lock-file scripts/ami-agent --dry-run  # Test without changes
+  sudo $0 lock scripts/README.md            # Lock single file (simple syntax)
+  sudo $0 unlock scripts/README.md          # Unlock single file (simple syntax)
+  sudo $0 lock scripts/                     # Lock entire directory
+  sudo $0 unlock base/scripts/              # Unlock entire directory
+  sudo $0 lock scripts/ami-agent --dry-run  # Test without changes
 
 Requires root privileges to modify immutable flags (except in dry-run mode).
 EOF
@@ -560,8 +562,8 @@ main() {
                 command="$arg"
                 ;;
             *)
-                # If command requires a path, this is the path argument
-                if [[ "$command" == "lock-file" || "$command" == "unlock-file" ]]; then
+                # If command is set and this doesn't start with -, it's a path argument
+                if [[ -n "$command" && "$arg" != -* ]]; then
                     target_path="$arg"
                 else
                     echo "ERROR: Unknown argument '$arg'" >&2
@@ -599,10 +601,20 @@ main() {
 
     case "$command" in
         lock)
-            lock_files
+            # If target_path provided, use lock_single; otherwise lock_files
+            if [[ -n "$target_path" ]]; then
+                lock_single "$target_path"
+            else
+                lock_files
+            fi
             ;;
         unlock)
-            unlock_files
+            # If target_path provided, use unlock_single; otherwise unlock_files
+            if [[ -n "$target_path" ]]; then
+                unlock_single "$target_path"
+            else
+                unlock_files
+            fi
             ;;
         lock-file)
             lock_single "$target_path"

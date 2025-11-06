@@ -9,11 +9,12 @@ Ensures git modules are fully committed and pushed upstream with zero tolerance 
 """
 
 import time
-import uuid
 from datetime import datetime
 from pathlib import Path
 
 from pydantic import BaseModel, Field
+
+from base.backend.utils.uuid_utils import uuid7
 
 from .agent_cli import AgentConfigPresets, get_agent_cli
 from .config import get_config
@@ -50,7 +51,7 @@ class SyncExecutor:
     def __init__(self) -> None:
         """Initialize sync executor."""
         self.config = get_config()
-        self.session_id = str(uuid.uuid4())
+        self.session_id = uuid7()
         self.logger = get_logger("sync", session_id=self.session_id)
         self.cli = get_agent_cli()
 

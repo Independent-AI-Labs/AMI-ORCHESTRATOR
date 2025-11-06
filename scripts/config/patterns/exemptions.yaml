@@ -1,0 +1,16 @@
+# Pattern Check Exemptions
+# Used by CodeQualityValidator in scripts/automation/hooks.py
+#
+# Files listed here are exempt from ALL fast pattern checks.
+# Typically these are files that contain pattern definitions in error messages.
+
+version: "1.0.0"
+
+# Files exempt from pattern checks (contain error messages with forbidden patterns)
+pattern_check_exemptions:
+  - "scripts/automation/hooks.py"
+  - "scripts/automation/validators.py"
+  - "scripts/config/patterns/bash_commands.yaml"
+  - "scripts/config/patterns/python_fast.yaml"
+  - "scripts/config/patterns/exemptions.yaml"
+  - "scripts/config/patterns/README.md"

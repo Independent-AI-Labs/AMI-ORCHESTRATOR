@@ -176,11 +176,11 @@ class TestAuditEngine:
         assert result is None
 
     @pytest.mark.skipif(AuditEngine is None, reason="AuditEngine not implemented yet")
-    def test_check_cache_missing_file(self):
+    def test_check_cache_missing_file(self, tmp_path):
         """_check_cache() returns None when cache file doesn't exist."""
         engine = AuditEngine()
         engine.config._data["audit"]["cache"]["enabled"] = True
-        engine.config._data["audit"]["cache"]["storage"] = "/tmp/nonexistent"
+        engine.config._data["audit"]["cache"]["storage"] = str(tmp_path / "nonexistent")
 
         result = engine._check_cache(Path("/test/file.py"))
 

@@ -3,6 +3,7 @@
 import json
 import logging
 from datetime import datetime
+from unittest.mock import Mock
 
 from scripts.automation.logger import JSONFormatter, StructuredLogger, get_logger
 
@@ -95,8 +96,6 @@ class TestStructuredLogger:
     def test_file_handler_created(self, tmp_path, monkeypatch):
         """Logger creates daily log file."""
         # Mock config to use temp directory
-        from unittest.mock import Mock
-
         mock_config = Mock()
         mock_config.get.return_value = str(tmp_path)
 

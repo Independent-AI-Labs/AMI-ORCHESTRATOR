@@ -11,6 +11,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
+from scripts.automation.agent_cli import AgentTimeoutError
 from scripts.automation.hooks import HookInput, HookResult, ResponseScanner
 
 
@@ -128,8 +129,8 @@ class TestCompletionModeratorIntegration:
             result = scanner._validate_completion("test-session", test_transcript)
 
             # Should allow
-            assert result.decision is None
-            cast(Mock, scanner.logger.info).assert_called_with("completion_moderator_allow", session_id="test-session")
+            assert result.decision == "allow"
+            cast(Mock, scanner.logger.info).assert_called_with("completion_moderator_allow", session_id="test-session", format="plain")
 
     def test_validate_completion_block_decision(self, scanner: ResponseScanner, test_transcript: Path) -> None:
         """Test parsing BLOCK decision from moderator output."""
@@ -216,8 +217,6 @@ class TestCompletionModeratorIntegration:
         cast(Any, scanner.config).root = Path("/home/ami/Projects/AMI-ORCHESTRATOR")
 
         with patch("scripts.automation.hooks.get_agent_cli") as mock_get_cli:
-            from scripts.automation.agent_cli import AgentTimeoutError
-
             mock_cli = Mock()
             mock_cli.run_print.side_effect = AgentTimeoutError(120, ["claude"], 120.0)
             mock_get_cli.return_value = mock_cli
@@ -227,7 +226,7 @@ class TestCompletionModeratorIntegration:
             # Should fail-closed (block)
             assert result.decision == "block"
             assert result.reason is not None
-            assert "COMPLETION VALIDATION ERROR" in result.reason
+            assert "COMPLETION VALIDATION TIMEOUT" in result.reason
             cast(Mock, scanner.logger.error).assert_called()
 
     def test_validate_completion_with_feedback_marker(self, scanner: ResponseScanner) -> None:
@@ -281,5 +280,5 @@ class TestCompletionModeratorIntegration:
             result = scanner._validate_completion("test-session", test_transcript)
 
             # Should still parse ALLOW correctly
-            assert result.decision is None  # allow() returns None
-            cast(Mock, scanner.logger.info).assert_called_with("completion_moderator_allow", session_id="test-session")
+            assert result.decision == "allow"
+            cast(Mock, scanner.logger.info).assert_called_with("completion_moderator_allow", session_id="test-session", format="plain")

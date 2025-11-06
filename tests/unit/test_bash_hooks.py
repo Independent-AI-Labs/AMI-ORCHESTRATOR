@@ -10,6 +10,7 @@ from typing import Any, cast
 from unittest.mock import Mock, patch
 
 import pytest
+import yaml
 
 from scripts.automation.agent_cli import AgentConfigPresets, ClaudeAgentCLI
 
@@ -97,14 +98,14 @@ class TestBashHooksEnforcement:
             hooks_yaml.unlink()
             tmp_dir.rmdir()
 
-    def test_run_print_creates_bash_only_settings(self, agent_cli: ClaudeAgentCLI) -> None:
+    def test_run_print_creates_bash_only_settings(self, agent_cli: ClaudeAgentCLI, tmp_path) -> None:
         """Test that run_print() creates bash-only settings when enable_hooks=False."""
         agent_config = AgentConfigPresets.completion_moderator(session_id="test-session")
         assert agent_config.enable_hooks is False
 
         with patch.object(agent_cli, "_create_bash_only_hooks_file") as mock_create_hooks, patch("subprocess.Popen") as mock_popen:
             # Mock settings file creation
-            mock_settings = Path("/tmp/test_settings.json")
+            mock_settings = tmp_path / "test_settings.json"
             mock_create_hooks.return_value = mock_settings
 
             # Mock process
@@ -188,8 +189,6 @@ class TestBashGuardIntegration:
 
         if not hooks_yaml_path.exists():
             pytest.skip("hooks.yaml not found")
-
-        import yaml
 
         with hooks_yaml_path.open("r") as f:
             hooks_config = yaml.safe_load(f)

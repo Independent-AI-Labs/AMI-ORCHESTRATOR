@@ -2,10 +2,10 @@
 
 import os
 import shutil
-import subprocess
 from pathlib import Path
 
 from backend.git_server.results import RepoResult, RepositoryError
+from base.backend.workers.git_command import GitCommandError, GitCommandWorker
 
 
 class GitRepoOps:
@@ -20,6 +20,11 @@ class GitRepoOps:
         """
         self.base_path = base_path
         self.repos_path = repos_path
+        # Initialize git command worker for all git operations
+        try:
+            self.git_worker = GitCommandWorker(work_dir=repos_path)
+        except RuntimeError as e:
+            raise RepositoryError(str(e)) from e
 
     def init_server(self) -> RepoResult:
         """Initialize git server directory structure."""
@@ -96,14 +101,9 @@ file:///path/to/git-repos/repos/repo-name.git
             raise RepositoryError(f"Repository '{repo_name}' already exists at {repo_path}")
 
         try:
-            subprocess.run(
-                ["git", "init", "--bare", str(repo_path)],
-                check=True,
-                capture_output=True,
-                text=True,
-            )
-        except subprocess.CalledProcessError as e:
-            raise RepositoryError(f"Failed to create repository: {e.stderr}") from e
+            self.git_worker.init_bare_repo(repo_path)
+        except GitCommandError as e:
+            raise RepositoryError(f"Failed to create repository: {e}") from e
 
         if description:
             desc_file = repo_path / "description"
@@ -145,17 +145,8 @@ file:///path/to/git-repos/repos/repo-name.git
 
                 repo_info["description"] = description
 
-                try:
-                    result = subprocess.run(
-                        ["git", "--git-dir", str(repo), "branch"],
-                        capture_output=True,
-                        text=True,
-                        check=True,
-                    )
-                    branches = [line.strip().replace("* ", "") for line in result.stdout.strip().split("\n") if line.strip()]
-                    branch_info = f"{len(branches)} branch(es)" if branches else "No branches"
-                except subprocess.CalledProcessError:
-                    branch_info = "Unknown"
+                branches = self.git_worker.get_branches(repo)
+                branch_info = f"{len(branches)} branch(es)" if branches else "No branches"
 
                 repo_info["branches"] = branch_info
 
@@ -206,11 +197,8 @@ file:///path/to/git-repos/repos/repo-name.git
             raise RepositoryError(f"Destination '{destination}' already exists")
 
         try:
-            subprocess.run(
-                ["git", "clone", f"file://{repo_path}", str(destination)],
-                check=True,
-            )
-        except subprocess.CalledProcessError as e:
+            self.git_worker.clone_repo(f"file://{repo_path}", destination)
+        except GitCommandError as e:
             raise RepositoryError(f"Failed to clone repository: {e}") from e
 
         return RepoResult(
@@ -259,52 +247,15 @@ file:///path/to/git-repos/repos/repo-name.git
 
     def _get_repo_branches(self, repo_path: Path) -> list[str]:
         """Get repository branches."""
-        try:
-            result = subprocess.run(
-                ["git", "--git-dir", str(repo_path), "branch", "-a"],
-                capture_output=True,
-                text=True,
-                check=True,
-            )
-            branches = result.stdout.strip()
-            if branches:
-                return branches.split("\n")
-        except subprocess.CalledProcessError:
-            pass
-        return []
+        return self.git_worker.get_branches(repo_path, all_branches=True)
 
     def _get_repo_tags(self, repo_path: Path) -> list[str]:
         """Get repository tags."""
-        try:
-            result = subprocess.run(
-                ["git", "--git-dir", str(repo_path), "tag"],
-                capture_output=True,
-                text=True,
-                check=True,
-            )
-            tags = result.stdout.strip()
-            if tags:
-                return tags.split("\n")
-        except subprocess.CalledProcessError:
-            pass
-        return []
+        return self.git_worker.get_tags(repo_path)
 
     def _get_repo_last_commit(self, repo_path: Path) -> dict[str, str] | None:
         """Get repository last commit information."""
-        try:
-            result = subprocess.run(
-                ["git", "--git-dir", str(repo_path), "log", "-1", "--format=%H%n%an <%ae>%n%ai%n%s"],
-                capture_output=True,
-                text=True,
-                check=True,
-            )
-            commit_info = result.stdout.strip().split("\n")
-            commit_info_fields = 4
-            if len(commit_info) >= commit_info_fields:
-                return {"hash": commit_info[0], "author": commit_info[1], "date": commit_info[2], "message": commit_info[3]}
-        except subprocess.CalledProcessError:
-            pass
-        return None
+        return self.git_worker.get_last_commit(repo_path)
 
     def repo_info(self, name: str) -> RepoResult:
         """Show detailed repository information."""

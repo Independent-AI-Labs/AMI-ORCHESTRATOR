@@ -1,9 +1,9 @@
 """SSH server bootstrap operations."""
 
-import subprocess
 from pathlib import Path
 
 from backend.git_server.results import BootstrapInfo, ServiceError, ServiceResult, SSHConfigInfo, SSHServerStatus
+from base.backend.workers.system_command import SystemCommandWorker
 from base.scripts.env.paths import find_orchestrator_root
 
 
@@ -17,6 +17,7 @@ class GitBootstrapOps:
             base_path: Base git server directory
         """
         self.base_path = base_path
+        self.system_worker = SystemCommandWorker()
 
     def bootstrap_ssh_server(self, install_type: str = "system") -> ServiceResult:
         """Bootstrap SSH server installation.
@@ -75,28 +76,22 @@ class GitBootstrapOps:
             sshd_venv: Path to sshd-venv control script
             openssh_dir: Path to OpenSSH installation directory
         """
-        try:
-            result = subprocess.run([str(sshd_venv), "status"], check=False, capture_output=True, text=True)
-            if result.returncode == 0:
-                return SSHServerStatus(
-                    status="running",
-                    openssh_dir=str(openssh_dir),
-                    sshd_venv=str(sshd_venv),
-                    output=result.stdout,
-                )
+        # Use system worker to execute sshd-venv script
+        result = self.system_worker.subprocess.run([str(sshd_venv), "status"], timeout=10.0)
+
+        if result["success"]:
             return SSHServerStatus(
-                status="not_running",
+                status="running",
                 openssh_dir=str(openssh_dir),
                 sshd_venv=str(sshd_venv),
-                start_command="sshd-venv start",
+                output=result["stdout"],
             )
-        except subprocess.CalledProcessError:
-            return SSHServerStatus(
-                status="error",
-                openssh_dir=str(openssh_dir),
-                sshd_venv=str(sshd_venv),
-                message="Could not check SSH server status",
-            )
+        return SSHServerStatus(
+            status="not_running",
+            openssh_dir=str(openssh_dir),
+            sshd_venv=str(sshd_venv),
+            start_command="sshd-venv start",
+        )
 
     def _get_venv_install_instructions(self) -> None:
         """Get instructions for installing OpenSSH in venv."""
@@ -113,17 +108,14 @@ class GitBootstrapOps:
 
     def _bootstrap_system_ssh(self) -> BootstrapInfo:
         """Bootstrap system SSH server installation."""
-        try:
-            result = subprocess.run(["which", "sshd"], check=False, capture_output=True, text=True)
+        # Use system worker to find sshd binary
+        sshd_path = self.system_worker.which("sshd")
 
-            if result.returncode == 0:
-                ssh_status = self._check_system_ssh_running(result.stdout.strip())
-            else:
-                self._get_system_install_instructions()
-                # This line won't be reached because _get_system_install_instructions raises
-
-        except subprocess.CalledProcessError as e:
-            raise ServiceError(f"Failed to check SSH server: {e}") from e
+        if sshd_path:
+            ssh_status = self._check_system_ssh_running(sshd_path)
+        else:
+            self._get_system_install_instructions()
+            # This line won't be reached because _get_system_install_instructions raises
 
         # Verify SSH configuration
         ssh_config = self._verify_ssh_configuration()
@@ -139,21 +131,26 @@ class GitBootstrapOps:
         Args:
             sshd_path: Path to sshd binary
         """
-        status_result = subprocess.run(["systemctl", "is-active", "ssh"], check=False, capture_output=True, text=True)
+        # Use system worker to check systemctl status
+        try:
+            status_result = self.system_worker.run_systemctl("is-active", "ssh", timeout=10.0)
 
-        if status_result.returncode == 0:
+            if status_result["success"]:
+                return SSHServerStatus(
+                    status="running",
+                    sshd_path=sshd_path,
+                )
             return SSHServerStatus(
-                status="running",
+                status="not_running",
                 sshd_path=sshd_path,
+                start_commands=[
+                    "sudo systemctl start ssh",
+                    "sudo systemctl enable ssh",
+                ],
             )
-        return SSHServerStatus(
-            status="not_running",
-            sshd_path=sshd_path,
-            start_commands=[
-                "sudo systemctl start ssh",
-                "sudo systemctl enable ssh",
-            ],
-        )
+        except RuntimeError as e:
+            # systemctl not found
+            raise ServiceError(str(e)) from e
 
     def _get_system_install_instructions(self) -> None:
         """Get instructions for installing system SSH server."""

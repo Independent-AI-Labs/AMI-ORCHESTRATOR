@@ -15,7 +15,9 @@ Prerequisites:
 - User 'ami' with SSH access
 """
 
+import concurrent.futures
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -79,7 +81,6 @@ def real_git_server(_tmp_path):
         yield (manager, server_base)
     finally:
         # Cleanup
-        import shutil
 
         if server_base.exists():
             shutil.rmtree(server_base, ignore_errors=True)
@@ -551,7 +552,6 @@ class TestNetworkEdgeCases:
             authorized_keys.symlink_to(manager.keys_path)
 
             # Clone multiple times concurrently
-            import concurrent.futures
 
             def clone_repo(index):
                 clone_dest = tmp_path / f"clone-{index}"

@@ -77,6 +77,58 @@ The script will:
 
 ## Other Scripts
 
+### check_pypi_versions.py
+Check the latest available versions of all dependencies in a pyproject.toml file from PyPI.
+
+**Features:**
+- Parses all dependency sections (dependencies, optional-dependencies, dependency-groups, tool.uv.dev-dependencies)
+- Queries PyPI API for the latest version of each package
+- Shows comparison between current pinned version and latest available
+- Supports filtering to show only outdated packages
+- JSON output option for automation/scripting
+
+**Usage:**
+```bash
+# Check dependencies in current directory's pyproject.toml
+scripts/ami-run.sh scripts/check_pypi_versions.py
+
+# Check specific pyproject.toml file
+scripts/ami-run.sh scripts/check_pypi_versions.py path/to/pyproject.toml
+
+# Show only outdated packages
+scripts/ami-run.sh scripts/check_pypi_versions.py pyproject.toml --outdated-only
+
+# Output as JSON for automation
+scripts/ami-run.sh scripts/check_pypi_versions.py pyproject.toml --json
+```
+
+**Examples:**
+```bash
+# Check all modules
+scripts/ami-run.sh scripts/check_pypi_versions.py base/pyproject.toml
+scripts/ami-run.sh scripts/check_pypi_versions.py nodes/pyproject.toml --outdated-only
+
+# Get outdated packages as JSON for processing
+scripts/ami-run.sh scripts/check_pypi_versions.py pyproject.toml --outdated-only --json | jq '.[] | .name'
+```
+
+**Output:**
+```
+Package                  | Current         | Latest          | Status   | Section
+-----------------------------------------------------------------------------------------------
+pyyaml                   | 6.0.2           | 6.0.3           | OUTDATED | dependencies
+ruff                     | 0.12.8          | 0.14.3          | OUTDATED | dependency-groups.dev
+mypy                     | 1.17.1          | 1.18.2          | OUTDATED | dependency-groups.dev
+loguru                   | 0.7.3           | 0.7.3           | UP-TO-DATE | dependency-groups.dev
+
+Summary:
+  Total dependencies: 24
+  Up-to-date: 11
+  Outdated: 13
+  No pin: 0
+  Unknown: 0
+```
+
 ### ami-repo
 Git repository server management CLI for creating and managing bare repositories with SSH access control.
 
@@ -332,3 +384,141 @@ Export git history and statistics.
 
 ### toggle_root_protection.sh
 Manage branch protection settings for the root repository.
+
+### setup-shell.sh
+Production shell environment setup script that configures comprehensive workflow aliases and PATH management.
+
+**Quick Start:**
+```bash
+# Source the setup script (add to your .bashrc or .zshrc for persistence)
+source scripts/setup-shell.sh
+# OR
+. scripts/setup-shell.sh
+```
+
+**Core Features:**
+
+1. **Environment Configuration:**
+   - Auto-detects AMI_ROOT and exports it
+   - Prepends `.venv/bin` directories to PATH for all tools
+   - Sets PYTHONPATH to include all modules
+   - No system modifications required
+
+2. **Wrapper Functions:**
+   ```bash
+   ami-run <script>        # Universal Python script runner
+   ami-uv <command>        # UV package manager wrapper
+   ami-agent <command>     # Agent CLI wrapper
+   ami-repo <command>      # Git repository server management
+   ```
+
+3. **Service Management:**
+   ```bash
+   ami-service <cmd>       # Direct setup_service.py wrapper
+   ami-start <process>     # Start process/profile
+   ami-stop <process>      # Stop process/profile
+   ami-restart <process>   # Restart process/profile
+   ami-profile <cmd>       # Manage profiles
+   ```
+
+4. **Dynamic Discovery Functions:**
+   ```bash
+   # Auto-detect current module from PWD if not specified
+   ami-test [module]       # Run tests for module (or auto-detect)
+   ami-install [module]    # Run module_setup.py (or auto-detect)
+   ami-setup [module]      # Alias for ami-install
+   ```
+
+5. **Code Quality:**
+   ```bash
+   ami-codecheck           # Run all pre-commit hooks
+   ami-codecheck ruff      # Run specific hook(s)
+   ami-codecheck ruff mypy # Run multiple hooks
+   ```
+
+6. **Git Shortcuts:**
+   ```bash
+   # Single module operations (auto-detect or specify)
+   ami-status [module]     # Git status
+   ami-diff [module]       # Git diff
+   ami-log [module]        # Git log (last 10)
+
+   # Multi-module operations
+   ami-status-all          # Status for all modules + root
+   ami-pull-all            # Pull for all modules + root
+   ```
+
+7. **Navigation Aliases:**
+   ```bash
+   # Jump to modules
+   ami-root, ami-base, ami-browser, ami-compliance
+   ami-domains, ami-files, ami-nodes, ami-streams, ami-ux
+
+   # Jump to common directories
+   ami-tests, ami-backend, ami-scripts, ami-docs
+   ```
+
+8. **Utilities:**
+   ```bash
+   ami-info                # Display environment info
+   ami-check-storage       # Check storage backends
+   ami-propagate-tests     # Propagate test runner
+   ```
+
+**Example Workflows:**
+
+```bash
+# Set up environment once per shell session
+source scripts/setup-shell.sh
+
+# Install/update a module
+ami-install base
+
+# Run tests in current directory's module
+cd base/backend/dataops
+ami-test  # Auto-detects base module
+
+# Or specify module explicitly
+ami-test base --filter test_dao
+
+# Check git status for current module
+cd base/backend
+ami-status  # Auto-detects base module
+
+# Or specify module
+ami-status nodes
+
+# Check all module statuses
+ami-status-all
+
+# Run code quality checks
+ami-codecheck              # All hooks
+ami-codecheck ruff mypy    # Specific hooks
+
+# Start development environment
+ami-start dev
+
+# Jump between modules
+ami-base
+ami-nodes
+ami-root
+```
+
+**Persistence:**
+
+Add to your `~/.bashrc` or `~/.zshrc`:
+```bash
+# AMI Orchestrator environment
+if [ -f ~/Projects/AMI-ORCHESTRATOR/scripts/setup-shell.sh ]; then
+    . ~/Projects/AMI-ORCHESTRATOR/scripts/setup-shell.sh
+fi
+```
+
+**Auto-Detection Logic:**
+
+The script intelligently detects context:
+- `_detect_current_module()`: Identifies which module PWD is in
+- `_find_module_root()`: Finds module root by looking for `backend/` + `requirements.txt`
+- `_find_nearest_module_setup()`: Locates nearest `module_setup.py` walking up from PWD
+
+This allows you to run `ami-test`, `ami-status`, etc. from any subdirectory without specifying the module name.

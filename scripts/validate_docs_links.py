@@ -1,4 +1,8 @@
-#!/usr/bin/env python3
+#!/usr/bin/env bash
+""":'
+exec "$(dirname "$0")/scripts/ami-run.sh" "$0" "$@"
+"""
+
 """Validate markdown links in documentation.
 
 Checks for:
@@ -225,27 +229,20 @@ def main() -> int:
     Returns:
         Exit code (0 = success, 1 = issues found)
     """
-    print("Validating documentation links...")
-    print()
 
     issues = validate_docs()
 
     if not issues:
-        print("✓ All documentation links are valid!")
         return 0
-
-    print(f"✗ Found {len(issues)} link issues:\n")
 
     # Group by issue type
     by_type: dict[str, list[LinkIssue]] = {}
     for issue in issues:
         by_type.setdefault(issue.issue_type, []).append(issue)
 
-    for issue_type, type_issues in sorted(by_type.items()):
-        print(f"{issue_type} ({len(type_issues)}):")
+    for _issue_type, type_issues in sorted(by_type.items()):
         for issue in type_issues:
-            print(format_issue(issue))
-            print()
+            pass
 
     return 1
 

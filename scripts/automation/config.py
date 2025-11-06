@@ -77,26 +77,33 @@ class Config:
         return substituted
 
     def _substitute_env(self, data: Any) -> Any:
-        """Recursively substitute ${VAR:default} patterns.
+        """Recursively substitute ${VAR:default} and {root} patterns.
 
         Args:
             data: Data to process (dict, list, str, or other)
 
         Returns:
-            Data with environment variables substituted
+            Data with environment variables and root path substituted
         """
         if isinstance(data, dict):
             return {k: self._substitute_env(v) for k, v in data.items()}
         if isinstance(data, list):
             return [self._substitute_env(v) for v in data]
-        if isinstance(data, str) and "${" in data:
-            # Simple substitution: ${VAR:default}
-            def replace(match: re.Match[str]) -> str:
-                var = match.group(1)
-                default = match.group(2) or ""
-                return os.environ.get(var, default)
+        if isinstance(data, str):
+            result = data
+            # Substitute {root} with orchestrator root
+            if "{root}" in result:
+                result = result.replace("{root}", str(self.root))
+            # Substitute ${VAR:default} with environment variables
+            if "${" in result:
 
-            return re.sub(r"\$\{([A-Z_]+)(?::([^}]*))?\}", replace, data)
+                def replace(match: re.Match[str]) -> str:
+                    var = match.group(1)
+                    default = match.group(2) or ""
+                    return os.environ.get(var, default)
+
+                result = re.sub(r"\$\{([A-Z_]+)(?::([^}]*))?\}", replace, result)
+            return result
         return data
 
     def resolve_path(self, key: str, **kwargs: Any) -> Path:

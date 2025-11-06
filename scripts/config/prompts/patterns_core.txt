@@ -1,4 +1,4 @@
-## VIOLATION PATTERNS - ZERO TOLERANCE (69 TOTAL)
+## VIOLATION PATTERNS - ZERO TOLERANCE (72 TOTAL)
 
 ### CRITICAL
 
@@ -17,6 +17,23 @@
 **Validation → False**: `def verify(): if not valid: return False` - should raise
 
 **Stub/No-Op**: `def method(): return True` - bypasses security, missing functionality
+
+**Fabricated Paths/Values on Error**: `except: return Path("/fake/path")` or `if not value: value = "fabricated"` - HIDES CRITICAL FAILURES
+- **Example VIOLATION**:
+  ```python
+  # If we couldn't extract the log path, create a default path
+  if not test_log_path:
+      timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+      test_log_path = orchestrator_root / "test_logs" / f"test_run_{timestamp}_default.log"
+  return success, test_log_path  # Returns fake path that doesn't exist
+  ```
+- **Required fix**: FAIL LOUDLY - raise exception or return None
+  ```python
+  if not test_log_path:
+      raise RuntimeError("Failed to extract test log path from test runner output")
+  return success, test_log_path
+  ```
+- **Why CRITICAL**: Misleads users/callers to check non-existent files; masks actual failure; makes debugging impossible; error reports reference fake data
 
 **Rollback Suppression**: `try: rollback(); except: pass` - data corruption
 
@@ -133,6 +150,28 @@
       return ParseResult(status="success", items=[{"id": 1}])
   ```
 
+**Complex Nested Dict Type Annotations**: `dict[str, dict[...]]`, `dict[str, list[dict[...]]]`, `list[dict[str, dict[...]]]`
+- **VIOLATIONS**: Nested dict type annotations are unmaintainable and self-documenting
+- **Example VIOLATION**:
+  ```python
+  self._metadata_cache: dict[str, dict[str, str]] = {}
+  self._versions_cache: dict[str, list[str]] = {}
+  data: dict[str, list[dict[str, Any]]] = {}
+  ```
+- **Required fix**:
+  ```python
+  from pydantic import BaseModel
+
+  class MetadataEntry(BaseModel):
+      version: str
+      author: str
+      # ... other fields with clear names
+
+  self._metadata_cache: dict[str, MetadataEntry] = {}
+  ```
+- **Why Pydantic models required**: Self-documenting field names, runtime validation, maintainable schema evolution, clear structure for testing/mocking, readable repr() output
+- **IMPORTANT**: Converting complex dict annotations to Pydantic models ALWAYS allowed and encouraged
+
 ### HIGH
 
 **Shell Continue on Error**: `for x in ...; do cmd || continue; done`
@@ -234,6 +273,66 @@
 **Missing Timeout Handling**: `result = timeout_op()` - no try/except
 
 **Subprocess Exit Ignored**: `subprocess.run(cmd, check=False)` or `subprocess.call(cmd)`
+- **EXCEPTION**: Polyglot shebang wrappers using `exec` command (NOT subprocess)
+- **Example NOT A VIOLATION**:
+  ```bash
+  #!/usr/bin/env bash
+  ''':'
+  exec "$(dirname "$0")/scripts/ami-run.sh" "$0" "$@"
+  '''
+  ```
+- **Rationale**: `exec` replaces current process (no subprocess created, no exit code to check); standard wrapper pattern; used by pipx, poetry, and other Python tools
+
+**`from __future__` Import Placement with Polyglot Shebang**:
+- **REQUIRED**: In files with polyglot shebangs, `from __future__ import annotations` MUST come on line 3 (immediately after shebang), with module docstring on line 4+
+- **Example CORRECT**:
+  ```python
+  #!/usr/bin/env bash
+  'exec "$(dirname "$0")/../../scripts/ami-run.sh" "$0" "$@" #'
+  from __future__ import annotations
+
+  """Module docstring explaining what this module does."""
+  ```
+- **Rationale**: Python requires `from __future__` before all code except comments/docstrings. Polyglot shebangs are bash code (not Python comments), so future import must come first. This satisfies both ruff F404 and PEP 257.
+
+**Direct Subprocess Calls**: `subprocess.run([...])`, `subprocess.Popen([...])` outside /base workers
+- **Example VIOLATION**:
+  ```python
+  import subprocess
+  result = subprocess.run(["git", "init", "--bare", str(path)], capture_output=True)
+  result = subprocess.run(["systemctl", "status", "service"], capture_output=True)
+  ```
+- **Required fix**:
+  ```python
+  from base.backend.workers.git_command import GitCommandWorker
+  from base.backend.workers.system_command import SystemCommandWorker
+
+  git_worker = GitCommandWorker()
+  git_worker.init_bare_repo(path)
+
+  system_worker = SystemCommandWorker()
+  system_worker.run_systemctl("status", "service")
+  ```
+- **IMPORTANT**: All subprocess execution MUST go through /base worker classes
+- **ALLOWED**: Only in base/backend/workers/*.py worker implementations themselves
+- **Correct approach**: Use GitCommandWorker for git operations, SystemCommandWorker for system commands (systemctl, loginctl, ssh-keygen, etc.); workers use FileSubprocessSync and shutil.which() for security; executable resolution at initialization
+
+**Subprocess Partial Path**: `subprocess.run(["git", ...])`, `subprocess.run(["systemctl", ...])`  (S603/S607)
+- **Example VIOLATION**:
+  ```python
+  subprocess.run(["git", "clone", url, dest])  # Partial path
+  subprocess.run(["systemctl", "start", "service"])  # Partial path
+  ```
+- **Required fix**:
+  ```python
+  import shutil
+  git_path = shutil.which("git")
+  if git_path is None:
+      raise RuntimeError("git not installed")
+  subprocess.run([git_path, "clone", url, dest])
+  ```
+- **Better fix**: Use /base workers which handle this automatically
+- **Correct approach**: Workers resolve absolute paths via shutil.which() at initialization; single subprocess execution point via FileSubprocessSync
 
 **Exception → None**: `except: return None` WHERE method signature does NOT include `| None` return type OR lacks docstring documenting None return
 - **ALLOWED**:
@@ -252,6 +351,26 @@
 **Stderr Redirect**: `command 2>/dev/null` or `2>&1` - suppresses errors
 
 **Uncaught Environment**: `value = os.environ["VAR"]` or `int(os.environ["VAR"])` - no try/except
+
+**Hardcoded Temp Paths**: `Path("/tmp/...")` or `"/tmp/..."` (S108)
+- **Example VIOLATION**:
+  ```python
+  test_file = Path("/tmp/test-file.txt")
+  temp_dir = "/tmp/myapp"
+  ```
+- **Required fix**:
+  ```python
+  # In tests: use pytest tmp_path fixture
+  def test_something(tmp_path):
+      test_file = tmp_path / "test-file.txt"
+
+  # In production code: use tempfile module
+  import tempfile
+  with tempfile.TemporaryDirectory() as temp_dir:
+      temp_path = Path(temp_dir) / "myapp"
+  ```
+- **IMPORTANT**: Never hardcode /tmp paths; security risk (predictable paths, symlink attacks)
+- **Correct approach**: Use pytest tmp_path/tmp_path_factory fixtures in tests; use tempfile.TemporaryDirectory/NamedTemporaryFile in production code
 
 **Uncaught JSON Parse**: `data = json.loads(s)` - no try/except
 
@@ -345,3 +464,35 @@
 **Test Fixtures**: `@pytest.fixture def empty_list(): return []`
 
 **Not a Git Repo**: `except CalledProcessError as e: if "not a git repository" in e.stderr: return None; raise`
+
+**Print in Production Code**: `print(...)` outside CLI entry points (T201)
+- **Example VIOLATION**:
+  ```python
+  # In backend/service.py:
+  def process_data(items):
+      print(f"Processing {len(items)} items")  # VIOLATION
+      return results
+  ```
+- **Required fix**:
+  ```python
+  from loguru import logger
+
+  def process_data(items):
+      logger.info(f"Processing {len(items)} items")
+      return results
+  ```
+- **ALLOWED**: Only in CLI entry point scripts (scripts/*.py with `if __name__ == "__main__"`)
+- **IMPORTANT**: Use logger for all non-CLI output; print() only for user-facing CLI output
+- **Correct approach**: Use loguru logger for debug/info/warning/error; print() only in CLI argument parsers and output formatters
+
+**Commented Code**: Code lines commented out instead of removed (ERA001)
+- **Example VIOLATION**:
+  ```python
+  result = calculate()
+  # old_result = legacy_calculate()  # VIOLATION
+  # return old_result  # VIOLATION
+  return result
+  ```
+- **Required fix**: Delete commented code, rely on git history
+- **ALLOWED**: Inline explanatory comments (not commented-out code)
+- **Correct approach**: Remove dead code; use git blame/log to recover if needed

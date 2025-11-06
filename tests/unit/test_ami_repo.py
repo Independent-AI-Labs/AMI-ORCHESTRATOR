@@ -3,7 +3,9 @@
 Tests GitRepoManager class methods in isolation with mocking.
 """
 
+import io
 import sys
+from contextlib import redirect_stdout
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -56,9 +58,6 @@ class TestURLGeneration:
         repo_path.mkdir()
 
         # Capture stdout
-        import io
-        from contextlib import redirect_stdout
-
         f = io.StringIO()
         with redirect_stdout(f):
             manager.get_repo_url("test", protocol="file")
@@ -76,9 +75,6 @@ class TestURLGeneration:
         manager.repos_path.mkdir(parents=True)
         repo_path = manager.repos_path / "test.git"
         repo_path.mkdir()
-
-        import io
-        from contextlib import redirect_stdout
 
         f = io.StringIO()
         with redirect_stdout(f):
@@ -217,9 +213,6 @@ class TestErrorHandling:
         manager = GitRepoManager(base_path=tmp_path)
         manager.repos_path.mkdir(parents=True)
 
-        import io
-        from contextlib import redirect_stdout
-
         f = io.StringIO()
         with redirect_stdout(f):
             manager.list_repos()
@@ -296,9 +289,6 @@ class TestSSHKeyManagement:
     def test_list_keys_empty(self, tmp_path):
         """list_ssh_keys handles no keys gracefully."""
         manager = GitRepoManager(base_path=tmp_path)
-
-        import io
-        from contextlib import redirect_stdout
 
         f = io.StringIO()
         with redirect_stdout(f):

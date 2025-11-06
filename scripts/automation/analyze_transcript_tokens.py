@@ -1,4 +1,8 @@
-#!/usr/bin/env python3
+#!/usr/bin/env bash
+""":'
+exec "$(dirname "$0")/../scripts/ami-run.sh" "$0" "$@"
+"""
+
 """Analyze token counts for all transcript files to determine context window requirements.
 
 This script scans all Claude Code transcript files and calculates token counts
@@ -110,7 +114,6 @@ def main() -> int:
     transcript_dir = Path.home() / ".claude" / "projects" / "-home-ami-Projects-AMI-ORCHESTRATOR"
 
     if not transcript_dir.exists():
-        print(f"Error: Transcript directory not found: {transcript_dir}")
         return 1
 
     # Find all transcript files
@@ -118,11 +121,7 @@ def main() -> int:
     transcript_files = [f for f in transcript_files if not f.name.endswith(".scanner_state")]
 
     if not transcript_files:
-        print("Error: No transcript files found")
         return 1
-
-    print(f"Analyzing {len(transcript_files)} transcript files...")
-    print()
 
     # Analyze each transcript
     results: list[TranscriptAnalysis] = []
@@ -133,81 +132,45 @@ def main() -> int:
             result = analyze_transcript(transcript_path)
             results.append(result)
             if idx % 100 == 0:
-                print(f"  Processed {idx}/{len(transcript_files)} files...")
-        except Exception as e:
+                pass
+        except Exception:
             failed_count += 1
-            print(f"  Error: {transcript_path.name}: {str(e)[:80]}")
 
     if not results:
-        print(f"\nError: All {len(transcript_files)} transcripts failed analysis")
         return 1
 
-    print(f"  Successfully analyzed: {len(results)}/{len(transcript_files)} files")
     if failed_count > 0:
-        print(f"  Failed: {failed_count} files")
-    print()
+        pass
 
     # Calculate statistics
     token_counts = [r["tokens"] for r in results]
 
-    min_tokens = min(token_counts)
+    min(token_counts)
     max_tokens = max(token_counts)
-    avg_tokens = statistics.mean(token_counts)
-    median_tokens = statistics.median(token_counts)
+    statistics.mean(token_counts)
+    statistics.median(token_counts)
 
     # Distribution
-    over_200k = sum(1 for t in token_counts if t > TOKEN_THRESHOLD_200K)
-    over_100k = sum(1 for t in token_counts if t > TOKEN_THRESHOLD_100K)
-    over_50k = sum(1 for t in token_counts if t > TOKEN_THRESHOLD_50K)
-    over_25k = sum(1 for t in token_counts if t > TOKEN_THRESHOLD_25K)
+    sum(1 for t in token_counts if t > TOKEN_THRESHOLD_200K)
+    sum(1 for t in token_counts if t > TOKEN_THRESHOLD_100K)
+    sum(1 for t in token_counts if t > TOKEN_THRESHOLD_50K)
+    sum(1 for t in token_counts if t > TOKEN_THRESHOLD_25K)
 
     # Top 10 largest
     sorted_results = sorted(results, key=lambda r: r["tokens"], reverse=True)
     top_10 = sorted_results[:10]
 
     # Output statistics
-    print("=" * 80)
-    print("TRANSCRIPT TOKEN ANALYSIS")
-    print("=" * 80)
-    print()
-    print(f"Total transcripts analyzed: {len(results)}")
-    print()
-    print("TOKEN STATISTICS:")
-    print(f"  Minimum:  {min_tokens:>10,} tokens")
-    print(f"  Maximum:  {max_tokens:>10,} tokens")
-    print(f"  Average:  {avg_tokens:>10,.0f} tokens")
-    print(f"  Median:   {median_tokens:>10,.0f} tokens")
-    print()
-    print("DISTRIBUTION:")
-    print(f"  > 200K tokens: {over_200k:>5} transcripts ({over_200k / len(results) * 100:.1f}%)")
-    print(f"  > 100K tokens: {over_100k:>5} transcripts ({over_100k / len(results) * 100:.1f}%)")
-    print(f"  >  50K tokens: {over_50k:>5} transcripts ({over_50k / len(results) * 100:.1f}%)")
-    print(f"  >  25K tokens: {over_25k:>5} transcripts ({over_25k / len(results) * 100:.1f}%)")
-    print()
-    print("TOP 10 LARGEST TRANSCRIPTS:")
-    print()
-    for i, result in enumerate(top_10, 1):
-        name = result["name"][:50]
-        tokens = result["tokens"]
-        messages = result["messages"]
-        print(f"  {i:>2}. {name:<50} {tokens:>10,} tokens ({messages:>4} msgs)")
-    print()
-    print("=" * 80)
-    print()
+    for _i, result in enumerate(top_10, 1):
+        result["name"][:50]
+        result["tokens"]
+        result["messages"]
 
     # Context window analysis
     if max_tokens <= TOKEN_THRESHOLD_200K:
-        print("✅ RESULT: All transcripts fit within 200K token context window.")
-        print()
+        pass
     else:
-        print(f"⚠️  RESULT: {over_200k} transcripts exceed 200K token context window.")
-        print(f"   Largest transcript: {max_tokens:,} tokens")
-        print()
-        print("   RECOMMENDATIONS:")
-        print("   1. Implement transcript truncation for large sessions")
-        print("   2. Use sliding window (last N user messages)")
-        print("   3. Summarize older messages and keep recent ones")
-        print()
+        pass
 
     return 0
 

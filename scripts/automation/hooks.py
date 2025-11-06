@@ -14,11 +14,11 @@ from typing import Any, Literal, cast
 
 import tiktoken
 
-from scripts.automation.agent_cli import AgentConfigPresets, AgentError, AgentExecutionError, get_agent_cli
+from scripts.automation.agent_cli import AgentConfigPresets, AgentError, AgentExecutionError, AgentTimeoutError, get_agent_cli
 from scripts.automation.config import get_config
 from scripts.automation.logger import get_logger
 from scripts.automation.transcript import format_messages_for_prompt, get_last_n_messages, is_actual_user_message
-from scripts.automation.validators import parse_code_fence_output, validate_python_full
+from scripts.automation.validators import load_bash_patterns, load_exemptions, parse_code_fence_output, validate_python_full
 
 # Resource limits (DoS protection)
 MAX_HOOK_INPUT_SIZE = 10 * 1024 * 1024  # 10MB
@@ -26,6 +26,10 @@ MAX_HOOK_INPUT_SIZE = 10 * 1024 * 1024  # 10MB
 # Token limits for moderator context
 # Claude CLI has input size limits beyond model context window - stay conservative
 MAX_MODERATOR_CONTEXT_TOKENS = 100_000  # Leave buffer for prompt + CLI input limits
+
+# Message count limits - moderator gets confused with too many messages (>100)
+# Even with token limit, high message count causes incorrect decisions
+MAX_MODERATOR_MESSAGE_COUNT = 100  # Hard cap on message count
 
 # Code fence parsing
 MIN_CODE_FENCE_LINES = 2  # Minimum lines for valid code fence (opening + closing)
@@ -48,10 +52,14 @@ def count_tokens(text: str) -> int:
 
 
 def prepare_moderator_context(transcript_path: Path) -> str:
-    """Prepare conversation context for moderator with token truncation.
+    """Prepare conversation context for moderator with token and message count limits.
 
-    Gets LAST N messages from transcript and applies binary search truncation
-    to fit within MAX_MODERATOR_CONTEXT_TOKENS limit (100K tokens).
+    Gets LAST N messages from transcript and applies:
+    1. Hard cap at MAX_MODERATOR_MESSAGE_COUNT (100 messages)
+    2. Binary search truncation to fit within MAX_MODERATOR_CONTEXT_TOKENS (100K tokens)
+
+    Message count limit is CRITICAL - moderator gives incorrect decisions above 100 messages
+    even when token count is within limits.
 
     This is the PRODUCTION function used by completion moderator hook.
     Tests MUST use this function to ensure they test production behavior.
@@ -72,11 +80,27 @@ def prepare_moderator_context(transcript_path: Path) -> str:
         return ""
 
     total_messages = len(all_messages)
+
+    # CRITICAL: Apply message count hard cap FIRST (before token-based truncation)
+    # Moderator gets confused with >100 messages and gives incorrect ALLOW decisions
+    if total_messages > MAX_MODERATOR_MESSAGE_COUNT:
+        all_messages = get_last_n_messages(transcript_path, MAX_MODERATOR_MESSAGE_COUNT)
+        logger = get_logger("hooks")
+        logger.warning(
+            "moderator_message_count_capped",
+            original_messages=total_messages,
+            capped_messages=MAX_MODERATOR_MESSAGE_COUNT,
+            reason="Moderator accuracy degrades above 100 messages",
+        )
+        total_messages = MAX_MODERATOR_MESSAGE_COUNT
+
     conversation_context = format_messages_for_prompt(all_messages)
     token_count = count_tokens(conversation_context)
 
     # If transcript is too large, use binary search to find how many messages fit
     if token_count > MAX_MODERATOR_CONTEXT_TOKENS:
+        original_token_count = token_count
+
         # Binary search to find appropriate window size
         left_window = 1
         right_window = total_messages
@@ -96,6 +120,18 @@ def prepare_moderator_context(transcript_path: Path) -> str:
 
         messages = get_last_n_messages(transcript_path, best_window)
         conversation_context = format_messages_for_prompt(messages)
+        truncated_token_count = count_tokens(conversation_context)
+
+        # Log warning about context truncation
+        logger = get_logger("hooks")
+        logger.warning(
+            "moderator_context_truncated",
+            original_messages=total_messages,
+            truncated_messages=best_window,
+            original_tokens=original_token_count,
+            truncated_tokens=truncated_token_count,
+            max_tokens=MAX_MODERATOR_CONTEXT_TOKENS,
+        )
 
     return conversation_context
 
@@ -143,6 +179,7 @@ class HookResult:
 
     decision: Literal["allow", "deny", "block"] | None = None
     reason: str | None = None
+    system_message: str | None = None
     event_type: Literal["PreToolUse", "Stop", "SubagentStop"] | None = None
 
     def to_json(self) -> str:
@@ -174,12 +211,21 @@ class HookResult:
                 output["hookSpecificOutput"]["permissionDecisionReason"] = self.reason
 
             return json.dumps(output)
-        # Stop/SubagentStop hooks use decision/reason format
+        # Stop/SubagentStop hooks use decision/reason/systemMessage format
+        # Note: Stop hooks use "approve"/"block" not "allow"/"deny"
         result: dict[str, Any] = {}
         if self.decision:
-            result["decision"] = self.decision
+            # Map internal decision to Stop hook decision
+            if self.decision == "allow":
+                result["decision"] = "approve"
+            elif self.decision == "block":
+                result["decision"] = "block"
+            else:
+                result["decision"] = self.decision  # Pass through for other values
         if self.reason:
             result["reason"] = self.reason
+        if self.system_message:
+            result["systemMessage"] = self.system_message
         return json.dumps(result)
 
     @classmethod
@@ -270,8 +316,9 @@ class HookValidator:
             # Set event type for correct JSON format
             result.event_type = cast(Literal["PreToolUse", "Stop", "SubagentStop"], hook_input.hook_event_name)
 
-            # Output result
-            print(result.to_json())
+            # Output result to stdout for Claude Code
+            sys.stdout.write(result.to_json() + "\n")
+            sys.stdout.flush()
 
             # Log result
             self.logger.info(
@@ -285,8 +332,14 @@ class HookValidator:
 
         except json.JSONDecodeError as e:
             self.logger.error("invalid_hook_input", error=str(e))
-            # Fail open on error
-            print(HookResult.allow().to_json())
+            # Fail closed - ZERO TOLERANCE
+            result = HookResult(
+                decision="block" if hook_input and hook_input.hook_event_name in ("Stop", "SubagentStop") else "deny",
+                reason=f"Hook input parsing failed: {e}",
+                event_type="Stop",  # Default to Stop format
+            )
+            sys.stdout.write(result.to_json() + "\n")
+            sys.stdout.flush()
             return 0
 
         except Exception as e:
@@ -294,50 +347,21 @@ class HookValidator:
             if hook_input:
                 error_log_args["session_id"] = hook_input.session_id
             self.logger.error("hook_error", **error_log_args)
-            # Fail open on error (safety)
-            print(HookResult.allow().to_json())
+            # Fail closed - ZERO TOLERANCE
+            # Default to block for any hook execution failure
+            event_type = hook_input.hook_event_name if hook_input else "Stop"
+            result = HookResult(
+                decision="block" if event_type in ("Stop", "SubagentStop") else "deny",
+                reason=f"Hook execution failed: {e}",
+                event_type=cast(Literal["PreToolUse", "Stop", "SubagentStop"], event_type),
+            )
+            sys.stdout.write(result.to_json() + "\n")
+            sys.stdout.flush()
             return 0
 
 
 class CommandValidator(HookValidator):
-    """Validates Bash commands."""
-
-    DENY_PATTERNS = [
-        (r"\bpython3?\b", "Use ami-run instead of direct python"),
-        (r"\bpip3?\b", "Add to pyproject.toml and use ami-uv sync"),
-        (r"(?<!i-)\buv\s+", "Use ami-uv wrapper"),
-        (r"(?<![/\w])pytest\s+", "Use ami-run scripts/run_tests.py instead of direct pytest"),
-        (r"\bcat\s+>", "Use Write/Edit tools instead of cat - bypasses code quality validation"),
-        (r"\becho\s+.*>", "Use Write/Edit tools instead of echo - bypasses code quality validation"),
-        (r"\btee\s+", "Use Write/Edit tools instead of tee - bypasses code quality validation"),
-        (r"--no-verify", "Git hook bypass forbidden"),
-        (r"\bgit\b.*\bcommit\b", "Use scripts/git_commit.sh"),
-        (r"\bgit\b.*\bpush\b", "Use scripts/git_push.sh"),
-        (r"\bgit\b.*\brestore\b", "Git restore forbidden - modifies staging/working tree"),
-        (r"\bgit\b.*\breset\b", "Git reset forbidden - modifies HEAD/staging/working tree"),
-        (r"\bgit\b.*\bcheckout\b", "Git checkout forbidden - modifies working tree"),
-        (r"\bgit\b.*\bpull\b", "Git pull forbidden - modifies working tree"),
-        (r"\bgit\b.*\brebase\b", "Git rebase forbidden - rewrites history"),
-        (r"\bgit\b.*\bmerge\b", "Git merge forbidden - modifies working tree"),
-        (r"\bgit\b.*\brm\b.*--cached", "Git rm --cached forbidden - removes files from git index"),
-        # Check && before & to avoid false matches (second & in && would match &(?!&))
-        (r"&&", "Use separate Bash calls instead of &&"),
-        (r"&(?!&)", "Use run_in_background parameter instead of &"),
-        (r";", "Use separate Bash calls instead of ;"),
-        (r"\|\|", "Use separate Bash calls instead of ||"),
-        (r"\|", "Use dedicated tools (Read/Grep) instead of pipes"),
-        (r">>", "Use Edit/Write tools instead of >>"),
-        (r"\bsed\b", "Use Edit tool instead of sed"),
-        (r"\bawk\b", "Use Read/Grep tools instead of awk"),
-        (r"\bnode\b", "Use nodes launcher for Node.js operations"),
-        (r"\bwget\b", "Use Read/WebFetch tools instead of wget"),
-        (r"\bpkill\b", "Use KillShell tool for background process management"),
-        (r"\bkill\b", "Use KillShell tool for background process management"),
-        (r"\bkillall\b", "Use KillShell tool for background process management"),
-        (r"\bsudo\b", "Sudo commands not allowed (except in approved scripts)"),
-        (r"(?<!--)\bchmod\b", "File permission changes not allowed (git update-index --chmod is allowed)"),
-        (r"\bchown\b", "File ownership changes not allowed"),
-    ]
+    """Validates Bash commands using patterns from YAML configuration."""
 
     def _extract_strings(self, obj: Any) -> Iterator[str]:
         """Recursively extract all string values from nested structures."""
@@ -351,7 +375,7 @@ class CommandValidator(HookValidator):
                 yield from self._extract_strings(item)
 
     def validate(self, hook_input: HookInput) -> HookResult:
-        """Validate bash command.
+        """Validate bash command against patterns from bash_commands.yaml.
 
         Args:
             hook_input: Hook input
@@ -366,10 +390,16 @@ class CommandValidator(HookValidator):
         if hook_input.tool_input is None:
             return HookResult.allow()
 
+        # Load patterns from YAML
+        deny_patterns = load_bash_patterns()
+
         # Check all strings in tool_input (handles nested structures)
         all_strings = list(self._extract_strings(hook_input.tool_input))
 
-        for pattern, message in self.DENY_PATTERNS:
+        for pattern_config in deny_patterns:
+            pattern = pattern_config.get("pattern", "")
+            message = pattern_config.get("message", "Pattern violation detected")
+
             for string in all_strings:
                 if re.search(pattern, string):
                     return HookResult.deny(f"{message} (pattern: {pattern})")
@@ -379,12 +409,6 @@ class CommandValidator(HookValidator):
 
 class CodeQualityValidator(HookValidator):
     """Validates code changes for quality regressions using LLM-based audit."""
-
-    # Files exempt from pattern checks (contain error messages with forbidden patterns)
-    PATTERN_CHECK_EXEMPTIONS = {
-        "scripts/automation/hooks.py",
-        "scripts/automation/validators.py",
-    }
 
     def _extract_old_new_code(self, hook_input: HookInput) -> tuple[str, str]:
         """Extract old and new code from hook input.
@@ -410,7 +434,7 @@ class CodeQualityValidator(HookValidator):
         return old_code, new_code
 
     def validate(self, hook_input: HookInput) -> HookResult:
-        """Validate code quality using LLM diff audit.
+        """Validate code quality using patterns and LLM diff audit.
 
         Args:
             hook_input: Hook input
@@ -428,8 +452,11 @@ class CodeQualityValidator(HookValidator):
         # Extract old/new code
         old_code, new_code = self._extract_old_new_code(hook_input)
 
+        # Load exemptions from YAML
+        exemptions = load_exemptions()
+
         # Check if file is exempt from pattern checks
-        is_pattern_exempt = any(file_path.endswith(exempt) for exempt in self.PATTERN_CHECK_EXEMPTIONS)
+        is_pattern_exempt = any(file_path.endswith(exempt) for exempt in exemptions)
 
         # Skip validation for exempt files
         if is_pattern_exempt:
@@ -446,6 +473,76 @@ class CodeQualityValidator(HookValidator):
         if is_valid:
             return HookResult.allow()
         return HookResult.deny(reason)
+
+
+class ShebangValidator(HookValidator):
+    """Validates Python file shebangs for security and correctness."""
+
+    def validate(self, hook_input: HookInput) -> HookResult:
+        """Validate shebangs in Python files.
+
+        Args:
+            hook_input: Hook input
+
+        Returns:
+            Validation result
+        """
+        # Only check Python files on Edit/Write
+        if hook_input.tool_name not in ("Edit", "Write") or hook_input.tool_input is None:
+            return HookResult.allow()
+
+        file_path_str = hook_input.tool_input.get("file_path", "")
+        if not file_path_str.endswith(".py"):
+            return HookResult.allow()
+
+        file_path = Path(file_path_str)
+
+        # Get new content
+        if hook_input.tool_name == "Write":
+            new_content = hook_input.tool_input.get("content", "")
+        else:  # Edit
+            # For edits, check if shebang is being modified
+            old_string = hook_input.tool_input.get("old_string", "")
+            new_string = hook_input.tool_input.get("new_string", "")
+
+            # Only check if shebang lines are involved
+            if not (old_string.startswith("#!") or new_string.startswith("#!")):
+                return HookResult.allow()
+
+            # Read current file and apply edit to get new content
+            if file_path.exists():
+                current = file_path.read_text()
+                new_content = current.replace(old_string, new_string, 1)
+            else:
+                new_content = new_string
+
+        # Check first 200 bytes for shebang
+        first_lines = new_content[:200].encode()
+
+        # Security patterns (fail immediately)
+        security_issues = [
+            (b"sudo", "Contains sudo (security risk)"),
+            (b"/usr/bin/python", "System python path (out-of-sandbox)"),
+            (b"/usr/local/bin/python", "System python path (out-of-sandbox)"),
+        ]
+
+        for pattern, description in security_issues:
+            if pattern in first_lines:
+                return HookResult.deny(f"SECURITY: {description} in {file_path_str}")
+
+        # Incorrect patterns
+        incorrect_patterns = [
+            (b"#!/usr/bin/env python3", "Direct python3 shebang"),
+            (b"#!/usr/bin/env python", "Direct python shebang"),
+            (b"#!/usr/bin/python", "Direct python shebang"),
+            (b'.venv/bin/python"', "Direct .venv python"),
+        ]
+
+        for pattern, description in incorrect_patterns:
+            if pattern in first_lines and b"ami-run.sh" not in first_lines:
+                return HookResult.deny(f"Shebang issue: {description} in {file_path_str}. Use ami-run wrapper instead.")
+
+        return HookResult.allow()
 
 
 class ResponseScanner(HookValidator):
@@ -568,21 +665,62 @@ class ResponseScanner(HookValidator):
         """
         cleaned_output = parse_code_fence_output(output)
 
-        # Check for ALLOW decision
-        if re.search(r"\bALLOW\b", cleaned_output, re.IGNORECASE):
-            self.logger.info("completion_moderator_allow", session_id=session_id)
-            return HookResult.allow()
+        # Check for conversational phrases that indicate prompt violation
+        conversational_phrases = [
+            r"I see\s+(?:the|that)",
+            r"Let me\s+(?:check|now|run|see|verify)",
+            r"I need to\s+",
+            r"I was\s+",
+            r"I'm\s+(?:confused|going)",
+            r"I've\s+(?:successfully|completed)",
+            r"Could you\s+",
+            r"Should I\s+",
+        ]
 
-        # Check for BLOCK decision
+        for phrase_pattern in conversational_phrases:
+            if re.search(phrase_pattern, cleaned_output, re.IGNORECASE):
+                self.logger.warning("completion_moderator_conversational", session_id=session_id, phrase=phrase_pattern, output_preview=cleaned_output[:200])
+                return HookResult.block(
+                    "COMPLETION VALIDATION ERROR\n\n"
+                    "Moderator returned conversational text instead of structured decision.\n"
+                    "This indicates a prompt following failure.\n\n"
+                    f"Output preview: {cleaned_output[:300]}\n\n"
+                    "Defaulting to BLOCK for safety."
+                )
+
+        # Try to extract XML decision tags (new format)
+        xml_match = re.search(r"<decision>\s*(.+?)\s*</decision>", cleaned_output, re.IGNORECASE | re.DOTALL)
+        if xml_match:
+            decision_text = xml_match.group(1).strip()
+
+            # Check if it's ALLOW
+            if re.match(r"^ALLOW$", decision_text, re.IGNORECASE):
+                self.logger.info("completion_moderator_allow", session_id=session_id, format="xml")
+                return HookResult(decision="allow", system_message="✅ Completion validated - work meets requirements")
+
+            # Check if it's BLOCK with reason
+            block_xml_match = re.match(r"^BLOCK:\s*(.+)$", decision_text, re.IGNORECASE | re.DOTALL)
+            if block_xml_match:
+                reason = block_xml_match.group(1).strip()
+                self.logger.info("completion_moderator_block", session_id=session_id, reason=reason[:100], format="xml")
+                return HookResult.block(f"❌ COMPLETION VALIDATION FAILED\n\n{reason}\n\nWork is not complete. Continue working or provide clarification.")
+
+        # Fallback: Check for plain ALLOW/BLOCK (backward compatibility)
+        if re.search(r"\bALLOW\b", cleaned_output, re.IGNORECASE):
+            self.logger.info("completion_moderator_allow", session_id=session_id, format="plain")
+            return HookResult(decision="allow", system_message="✅ Completion validated - work meets requirements")
+
         block_match = re.search(r"\bBLOCK:\s*(.+)", cleaned_output, re.IGNORECASE | re.DOTALL)
         if block_match:
             reason = block_match.group(1).strip()
-            self.logger.info("completion_moderator_block", session_id=session_id, reason=reason[:100])
+            self.logger.info("completion_moderator_block", session_id=session_id, reason=reason[:100], format="plain")
             return HookResult.block(f"❌ COMPLETION VALIDATION FAILED\n\n{reason}\n\nWork is not complete. Continue working or provide clarification.")
 
         # No clear decision - fail closed
         self.logger.warning("completion_moderator_unclear", session_id=session_id, output=cleaned_output[:200])
-        return HookResult.block(f"COMPLETION VALIDATION UNCLEAR\n\nModerator output:\n{output}\n\nCannot determine if work is complete.")
+        return HookResult.block(
+            f"COMPLETION VALIDATION UNCLEAR\n\nModerator output:\n{output}\n\nCannot determine if work is complete. Defaulting to BLOCK for safety."
+        )
 
     def _load_moderator_context(self, session_id: str, execution_id: str, transcript_path: Path) -> tuple[str | None, HookResult | None]:
         """Load and validate conversation context for moderator.
@@ -630,6 +768,23 @@ class ResponseScanner(HookValidator):
         Returns:
             Block result with error details
         """
+        if isinstance(error, AgentTimeoutError):
+            self.logger.error(
+                "completion_moderator_timeout",
+                session_id=session_id,
+                execution_id=execution_id,
+                timeout_seconds=error.timeout,
+                actual_duration=error.duration,
+            )
+            return HookResult.block(
+                f"❌ COMPLETION VALIDATION TIMEOUT\n\n"
+                f"Moderator exceeded {error.timeout}s timeout while analyzing conversation.\n\n"
+                f"This typically indicates:\n"
+                f"1. Very large conversation context (>100K tokens)\n"
+                f"2. API slowness/throttling\n"
+                f"3. Network issues\n\n"
+                f"Cannot verify completion due to timeout. Work remains unverified."
+            )
         if isinstance(error, AgentExecutionError):
             self.logger.error(
                 "completion_moderator_error",
@@ -653,6 +808,243 @@ class ResponseScanner(HookValidator):
             return HookResult.block(f"❌ COMPLETION VALIDATION ERROR\n\n{error}\n\nCannot verify completion due to moderator failure.")
         self.logger.error("completion_moderator_error", session_id=session_id, execution_id=execution_id, error=str(error))
         raise error
+
+    def _check_first_output_in_audit_log(self, audit_log_path: Path) -> bool:
+        """Check if audit log contains first output marker.
+
+        Args:
+            audit_log_path: Path to audit log file
+
+        Returns:
+            True if first output marker found, False otherwise
+        """
+        if not audit_log_path or not audit_log_path.exists():
+            return False
+
+        try:
+            with audit_log_path.open() as f:
+                for line in f:
+                    if "=== FIRST OUTPUT:" in line:
+                        return True
+        except OSError:
+            pass
+
+        return False
+
+    def _check_decision_in_output(self, output: str) -> bool:
+        """Check if moderator output contains a decision tag.
+
+        Args:
+            output: Moderator output string
+
+        Returns:
+            True if <decision> tag found, False otherwise
+        """
+        if not output:
+            return False
+        return "<decision>" in output.lower()
+
+    def _run_moderator_with_first_output_monitoring(
+        self,
+        session_id: str,
+        execution_id: str,
+        cli: Any,
+        moderator_prompt: Path,
+        conversation_context: str,
+        completion_moderator_config: Any,
+        audit_log_path: Path | None,
+        max_attempts: int = 2,
+        first_output_timeout: float = 3.5,
+    ) -> tuple[str, dict[str, Any] | None]:
+        """Run moderator with automatic restart if hangs during startup or analysis.
+
+        Monitors for TWO types of hangs:
+        1. **Startup hang**: No first output within first_output_timeout (default 3.5s)
+           - Claude never starts streaming
+           - Process appears stuck before any output
+
+        2. **Analysis hang**: First output produced but no <decision> tag
+           - Claude starts streaming (system init message)
+           - But hangs during thinking/analysis phase
+           - Never produces final <decision> output
+
+        If either hang detected, automatically restarts (up to max_attempts total).
+
+        This fixes two historical issues:
+        - execution 90858109: hung during analysis phase after first output
+        - execution 9101bf43: hung during analysis, no decision after first output
+
+        Args:
+            session_id: Session ID
+            execution_id: Execution ID
+            cli: Agent CLI instance
+            moderator_prompt: Path to moderator prompt file
+            conversation_context: Conversation context string
+            completion_moderator_config: Agent config
+            audit_log_path: Audit log path (required for monitoring)
+            max_attempts: Maximum attempts (default 2: original + 1 restart)
+            first_output_timeout: Seconds to wait for first output (default 3.5s)
+
+        Returns:
+            Tuple of (output, metadata)
+
+        Raises:
+            AgentTimeoutError: All attempts hung without first output
+            AgentError: Other execution errors
+        """
+        import time
+
+        if not audit_log_path:
+            # No audit log - cannot monitor for first output, run directly
+            result: tuple[str, dict[str, Any] | None] = cli.run_print(
+                instruction_file=moderator_prompt,
+                stdin=conversation_context,
+                agent_config=completion_moderator_config,
+                audit_log_path=audit_log_path,
+            )
+            return result
+
+        # Use shorter timeout to detect hangs quickly
+        # first_output_timeout determines how quickly we detect and retry on hangs
+        original_timeout = completion_moderator_config.timeout
+        hang_detection_timeout = max(int(first_output_timeout * 2), 10)  # At least 2x first_output_timeout
+
+        for attempt in range(1, max_attempts + 1):
+            attempt_execution_id = f"{execution_id}-attempt{attempt}"
+
+            # Clear audit log for this attempt
+            if audit_log_path.exists():
+                audit_log_path.unlink()
+
+            self.logger.info(
+                "completion_moderator_attempt_starting",
+                session_id=session_id,
+                execution_id=attempt_execution_id,
+                attempt=attempt,
+                max_attempts=max_attempts,
+                timeout=hang_detection_timeout,
+            )
+
+            # Set shorter timeout for hang detection
+            completion_moderator_config.timeout = hang_detection_timeout
+
+            try:
+                start_time = time.time()
+
+                # Start moderator execution
+                # Note: first_output_timeout monitoring happens via audit log polling
+                # If no first output within first_output_timeout, we check audit log and retry
+                output, metadata = cli.run_print(
+                    instruction_file=moderator_prompt,
+                    stdin=conversation_context,
+                    agent_config=completion_moderator_config,
+                    audit_log_path=audit_log_path,
+                )
+
+                # Success - verify first output was produced
+                has_first_output = self._check_first_output_in_audit_log(audit_log_path)
+                has_decision = self._check_decision_in_output(output)
+                elapsed = time.time() - start_time
+
+                if has_first_output and has_decision:
+                    # Complete success - both first output and decision present
+                    self.logger.info(
+                        "completion_moderator_attempt_success",
+                        session_id=session_id,
+                        execution_id=attempt_execution_id,
+                        attempt=attempt,
+                        elapsed=round(elapsed, 2),
+                    )
+                    # Restore original timeout
+                    completion_moderator_config.timeout = original_timeout
+                    return output, metadata
+
+                if has_first_output and not has_decision:
+                    # Analysis hang: first output present but no decision
+                    # This is the case where Claude starts streaming but hangs during analysis
+                    if attempt < max_attempts:
+                        # Kill hung process before retry
+                        cli.kill_current_process()
+
+                        self.logger.warning(
+                            "completion_moderator_analysis_hang_restarting",
+                            session_id=session_id,
+                            execution_id=attempt_execution_id,
+                            attempt=attempt,
+                            max_attempts=max_attempts,
+                            reason="First output present but no decision tag - Claude hung during analysis",
+                            output_preview=output[:500] if output else "",
+                            output_length=len(output) if output else 0,
+                            has_streaming_messages=bool(output and '{"type"' in output),
+                            elapsed=elapsed,
+                        )
+                        continue  # Retry
+                    # Last attempt - return output even without decision
+                    # Parsing will handle missing decision (fail-closed)
+                    self.logger.error(
+                        "completion_moderator_analysis_hang_exhausted",
+                        session_id=session_id,
+                        execution_id=attempt_execution_id,
+                        attempt=attempt,
+                        reason="No decision tag after all attempts",
+                    )
+                    completion_moderator_config.timeout = original_timeout
+                    return output, metadata
+
+                # No first output but completed (shouldn't happen, but handle it)
+                self.logger.warning(
+                    "completion_moderator_no_first_output_but_completed",
+                    session_id=session_id,
+                    execution_id=attempt_execution_id,
+                    attempt=attempt,
+                )
+                # Still return the output - this is unexpected but not necessarily wrong
+                completion_moderator_config.timeout = original_timeout
+                return output, metadata
+
+            except (AgentTimeoutError, AgentExecutionError) as e:
+                # Check if first output was produced before failure
+                has_first_output = self._check_first_output_in_audit_log(audit_log_path)
+
+                if not has_first_output and attempt < max_attempts:
+                    # No first output - this is a hang, retry
+                    # Kill hung process before retry
+                    cli.kill_current_process()
+
+                    # Get audit log size for debugging
+                    audit_log_size = audit_log_path.stat().st_size if audit_log_path and audit_log_path.exists() else 0
+
+                    self.logger.warning(
+                        "completion_moderator_hang_detected_restarting",
+                        session_id=session_id,
+                        execution_id=attempt_execution_id,
+                        attempt=attempt,
+                        max_attempts=max_attempts,
+                        error_type=type(e).__name__,
+                        reason="No first output within timeout - likely Claude hang",
+                        audit_log_size=audit_log_size,
+                        elapsed=time.time() - start_time,
+                    )
+
+                    # Restore timeout before retry
+                    completion_moderator_config.timeout = original_timeout
+                    continue  # Retry
+
+                # First output was produced OR last attempt - re-raise
+                completion_moderator_config.timeout = original_timeout
+                raise
+
+            except Exception:
+                # Other errors - re-raise immediately
+                completion_moderator_config.timeout = original_timeout
+                raise
+
+        # All attempts exhausted without success
+        raise AgentTimeoutError(
+            timeout=int(hang_detection_timeout * max_attempts),
+            cmd=["claude", "--print"],  # Simplified cmd for error reporting
+            duration=float(hang_detection_timeout * max_attempts),
+        )
 
     def _validate_completion(self, session_id: str, transcript_path: Path) -> HookResult:
         """Validate completion marker using moderator agent.
@@ -684,16 +1076,103 @@ class ResponseScanner(HookValidator):
                 f"COMPLETION VALIDATION ERROR\n\nModerator prompt not found: {moderator_prompt}\n\nCannot validate completion without prompt."
             )
 
-        # Run moderator agent and parse decision
+        # Create audit log file for debugging/troubleshooting
+        audit_dir = self.config.root / "logs" / "agent-cli"
+        audit_dir.mkdir(parents=True, exist_ok=True)
+        audit_log_path = audit_dir / f"completion-moderator-{execution_id}.log"
+
         try:
+            from datetime import datetime
+
+            with audit_log_path.open("w") as f:
+                f.write(f"=== MODERATOR EXECUTION {execution_id} ===\n")
+                if conversation_context:
+                    f.write(f"Timestamp: {datetime.now().isoformat()}\n")
+                    f.write(f"Session: {session_id}\n")
+                    f.write(f"Context size: {len(conversation_context)} chars\n")
+                    f.write(f"Token count: {count_tokens(conversation_context)}\n\n")
+                    f.write("=== PROMPT ===\n")
+                    f.write(moderator_prompt.read_text())
+                    f.write("\n\n=== CONVERSATION CONTEXT ===\n")
+                    f.write(conversation_context)
+                    f.write("\n\n=== STREAMING OUTPUT ===\n")
+
+            self.logger.info("completion_moderator_audit_log_created", session_id=session_id, execution_id=execution_id, path=str(audit_log_path))
+        except OSError as e:
+            self.logger.warning("completion_moderator_audit_log_failed", session_id=session_id, execution_id=execution_id, error=str(e))
+
+        # Run moderator agent and parse decision
+        # Timeout behavior:
+        # - agent_cli has 100s timeout (AgentConfigPresets.completion_moderator)
+        # - hooks.yaml has 120s timeout (framework level)
+        # - If agent_cli times out first: AgentTimeoutError caught → fail-closed (BLOCK)
+        # - If framework times out first: process killed → hook framework fails-open (ALLOW)
+        # - Timeouts must be aligned to ensure fail-closed behavior (agent < framework)
+        try:
+            import signal
+            import time
+
+            # Set up alarm for framework timeout detection
+            # Framework timeout is 120s, set alarm at 115s to log before kill
+            framework_timeout = 120
+            warning_time = framework_timeout - 5
+
+            def timeout_warning_handler(signum: int, frame: Any) -> None:
+                """Log warning when approaching framework timeout."""
+                self.logger.error(
+                    "completion_moderator_approaching_timeout",
+                    session_id=session_id,
+                    execution_id=execution_id,
+                    warning_time=warning_time,
+                    framework_timeout=framework_timeout,
+                )
+
+            signal.signal(signal.SIGALRM, timeout_warning_handler)
+            signal.alarm(warning_time)
+
             cli = get_agent_cli()
             completion_moderator_config = AgentConfigPresets.completion_moderator(session_id)
             completion_moderator_config.enable_streaming = True
-            output, _ = cli.run_print(
-                instruction_file=moderator_prompt,
-                stdin=conversation_context,
-                agent_config=completion_moderator_config,
+
+            start_time = time.time()
+            self.logger.info("completion_moderator_starting", session_id=session_id, execution_id=execution_id)
+
+            # Run moderator with first-output monitoring and automatic restart
+            if not conversation_context:
+                return HookResult.block("Cannot validate completion - no conversation context")
+
+            output, _ = self._run_moderator_with_first_output_monitoring(
+                session_id=session_id,
+                execution_id=execution_id,
+                cli=cli,
+                moderator_prompt=moderator_prompt,
+                conversation_context=conversation_context,
+                completion_moderator_config=completion_moderator_config,
+                audit_log_path=audit_log_path,
+                max_attempts=2,  # Original + 1 restart
+                first_output_timeout=3.5,  # Seconds to wait for first output
             )
+
+            signal.alarm(0)  # Cancel alarm on success
+
+            elapsed_time = time.time() - start_time
+            self.logger.info(
+                "completion_moderator_completed",
+                session_id=session_id,
+                execution_id=execution_id,
+                elapsed_seconds=round(elapsed_time, 2),
+            )
+
+            slow_threshold_seconds = 60
+            if elapsed_time > slow_threshold_seconds:
+                self.logger.warning(
+                    "completion_moderator_slow",
+                    session_id=session_id,
+                    execution_id=execution_id,
+                    elapsed_seconds=round(elapsed_time, 2),
+                    threshold_seconds=slow_threshold_seconds,
+                )
+
             self.logger.info("completion_moderator_raw_output", session_id=session_id, execution_id=execution_id, output=output)
             return self._parse_moderator_decision(session_id, output)
         except Exception as e:

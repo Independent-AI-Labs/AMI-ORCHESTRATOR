@@ -1,3 +1,8 @@
+#!/usr/bin/env bash
+'exec "$(dirname "$0")/../scripts/ami-run.sh" "$(dirname "$0")/agent_main.py" "$@" #'
+
+from __future__ import annotations
+
 """AMI Agent - Unified automation entry point.
 
 Replaces multiple bash scripts (claude-agent.sh, claude-audit.sh, etc.)
@@ -46,13 +51,10 @@ Examples:
     ami-agent --docs docs/
 """
 
-from __future__ import annotations
-
 import json
 import subprocess
 import sys
 import tempfile
-import uuid
 from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
@@ -68,6 +70,7 @@ ORCHESTRATOR_ROOT, MODULE_ROOT = setup_imports()
 # Ensure scripts.automation is importable
 sys.path.insert(0, str(ORCHESTRATOR_ROOT))
 
+from base.backend.utils.uuid_utils import uuid7
 from scripts.automation.agent_cli import (
     AgentConfigPresets,
     AgentError,
@@ -80,6 +83,7 @@ from scripts.automation.hooks import (
     CodeQualityValidator,
     CommandValidator,
     ResponseScanner,
+    ShebangValidator,
 )
 from scripts.automation.logger import get_logger
 
@@ -247,7 +251,6 @@ def mode_print(instruction_path: str) -> int:
     instruction_file = Path(instruction_path)
 
     if not instruction_file.exists():
-        print(f"Instruction file not found: {instruction_path}", file=sys.stderr)
         return 1
 
     # Read stdin
@@ -256,21 +259,18 @@ def mode_print(instruction_path: str) -> int:
     # Run with worker agent preset (hooks enabled, all tools)
     cli = get_agent_cli()
     try:
-        session_id = str(uuid.uuid4())
-        output = cli.run_print(
+        session_id = uuid7()
+        cli.run_print(
             instruction_file=instruction_file,
             stdin=stdin,
             agent_config=AgentConfigPresets.worker(session_id=session_id),
         )
         # Print output
-        print(output)
         return 0
     except AgentExecutionError as e:
         # Print output even on failure
-        print(e.stdout, end="")
         return e.exit_code
-    except AgentError as e:
-        print(f"Error: {e}", file=sys.stderr)
+    except AgentError:
         return 1
 
 
@@ -278,7 +278,7 @@ def mode_hook(validator_name: str) -> int:
     """Hook validator mode - Validate hook input from stdin.
 
     Args:
-        validator_name: Name of validator (command-guard, code-quality, response-scanner)
+        validator_name: Name of validator (command-guard, code-quality, response-scanner, shebang-check)
 
     Returns:
         Exit code (0=success, 1=failure)
@@ -287,13 +287,12 @@ def mode_hook(validator_name: str) -> int:
         "command-guard": CommandValidator,
         "code-quality": CodeQualityValidator,
         "response-scanner": ResponseScanner,
+        "shebang-check": ShebangValidator,
     }
 
     validator_class = validators.get(validator_name)
 
     if not validator_class:
-        print(f"Unknown validator: {validator_name}", file=sys.stderr)
-        print(f"Available: {', '.join(validators.keys())}", file=sys.stderr)
         return 1
 
     validator = validator_class()
@@ -314,7 +313,6 @@ def mode_audit(directory_path: str, retry_errors: bool = False, user_instruction
     directory = Path(directory_path)
 
     if not directory.exists():
-        print(f"Directory not found: {directory_path}", file=sys.stderr)
         return 1
 
     engine = AuditEngine()
@@ -323,24 +321,16 @@ def mode_audit(directory_path: str, retry_errors: bool = False, user_instruction
     results = engine.audit_directory(directory, parallel=True, max_workers=4, retry_errors=retry_errors, user_instruction=user_instruction)
 
     # Print summary
-    passed = sum(1 for r in results if r.status == "PASS")
+    sum(1 for r in results if r.status == "PASS")
     failed = sum(1 for r in results if r.status == "FAIL")
     errors = sum(1 for r in results if r.status == "ERROR")
 
-    print("\nAudit Summary:")
-    print(f"  Total: {len(results)}")
-    print(f"  Passed: {passed}")
-    print(f"  Failed: {failed}")
-    print(f"  Errors: {errors}")
-
     # Print failures
     if failed > 0:
-        print("\nFailures:")
         for result in results:
             if result.status == "FAIL":
-                print(f"\n  {result.file_path}:")
-                for violation in result.violations:
-                    print(f"    Line {violation['line']}: {violation['message']}")
+                for _violation in result.violations:
+                    pass
 
     return 1 if (failed > 0 or errors > 0) else 0
 
@@ -360,14 +350,12 @@ def mode_tasks(path: str, root_dir: str | None = None, parallel: bool = False, u
     target_path = Path(path)
 
     if not target_path.exists():
-        print(f"Path not found: {path}", file=sys.stderr)
         return 1
 
     # Convert root_dir to Path if provided
     root_path = Path(root_dir) if root_dir else None
 
     if root_path and not root_path.exists():
-        print(f"Root directory not found: {root_dir}", file=sys.stderr)
         return 1
 
     from scripts.automation.tasks import TaskExecutor
@@ -378,31 +366,22 @@ def mode_tasks(path: str, root_dir: str | None = None, parallel: bool = False, u
     results = executor.execute_tasks(target_path, parallel=parallel, root_dir=root_path, user_instruction=user_instruction)
 
     # Print summary
-    completed = sum(1 for r in results if r.status == "completed")
+    sum(1 for r in results if r.status == "completed")
     feedback = sum(1 for r in results if r.status == "feedback")
     failed = sum(1 for r in results if r.status == "failed")
     timeout = sum(1 for r in results if r.status == "timeout")
 
-    print("\nTask Execution Summary:")
-    print(f"  Total: {len(results)}")
-    print(f"  Completed: {completed}")
-    print(f"  Needs Feedback: {feedback}")
-    print(f"  Failed: {failed}")
-    print(f"  Timeout: {timeout}")
-
     # Print feedback files
     if feedback > 0:
-        print("\nFeedback Files:")
         for result in results:
             if result.status == "feedback":
-                print(f"  - {result.task_file.name}: See feedback-*-{result.task_file.stem}.md")
+                pass
 
     # Print failed tasks
     if failed > 0:
-        print("\nFailed Tasks:")
         for result in results:
             if result.status == "failed":
-                print(f"  - {result.task_file.name}: {result.error}")
+                pass
 
     return 1 if (failed > 0 or timeout > 0) else 0
 
@@ -420,11 +399,9 @@ def mode_sync(module_path: str, user_instruction: str | None = None) -> int:
     module = Path(module_path)
 
     if not module.exists():
-        print(f"Module not found: {module_path}", file=sys.stderr)
         return 1
 
     if not (module / ".git").exists():
-        print(f"Not a git repository: {module_path}", file=sys.stderr)
         return 1
 
     from scripts.automation.sync import SyncExecutor
@@ -435,16 +412,12 @@ def mode_sync(module_path: str, user_instruction: str | None = None) -> int:
     result = executor.sync_module(module, user_instruction=user_instruction)
 
     # Print result
-    print(f"\nSync Result: {result.status.upper()}")
-    print(f"  Module: {result.module_path}")
-    print(f"  Attempts: {len(result.attempts)}")
-    print(f"  Duration: {result.total_duration:.1f}s")
 
     if result.error:
-        print(f"  Error: {result.error}")
+        pass
 
     if result.status == "feedback":
-        print("\n  Needs Feedback: See .sync-progress-*.md in module directory")
+        pass
 
     return 0 if result.status == "synced" else 1
 
@@ -464,14 +437,12 @@ def mode_docs(directory_path: str, root_dir: str | None = None, parallel: bool =
     directory = Path(directory_path)
 
     if not directory.exists():
-        print(f"Directory not found: {directory_path}", file=sys.stderr)
         return 1
 
     # Convert root_dir to Path if provided
     root_path = Path(root_dir) if root_dir else None
 
     if root_path and not root_path.exists():
-        print(f"Root directory not found: {root_dir}", file=sys.stderr)
         return 1
 
     from scripts.automation.docs import DocsExecutor
@@ -487,37 +458,23 @@ def mode_docs(directory_path: str, root_dir: str | None = None, parallel: bool =
     failed = sum(1 for r in results if r.status == "failed")
     timeout = sum(1 for r in results if r.status == "timeout")
 
-    print("\nDocumentation Maintenance Summary:")
-    print(f"  Total: {len(results)}")
-    print(f"  Completed: {completed}")
-    print(f"  Needs Feedback: {feedback}")
-    print(f"  Failed: {failed}")
-    print(f"  Timeout: {timeout}")
-
     # Print action breakdown for completed docs
     if completed > 0:
-        updated = sum(1 for r in results if r.status == "completed" and r.action == "UPDATE")
-        archived = sum(1 for r in results if r.status == "completed" and r.action == "ARCHIVE")
-        deleted = sum(1 for r in results if r.status == "completed" and r.action == "DELETE")
-
-        print("\nActions Taken:")
-        print(f"  Updated: {updated}")
-        print(f"  Archived: {archived}")
-        print(f"  Marked for Deletion: {deleted}")
+        sum(1 for r in results if r.status == "completed" and r.action == "UPDATE")
+        sum(1 for r in results if r.status == "completed" and r.action == "ARCHIVE")
+        sum(1 for r in results if r.status == "completed" and r.action == "DELETE")
 
     # Print feedback files
     if feedback > 0:
-        print("\nDocs Needing Feedback:")
         for result in results:
             if result.status == "feedback" and result.feedback:
-                print(f"  - {result.doc_file.name}: {result.feedback[:100]}...")
+                pass
 
     # Print failed docs
     if failed > 0:
-        print("\nFailed Docs:")
         for result in results:
             if result.status == "failed":
-                print(f"  - {result.doc_file.name}: {result.error}")
+                pass
 
     return 1 if (failed > 0 or timeout > 0) else 0
 
@@ -546,7 +503,7 @@ def main() -> int:
     parser.add_argument(
         "--hook",
         metavar="VALIDATOR",
-        help="Hook validator mode (command-guard, code-quality, response-scanner)",
+        help="Hook validator mode (command-guard, code-quality, response-scanner, shebang-check)",
     )
 
     parser.add_argument(

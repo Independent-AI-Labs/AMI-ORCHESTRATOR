@@ -30,7 +30,7 @@ hooks:
 
 # Claude Code CLI settings (abstraction layer in code)
 claude_cli:
-  command: "claude"
+  command: "{root}/.venv/node_modules/.bin/claude"  # Use venv Claude, not system
   model_default: "claude-sonnet-4-5"
   model_audit: "claude-sonnet-4-5"  # 100% accuracy requirement
 

@@ -1,4 +1,6 @@
-#!/usr/bin/env python3
+#!/usr/bin/env bash
+"""'exec "$(dirname "$0")/ami-run.sh" "$0" "$@" #"""
+
 """Git repository server management CLI.
 
 Creates and manages bare git repositories for local/remote development.
@@ -36,13 +38,11 @@ def get_base_path() -> Path:
 
 def _print_success(message: str) -> None:
     """Print success message."""
-    print(f"✓ {message}")
 
 
 def _print_info(message: str, indent: int = 0) -> None:
     """Print info message with optional indentation."""
-    prefix = "  " * indent
-    print(f"{prefix}{message}")
+    "  " * indent
 
 
 class GitRepoManager:
@@ -68,16 +68,19 @@ class GitRepoManager:
 
     def init_server(self) -> None:
         """Initialize git server directory structure."""
-        result = self.repo_ops.init_server()
-        _print_success(result.message)
-        if result.data:
-            if result.data.get("already_exists"):
-                _print_info(f"Base path: {result.data['base_path']}", 1)
-                _print_info(f"Repositories: {result.data['repos_path']}", 1)
-            else:
-                _print_info(f"Base path: {result.data['base_path']}", 1)
-                _print_info(f"Repositories: {result.data['repos_path']}", 1)
-                _print_info(f"README: {result.data['readme_path']}", 1)
+        try:
+            result = self.repo_ops.init_server()
+            _print_success(result.message)
+            if result.data:
+                if result.data.get("already_exists"):
+                    _print_info(f"Base path: {result.data['base_path']}", 1)
+                    _print_info(f"Repositories: {result.data['repos_path']}", 1)
+                else:
+                    _print_info(f"Base path: {result.data['base_path']}", 1)
+                    _print_info(f"Repositories: {result.data['repos_path']}", 1)
+                    _print_info(f"README: {result.data['readme_path']}", 1)
+        except (RepositoryError, GitServerError):
+            sys.exit(1)
 
     def create_repo(self, name: str, description: str | None = None) -> None:
         """Create a new bare git repository.
@@ -86,13 +89,16 @@ class GitRepoManager:
             name: Repository name (without .git extension)
             description: Optional repository description
         """
-        result = self.repo_ops.create_repo(name, description)
-        _print_success(result.message)
-        _print_info(f"Repository: {result.repo_name}", 1)
-        _print_info(f"Path: {result.repo_path}", 1)
-        _print_info(f"URL: {result.url}", 1)
-        if result.data and result.data.get("description"):
-            _print_info(f"Description: {result.data['description']}", 1)
+        try:
+            result = self.repo_ops.create_repo(name, description)
+            _print_success(result.message)
+            _print_info(f"Repository: {result.repo_name}", 1)
+            _print_info(f"Path: {result.repo_path}", 1)
+            _print_info(f"URL: {result.url}", 1)
+            if result.data and result.data.get("description"):
+                _print_info(f"Description: {result.data['description']}", 1)
+        except (RepositoryError, GitServerError):
+            sys.exit(1)
 
     def list_repos(self, verbose: bool = False) -> None:
         """List all repositories.
@@ -100,17 +106,19 @@ class GitRepoManager:
         Args:
             verbose: Show detailed information
         """
-        result = self.repo_ops.list_repos(verbose)
-        _print_success(result.message)
-        if result.data and result.data.get("repos"):
-            for repo in result.data["repos"]:
-                print(f"\n{repo['name']}")
-                _print_info(f"Path: {repo['path']}", 1)
-                _print_info(f"URL: {repo['url']}", 1)
-                if verbose and "description" in repo:
-                    _print_info(f"Description: {repo['description']}", 1)
-                if verbose and "branches" in repo:
-                    _print_info(f"Branches: {repo['branches']}", 1)
+        try:
+            result = self.repo_ops.list_repos(verbose)
+            _print_success(result.message)
+            if result.data and result.data.get("repos"):
+                for repo in result.data["repos"]:
+                    _print_info(f"Path: {repo['path']}", 1)
+                    _print_info(f"URL: {repo['url']}", 1)
+                    if verbose and "description" in repo:
+                        _print_info(f"Description: {repo['description']}", 1)
+                    if verbose and "branches" in repo:
+                        _print_info(f"Branches: {repo['branches']}", 1)
+        except (RepositoryError, GitServerError):
+            sys.exit(1)
 
     def get_repo_url(self, name: str, protocol: str = "file") -> None:
         """Get repository URL.
@@ -119,8 +127,10 @@ class GitRepoManager:
             name: Repository name
             protocol: URL protocol (file, ssh, http)
         """
-        result = self.repo_ops.get_repo_url(name, protocol)
-        print(result.url)
+        try:
+            self.repo_ops.get_repo_url(name, protocol)
+        except (RepositoryError, GitServerError):
+            sys.exit(1)
 
     def clone_repo(self, name: str, destination: Path | None = None) -> None:
         """Clone a repository.
@@ -129,11 +139,14 @@ class GitRepoManager:
             name: Repository name
             destination: Destination directory (defaults to repo name without .git)
         """
-        result = self.repo_ops.clone_repo(name, destination)
-        _print_success(result.message)
-        if result.data:
-            _print_info(f"Source: {result.data['source']}", 1)
-            _print_info(f"Destination: {result.data['destination']}", 1)
+        try:
+            result = self.repo_ops.clone_repo(name, destination)
+            _print_success(result.message)
+            if result.data:
+                _print_info(f"Source: {result.data['source']}", 1)
+                _print_info(f"Destination: {result.data['destination']}", 1)
+        except (RepositoryError, GitServerError):
+            sys.exit(1)
 
     def delete_repo(self, name: str, force: bool = False) -> None:
         """Delete a repository.
@@ -142,18 +155,19 @@ class GitRepoManager:
             name: Repository name
             force: Skip confirmation prompt
         """
-        result = self.repo_ops.delete_repo(name, confirmed=force)
-        if not result.success and result.data and result.data.get("requires_confirmation"):
-            print(f"⚠ Delete repository '{name}' at {result.data['repo_path']}?")
-            response = input("Type 'yes' to confirm: ")
-            if response.lower() == "yes":
-                result = self.repo_ops.delete_repo(name, confirmed=True)
-                _print_success(result.message)
+        try:
+            result = self.repo_ops.delete_repo(name, confirmed=force)
+            if not result.success and result.data and result.data.get("requires_confirmation"):
+                response = input("Type 'yes' to confirm: ")
+                if response.lower() == "yes":
+                    result = self.repo_ops.delete_repo(name, confirmed=True)
+                    _print_success(result.message)
+                else:
+                    return
             else:
-                print("Cancelled")
-                return
-        else:
-            _print_success(result.message)
+                _print_success(result.message)
+        except (RepositoryError, GitServerError):
+            sys.exit(1)
 
     def repo_info(self, name: str) -> None:
         """Show detailed repository information.
@@ -161,28 +175,32 @@ class GitRepoManager:
         Args:
             name: Repository name
         """
-        result = self.repo_ops.repo_info(name)
-        if result.data:
-            print(f"\nRepository: {result.data['name']}")
-            _print_info(f"Path: {result.data['path']}", 1)
-            _print_info(f"URL: {result.data['url']}", 1)
-            if result.data.get("description"):
-                _print_info(f"Description: {result.data['description']}", 1)
-            if result.data.get("branches"):
-                print("\nBranches:")
-                for branch in result.data["branches"]:
-                    _print_info(branch, 1)
-            if result.data.get("tags"):
-                print("\nTags:")
-                for tag in result.data["tags"]:
-                    _print_info(tag, 1)
-            if result.data.get("last_commit"):
-                print("\nLast Commit:")
-                commit = result.data["last_commit"]
-                _print_info(f"Hash: {commit['hash']}", 1)
-                _print_info(f"Author: {commit['author']}", 1)
-                _print_info(f"Date: {commit['date']}", 1)
-                _print_info(f"Message: {commit['message']}", 1)
+        try:
+            result = self.repo_ops.repo_info(name)
+            if result.data:
+                _print_info(f"Path: {result.data['path']}", 1)
+                _print_info(f"URL: {result.data['url']}", 1)
+                if result.data.get("description"):
+                    _print_info(f"Description: {result.data['description']}", 1)
+
+                branches = result.data.get("branches")
+                if branches:
+                    for branch in branches:
+                        _print_info(branch, 1)
+                else:
+                    pass
+
+                if result.data.get("tags"):
+                    for tag in result.data["tags"]:
+                        _print_info(tag, 1)
+                if result.data.get("last_commit"):
+                    commit = result.data["last_commit"]
+                    _print_info(f"Hash: {commit['hash']}", 1)
+                    _print_info(f"Author: {commit['author']}", 1)
+                    _print_info(f"Date: {commit['date']}", 1)
+                    _print_info(f"Message: {commit['message']}", 1)
+        except (RepositoryError, GitServerError):
+            sys.exit(1)
 
     def add_ssh_key(self, key_file: Path, name: str) -> None:
         """Add SSH public key with git-only restrictions.
@@ -191,24 +209,29 @@ class GitRepoManager:
             key_file: Path to SSH public key file
             name: Identifier for this key
         """
-        result = self.ssh_ops.add_ssh_key(key_file, name)
-        _print_success(result.message)
-        if result.data:
-            _print_info(f"Key name: {result.data['name']}", 1)
-            _print_info(f"Restrictions: {result.data['restrictions']}", 1)
-            _print_info(f"Link command: {result.data['link_command']}", 1)
+        try:
+            result = self.ssh_ops.add_ssh_key(key_file, name)
+            _print_success(result.message)
+            if result.data:
+                _print_info(f"Key name: {result.data['name']}", 1)
+                _print_info(f"Restrictions: {result.data['restrictions']}", 1)
+                _print_info(f"Link command: {result.data['link_command']}", 1)
+        except (SSHKeyError, GitServerError):
+            sys.exit(1)
 
     def list_ssh_keys(self) -> None:
         """List all authorized SSH keys."""
-        result = self.ssh_ops.list_ssh_keys()
-        _print_success(result.message)
-        if result.data and result.data.get("keys"):
-            for key in result.data["keys"]:
-                print(f"\n{key['name']}")
-                if "type" in key:
-                    _print_info(f"Type: {key['type']}", 1)
-                if "fingerprint" in key:
-                    _print_info(f"Fingerprint: {key['fingerprint']}", 1)
+        try:
+            result = self.ssh_ops.list_ssh_keys()
+            _print_success(result.message)
+            if result.data and result.data.get("keys"):
+                for key in result.data["keys"]:
+                    if "type" in key:
+                        _print_info(f"Type: {key['type']}", 1)
+                    if "fingerprint" in key:
+                        _print_info(f"Fingerprint: {key['fingerprint']}", 1)
+        except (SSHKeyError, GitServerError):
+            sys.exit(1)
 
     def remove_ssh_key(self, name: str) -> None:
         """Remove an SSH key by name.
@@ -216,15 +239,21 @@ class GitRepoManager:
         Args:
             name: Key identifier to remove
         """
-        result = self.ssh_ops.remove_ssh_key(name)
-        _print_success(result.message)
+        try:
+            result = self.ssh_ops.remove_ssh_key(name)
+            _print_success(result.message)
+        except (SSHKeyError, GitServerError):
+            sys.exit(1)
 
     def setup_ssh_link(self) -> None:
         """Link git authorized_keys to ~/.ssh/authorized_keys."""
-        result = self.ssh_ops.setup_ssh_link()
-        _print_success(result.message)
-        if result.data:
-            _print_info(f"{result.data['link_target']} -> {result.data['link_source']}", 1)
+        try:
+            result = self.ssh_ops.setup_ssh_link()
+            _print_success(result.message)
+            if result.data:
+                _print_info(f"{result.data['link_target']} -> {result.data['link_source']}", 1)
+        except (SSHKeyError, GitServerError):
+            sys.exit(1)
 
     def generate_ssh_key(self, name: str, key_type: str = "ed25519", comment: str | None = None) -> None:
         """Generate a new SSH key pair with secure permissions.
@@ -234,15 +263,17 @@ class GitRepoManager:
             key_type: Key type (ed25519, rsa, ecdsa)
             comment: Optional comment for the key
         """
-        result = self.ssh_ops.generate_ssh_key(name, key_type, comment)
-        _print_success(result.message)
-        if result.data:
-            _print_info(f"Name: {result.data['name']}", 1)
-            _print_info(f"Type: {result.data['type']}", 1)
-            _print_info(f"Private key: {result.data['private_key']} (permissions: 0600)", 1)
-            _print_info(f"Public key: {result.data['public_key']} (permissions: 0644)", 1)
-            print("\nKey fingerprint:")
-            _print_info(result.data["fingerprint"], 1)
+        try:
+            result = self.ssh_ops.generate_ssh_key(name, key_type, comment)
+            _print_success(result.message)
+            if result.data:
+                _print_info(f"Name: {result.data['name']}", 1)
+                _print_info(f"Type: {result.data['type']}", 1)
+                _print_info(f"Private key: {result.data['private_key']} (permissions: 0600)", 1)
+                _print_info(f"Public key: {result.data['public_key']} (permissions: 0644)", 1)
+                _print_info(result.data["fingerprint"], 1)
+        except (SSHKeyError, GitServerError):
+            sys.exit(1)
 
     def bootstrap_ssh_server(self, install_type: str = "system") -> None:
         """Bootstrap SSH server installation.
@@ -250,21 +281,22 @@ class GitRepoManager:
         Args:
             install_type: 'system' for system-wide or 'venv' for virtualenv
         """
-        result = self.bootstrap_ops.bootstrap_ssh_server(install_type)
-        print(f"Bootstrapping SSH server ({install_type} installation)\n")
-        if result.data and result.data.get("bootstrap_info"):
-            bootstrap_info: BootstrapInfo = result.data["bootstrap_info"]
-            if bootstrap_info.note:
-                print(f"Note: {bootstrap_info.note}\n")
-            if bootstrap_info.ssh_status:
-                self._print_ssh_status(bootstrap_info.ssh_status)
-            if bootstrap_info.ssh_config:
-                self._print_ssh_config(bootstrap_info.ssh_config)
-        _print_success(result.message)
-        if result.data and result.data.get("next_steps"):
-            print("\nNext steps:")
-            for i, step in enumerate(result.data["next_steps"], 1):
-                _print_info(f"{i}. {step}", 1)
+        try:
+            result = self.bootstrap_ops.bootstrap_ssh_server(install_type)
+            if result.data and result.data.get("bootstrap_info"):
+                bootstrap_info: BootstrapInfo = result.data["bootstrap_info"]
+                if bootstrap_info.note:
+                    pass
+                if bootstrap_info.ssh_status:
+                    self._print_ssh_status(bootstrap_info.ssh_status)
+                if bootstrap_info.ssh_config:
+                    self._print_ssh_config(bootstrap_info.ssh_config)
+            _print_success(result.message)
+            if result.data and result.data.get("next_steps"):
+                for i, step in enumerate(result.data["next_steps"], 1):
+                    _print_info(f"{i}. {step}", 1)
+        except (ServiceError, GitServerError):
+            sys.exit(1)
 
     def _print_ssh_status(self, ssh_status: SSHServerStatus) -> None:
         """Print SSH status information."""
@@ -287,18 +319,14 @@ class GitRepoManager:
 
     def _print_not_running_ssh_status(self, ssh_status: SSHServerStatus) -> None:
         """Print not running SSH server status."""
-        print("⚠ SSH server is not running")
         if ssh_status.start_command:
-            print("\nStart SSH server:")
             _print_info(ssh_status.start_command, 1)
         if ssh_status.start_commands:
-            print("\nStart SSH server:")
             for cmd in ssh_status.start_commands:
                 _print_info(cmd, 1)
 
     def _print_unknown_ssh_status(self, ssh_status: SSHServerStatus) -> None:
         """Print unknown SSH server status."""
-        print(f"⚠ SSH server status: {ssh_status.status}")
         if ssh_status.message:
             _print_info(ssh_status.message, 1)
 
@@ -307,11 +335,10 @@ class GitRepoManager:
         if ssh_config.status == "found":
             _print_success(f"SSH configuration: {ssh_config.config_path}")
             if ssh_config.recommended_settings:
-                print("\nRecommended security settings:")
                 for setting in ssh_config.recommended_settings:
                     _print_info(setting, 1)
         else:
-            print(f"⚠ {ssh_config.message if ssh_config.message else 'SSH config status unknown'}")
+            pass
 
 
 def service_status() -> None:
@@ -320,23 +347,18 @@ def service_status() -> None:
     repos_path = base_path / "repos"
     service_ops = GitServiceOps(base_path, repos_path)
     result = service_ops.service_status()
-    print("Git Server Service Status\n")
     if result.services:
         # Group by mode
         dev_services = [s for s in result.services if s.get("mode") == "dev"]
         systemd_services = [s for s in result.services if s.get("mode") == "systemd"]
 
         if dev_services:
-            print("Development Mode (setup_service.py):")
             for svc in dev_services:
-                print(f"  {svc['symbol']} {svc['service']}: {svc['status']}")
                 if "message" in svc:
                     _print_info(svc["message"], 2)
 
         if systemd_services:
-            print("\nProduction Mode (systemd):")
             for svc in systemd_services:
-                print(f"  {svc['symbol']} {svc['service']}: {svc['status']}")
                 if "message" in svc:
                     _print_info(svc["message"], 2)
 
@@ -365,17 +387,13 @@ def service_install_systemd() -> None:
     repos_path = base_path / "repos"
     service_ops = GitServiceOps(base_path, repos_path)
     result = service_ops.service_install_systemd()
-    print("Installing systemd user services...\n")
     if result.data:
         _print_success(f"Created {result.data['sshd_service']}")
         _print_success(f"Created {result.data['daemon_service']}")
         _print_success("Reloaded systemd user daemon")
         _print_success("Enabled services (auto-start)")
         _print_success("Enabled lingering (services persist after logout)")
-        print(f"\n{result.message}")
-        print("\nTo start services:")
         _print_info(result.data["start_command"], 1)
-        print("\nTo check status:")
         _print_info(result.data["status_command"], 1)
 
 
@@ -521,11 +539,9 @@ def main() -> NoReturn:
 
     try:
         _execute_command(args, manager)
-    except (RepositoryError, SSHKeyError, ServiceError, GitServerError) as e:
-        print(f"Error: {e}", file=sys.stderr)
+    except (RepositoryError, SSHKeyError, ServiceError, GitServerError):
         sys.exit(1)
-    except ValueError as e:
-        print(f"Error: {e}", file=sys.stderr)
+    except ValueError:
         parser.print_help()
         sys.exit(1)
 

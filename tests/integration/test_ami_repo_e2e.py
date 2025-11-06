@@ -4,9 +4,11 @@ Tests real repository operations with actual git commands and file system.
 NO TEST DOUBLES - all operations use real subprocess execution.
 """
 
+import io
 import os
 import subprocess
 import sys
+from contextlib import redirect_stdout
 from pathlib import Path
 
 import pytest
@@ -72,9 +74,6 @@ class TestRepositoryManagement:
         manager = GitRepoManager(base_path=tmp_path)
         manager.init_server()
 
-        import io
-        from contextlib import redirect_stdout
-
         f = io.StringIO()
         with redirect_stdout(f):
             manager.list_repos()
@@ -92,9 +91,6 @@ class TestRepositoryManagement:
         manager.create_repo("repo2")
         manager.create_repo("repo3")
 
-        import io
-        from contextlib import redirect_stdout
-
         f = io.StringIO()
         with redirect_stdout(f):
             manager.list_repos()
@@ -110,9 +106,6 @@ class TestRepositoryManagement:
         manager = GitRepoManager(base_path=tmp_path)
         manager.init_server()
         manager.create_repo("test-repo", description="Test description")
-
-        import io
-        from contextlib import redirect_stdout
 
         f = io.StringIO()
         with redirect_stdout(f):
@@ -142,9 +135,6 @@ class TestRepositoryManagement:
         manager = GitRepoManager(base_path=tmp_path)
         manager.init_server()
         manager.create_repo("test-repo", description="Test repository")
-
-        import io
-        from contextlib import redirect_stdout
 
         f = io.StringIO()
         with redirect_stdout(f):
@@ -238,9 +228,6 @@ class TestSSHKeyManagement:
 
         _, pub_key = ssh_key_pair
         manager.add_ssh_key(pub_key, "test-key")
-
-        import io
-        from contextlib import redirect_stdout
 
         f = io.StringIO()
         with redirect_stdout(f):
@@ -341,8 +328,6 @@ class TestCompleteWorkflows:
         manager.add_ssh_key(pub_key, "developer-key")
 
         # List keys
-        import io
-        from contextlib import redirect_stdout
 
         f = io.StringIO()
         with redirect_stdout(f):
@@ -370,8 +355,6 @@ class TestCompleteWorkflows:
             manager.create_repo(repo, description=f"{repo} repository")
 
         # Verify all exist
-        import io
-        from contextlib import redirect_stdout
 
         f = io.StringIO()
         with redirect_stdout(f):

@@ -7,6 +7,8 @@ from pathlib import Path
 import pytest
 import yaml
 
+import scripts.automation.config as config_module
+
 # Import will fail until we implement config.py - that's expected in TDD
 try:
     from scripts.automation.config import Config, get_config
@@ -161,8 +163,6 @@ class TestConfig:
         monkeypatch.setenv("TEST_CONFIG", str(temp_config_file))
 
         # Reset singleton
-        import scripts.automation.config as config_module
-
         config_module._config = None
 
         config1 = get_config()

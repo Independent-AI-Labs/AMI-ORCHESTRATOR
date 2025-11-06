@@ -1,0 +1,27 @@
+# Prometheus configuration for AMI Orchestrator
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'ami-orchestrator'
+    environment: 'development'
+
+# Remote write configuration (enabled via --web.enable-remote-write-receiver)
+# No additional config needed for remote write receiver
+
+# Scrape configurations
+scrape_configs:
+  # Self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # AMI Orchestrator metrics (if exposed)
+  - job_name: 'ami-orchestrator'
+    static_configs:
+      - targets: ['host.docker.internal:9100']
+    # Scrape even if target is down
+    scrape_interval: 15s
+    scrape_timeout: 10s
+    honor_labels: true

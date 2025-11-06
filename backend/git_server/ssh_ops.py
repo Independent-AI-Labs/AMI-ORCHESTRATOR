@@ -2,10 +2,10 @@
 
 import base64
 import hashlib
-import subprocess
 from pathlib import Path
 
 from backend.git_server.results import SSHKeyError, SSHKeyResult
+from base.backend.workers.system_command import SystemCommandWorker
 
 
 class GitSSHOps:
@@ -24,6 +24,7 @@ class GitSSHOps:
         self.repos_path = repos_path
         self.keys_path = keys_path
         self.ssh_dir = ssh_dir
+        self.system_worker = SystemCommandWorker()
 
     def add_ssh_key(self, key_file: Path, name: str) -> SSHKeyResult:
         """Add SSH public key with git-only restrictions."""
@@ -197,8 +198,7 @@ class GitSSHOps:
         if key_path.exists():
             raise SSHKeyError(f"Key '{name}' already exists at {key_path}")
 
-        cmd = [
-            "ssh-keygen",
+        args = [
             "-t",
             key_type,
             "-f",
@@ -210,14 +210,14 @@ class GitSSHOps:
         ]
 
         if key_type == "rsa":
-            cmd.extend(["-b", "4096"])
+            args.extend(["-b", "4096"])
         elif key_type == "ecdsa":
-            cmd.extend(["-b", "521"])
+            args.extend(["-b", "521"])
 
         try:
-            result = subprocess.run(cmd, check=True, capture_output=True, text=True)
-        except subprocess.CalledProcessError as e:
-            raise SSHKeyError(f"Failed to generate key: {e.stderr}") from e
+            result = self.system_worker.run_command("ssh-keygen", args, timeout=30.0, check=True)
+        except Exception as e:
+            raise SSHKeyError(f"Failed to generate key: {e}") from e
 
         pub_key_path = key_path.with_suffix(".pub")
         if not key_path.exists() or not pub_key_path.exists():
@@ -236,7 +236,7 @@ class GitSSHOps:
                 "type": key_type,
                 "private_key": str(key_path),
                 "public_key": str(pub_key_path),
-                "fingerprint": result.stdout.strip(),
+                "fingerprint": result["stdout"].strip(),
                 "keys_dir": str(keys_dir),
             },
         )

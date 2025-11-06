@@ -17,11 +17,15 @@ hooks:
     timeout: 60
 
   # Stop - Response Scanner
+  # Framework timeout (120s) must exceed agent timeout (20s) to ensure
+  # agent timeouts are logged before framework kills the process
   - event: "Stop"
     command: "response-scanner"
-    timeout: 10
+    timeout: 120
 
   # SubagentStop - Response Scanner
+  # Framework timeout (120s) must exceed agent timeout (20s) to ensure
+  # agent timeouts are logged before framework kills the process
   - event: "SubagentStop"
     command: "response-scanner"
-    timeout: 10
+    timeout: 120

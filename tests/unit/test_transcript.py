@@ -77,8 +77,6 @@ class TestParseMessageIncludesTools:
                 f.write(json.dumps(tool_use_msg) + "\n")
 
             # Parse and verify tool use is included
-            from scripts.automation.transcript import get_last_n_messages
-
             messages_parsed = get_last_n_messages(transcript, 1)
             assert len(messages_parsed) == 1
             text = messages_parsed[0]["text"]
@@ -107,8 +105,6 @@ class TestParseMessageIncludesTools:
             temp_path = Path(f.name)
 
         try:
-            from scripts.automation.transcript import get_last_n_messages
-
             messages_parsed = get_last_n_messages(temp_path, 1)
             assert len(messages_parsed) == 1
             text = messages_parsed[0]["text"]
@@ -140,8 +136,6 @@ class TestSystemReminderStripping:
             temp_path = Path(f.name)
 
         try:
-            from scripts.automation.transcript import get_last_n_messages
-
             messages = get_last_n_messages(temp_path, 1)
             assert len(messages) == 1
             text = messages[0]["text"]
@@ -169,8 +163,6 @@ class TestSystemReminderStripping:
             temp_path = Path(f.name)
 
         try:
-            from scripts.automation.transcript import get_last_n_messages
-
             messages = get_last_n_messages(temp_path, 1)
             assert len(messages) == 1
             text = messages[0]["text"]

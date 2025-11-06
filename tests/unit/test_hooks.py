@@ -10,6 +10,7 @@ import pytest
 
 # Import will fail until we implement hooks.py - that's expected in TDD
 try:
+    from scripts.automation.agent_cli import AgentError
     from scripts.automation.hooks import (
         CodeQualityValidator,
         CommandValidator,
@@ -19,6 +20,7 @@ try:
         ResponseScanner,
     )
 except ImportError:
+    AgentError = None
     HookInput = None
     HookResult = None
     HookValidator = None
@@ -31,14 +33,14 @@ class TestHookInput:
     """Unit tests for HookInput."""
 
     @pytest.mark.skipif(HookInput is None, reason="HookInput not implemented yet")
-    def test_from_stdin_valid_json(self):
+    def test_from_stdin_valid_json(self, tmp_path):
         """HookInput.from_stdin() parses valid JSON."""
         hook_data = {
             "session_id": "test-123",
             "hook_event_name": "PreToolUse",
             "tool_name": "Bash",
             "tool_input": {"command": "ls -la"},
-            "transcript_path": "/tmp/transcript.jsonl",
+            "transcript_path": str(tmp_path / "transcript.jsonl"),
         }
 
         # Mock stdin
@@ -840,8 +842,6 @@ class TestResponseScannerSessionIdLogging:
         try:
             # Mock agent CLI to raise an error
             mock_agent_cli = mocker.MagicMock()
-            from scripts.automation.agent_cli import AgentError
-
             mock_agent_cli.run_print.side_effect = AgentError("Agent failed")
             mocker.patch("scripts.automation.hooks.get_agent_cli", return_value=mock_agent_cli)
 

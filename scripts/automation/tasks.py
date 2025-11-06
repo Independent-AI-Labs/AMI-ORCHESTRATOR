@@ -10,12 +10,13 @@ import os
 import re
 import subprocess
 import time
-import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Literal, cast
 
 from pydantic import BaseModel, Field
+
+from base.backend.utils.uuid_utils import uuid7
 
 from .agent_cli import AgentConfigPresets, get_agent_cli
 from .config import get_config
@@ -60,7 +61,7 @@ class TaskExecutor:
             RuntimeError: If AMI_SUDO_PASSWORD environment variable not set and file locking enabled
         """
         self.config = get_config()
-        self.session_id = str(uuid.uuid4())
+        self.session_id = uuid7()
         self.logger = get_logger("tasks", session_id=self.session_id)
         self.cli = get_agent_cli()
         self.prompts_dir = self.config.root / self.config.get("prompts.dir")
@@ -711,14 +712,7 @@ Validate if the task was completed correctly."""
 
         # Only display if we have any metadata
         if total_cost > 0 or total_turns > 0:
-            print(f"\n{'=' * 60}")
-            print(f"Task Metadata: {task_name}")
-            print(f"{'=' * 60}")
-            print(f"Total Cost:         ${total_cost:.4f}")
-            print(f"Total Duration:     {total_duration_ms / 1000:.1f}s")
-            print(f"API Duration:       {total_api_ms / 1000:.1f}s")
-            print(f"Total Turns:        {total_turns}")
-            print(f"{'=' * 60}\n")
+            pass
 
     def _parse_moderator_result(self, output: str) -> dict[str, Any]:
         """Parse moderator validation result.

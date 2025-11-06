@@ -24,7 +24,7 @@ YOU ALWAYS DELIVER THE HIGHEST QUALITY ENTERPRISE SOFTWARE
 - Read the relevant source before doing or saying anything
 - Stay on `main` for the root repo and every submodule; if detached, return immediately
 - Leave module directories (`base`, `browser`, `compliance`, `domains`, `files`, `nodes`, `streams`, `ux`) alone unless explicitly directed
-- Ship production-ready changes only; never introduce versioned files, temporal markers, adapters for backward support, or workarounds
+- Ship production-ready changes only; never introduce versioned files, temporal markers, backward compatibility layers, or workarounds
 - Update existing code instead of layering aliases or dual formats; migrate data/configs rather than parsing both
 - Treat `ux/ui-concept` as reference-only code; don't chase lint/build noise there unless asked
 - Never introduce implicit defaults; surface optional storage or features explicitly

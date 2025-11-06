@@ -11,10 +11,17 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 try:
-    from scripts.automation.agent_cli import AgentConfig, ClaudeAgentCLI
+    from scripts.automation.agent_cli import (
+        AgentConfig,
+        AgentProcessKillError,
+        AgentTimeoutError,
+        ClaudeAgentCLI,
+    )
 except ImportError:
     AgentConfig = None
     ClaudeAgentCLI = None
+    AgentTimeoutError = None
+    AgentProcessKillError = None
 
 
 class TestTimeoutEnforcement:
@@ -42,8 +49,6 @@ class TestTimeoutEnforcement:
     @pytest.mark.skipif(ClaudeAgentCLI is None, reason="ClaudeAgentCLI not implemented yet")
     def test_timeout_triggers_sigkill(self):
         """Timeout triggers SIGKILL to force-terminate hung process."""
-        from scripts.automation.agent_cli import AgentTimeoutError
-
         cli = ClaudeAgentCLI()
 
         # Simulate timeout
@@ -108,8 +113,6 @@ class TestTimeoutLogging:
     @pytest.mark.skipif(ClaudeAgentCLI is None, reason="ClaudeAgentCLI not implemented yet")
     def test_timeout_logs_error(self):
         """Timeout logs error with timeout duration."""
-        from scripts.automation.agent_cli import AgentTimeoutError
-
         cli = ClaudeAgentCLI()
 
         mock_process = MagicMock()
@@ -135,8 +138,6 @@ class TestTimeoutLogging:
     @pytest.mark.skipif(ClaudeAgentCLI is None, reason="ClaudeAgentCLI not implemented yet")
     def test_kill_success_logs_info(self):
         """Successful SIGKILL logs info with PID."""
-        from scripts.automation.agent_cli import AgentTimeoutError
-
         cli = ClaudeAgentCLI()
 
         mock_process = MagicMock()
@@ -162,8 +163,6 @@ class TestTimeoutLogging:
     @pytest.mark.skipif(ClaudeAgentCLI is None, reason="ClaudeAgentCLI not implemented yet")
     def test_kill_failure_logs_error(self):
         """Failed SIGKILL with non-recoverable error raises AgentProcessKillError."""
-        from scripts.automation.agent_cli import AgentProcessKillError
-
         cli = ClaudeAgentCLI()
 
         mock_process = MagicMock()

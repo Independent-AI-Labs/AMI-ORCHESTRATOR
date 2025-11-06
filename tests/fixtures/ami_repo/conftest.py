@@ -2,10 +2,17 @@
 
 import os
 import subprocess
-import tempfile
+import sys
 from pathlib import Path
 
 import pytest
+
+# Add scripts directory to path for ami_repo import
+scripts_dir = Path(__file__).resolve().parents[3] / "scripts"
+if str(scripts_dir) not in sys.path:
+    sys.path.insert(0, str(scripts_dir))
+
+from ami_repo import GitRepoManager
 
 # Path to test fixtures
 FIXTURES_DIR = Path(__file__).parent
@@ -132,21 +139,8 @@ def git_repo_manager(tmp_path):
     Returns:
         GitRepoManager instance
     """
-    # Import here to avoid import errors if module not available
-    import sys
-    from pathlib import Path
-
-    # Add scripts directory to path
-    scripts_dir = Path(__file__).resolve().parents[3] / "scripts"
-    if str(scripts_dir) not in sys.path:
-        sys.path.insert(0, str(scripts_dir))
-
-    from ami_repo import GitRepoManager
-
     base_path = tmp_path / "git-repos"
-    manager = GitRepoManager(base_path=base_path)
-
-    return manager
+    return GitRepoManager(base_path=base_path)
 
 
 @pytest.fixture(autouse=True)

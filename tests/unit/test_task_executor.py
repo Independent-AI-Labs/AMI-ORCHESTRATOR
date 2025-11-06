@@ -1,6 +1,8 @@
 """Unit tests for TaskExecutor."""
 
+import subprocess
 import tempfile
+import unittest.mock
 from pathlib import Path
 
 import pytest
@@ -336,8 +338,6 @@ class TestTaskExecutorFileLocking:
 
     def test_lock_unlock_success_with_mocked_subprocess(self, monkeypatch):
         """Lock and unlock succeed when chattr returns exit code 0."""
-        import unittest.mock
-
         # Set AMI_SUDO_PASSWORD for initialization
         monkeypatch.setenv("AMI_SUDO_PASSWORD", "test-password")
 
@@ -365,15 +365,12 @@ class TestTaskExecutorFileLocking:
                 assert calls[0][0][0] == ["sudo", "-S", "chattr", "+i", str(test_file)]
                 assert calls[1][0][0] == ["sudo", "-S", "chattr", "-i", str(test_file)]
 
-    def test_lock_file_failure_raises_error(self, monkeypatch):
+    def test_lock_file_failure_raises_error(self, monkeypatch, tmp_path):
         """Lock file raises CalledProcessError when chattr fails."""
-        import subprocess
-        import unittest.mock
-
         # Set AMI_SUDO_PASSWORD for initialization
         monkeypatch.setenv("AMI_SUDO_PASSWORD", "test-password")
 
-        test_file = Path("/tmp/test-lock-file.md")
+        test_file = tmp_path / "test-lock-file.md"
 
         # Mock subprocess to simulate chattr failure
         with unittest.mock.patch("subprocess.Popen") as mock_popen:
@@ -391,15 +388,12 @@ class TestTaskExecutorFileLocking:
             assert exc_info.value.returncode == 1
             assert exc_info.value.cmd == ["sudo", "-S", "chattr", "+i", str(test_file)]
 
-    def test_unlock_file_failure_raises_error(self, monkeypatch):
+    def test_unlock_file_failure_raises_error(self, monkeypatch, tmp_path):
         """Unlock file raises CalledProcessError when chattr fails."""
-        import subprocess
-        import unittest.mock
-
         # Set AMI_SUDO_PASSWORD for initialization
         monkeypatch.setenv("AMI_SUDO_PASSWORD", "test-password")
 
-        test_file = Path("/tmp/test-unlock-file.md")
+        test_file = tmp_path / "test-unlock-file.md"
 
         # Mock subprocess to simulate chattr failure
         with unittest.mock.patch("subprocess.Popen") as mock_popen:

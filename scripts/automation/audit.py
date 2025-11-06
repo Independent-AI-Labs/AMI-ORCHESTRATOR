@@ -8,7 +8,6 @@ import fnmatch
 import hashlib
 import json
 import time
-import uuid
 from collections.abc import Iterator
 from concurrent.futures import ProcessPoolExecutor
 from datetime import datetime
@@ -16,6 +15,8 @@ from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel
+
+from base.backend.utils.uuid_utils import uuid7
 
 from .agent_cli import AgentConfigPresets, get_agent_cli
 from .config import get_config
@@ -64,7 +65,7 @@ class AuditEngine:
     def __init__(self) -> None:
         """Initialize audit engine."""
         self.config = get_config()
-        self.session_id = str(uuid.uuid4())
+        self.session_id = uuid7()
         self.logger = get_logger("audit", session_id=self.session_id)
 
     def audit_directory(

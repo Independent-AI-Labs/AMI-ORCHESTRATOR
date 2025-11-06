@@ -1,10 +1,10 @@
 """Git server service management operations."""
 
 import os
-import subprocess
 from pathlib import Path
 
 from backend.git_server.results import ServiceError, ServiceResult
+from base.backend.workers.system_command import SystemCommandWorker
 
 
 class GitServiceOps:
@@ -19,6 +19,7 @@ class GitServiceOps:
         """
         self.base_path = base_path
         self.repos_path = repos_path
+        self.system_worker = SystemCommandWorker()
 
     def service_status(self) -> ServiceResult:
         """Check status of git server services."""
@@ -26,13 +27,12 @@ class GitServiceOps:
 
         # Check development mode (setup_service.py)
         try:
-            result = subprocess.run(
-                ["scripts/ami-run.sh", "nodes/scripts/setup_service.py", "process", "status", "git-sshd"],
-                capture_output=True,
-                text=True,
-                check=False,
+            result = self.system_worker.run_command(
+                "scripts/ami-run.sh",
+                ["nodes/scripts/setup_service.py", "process", "status", "git-sshd"],
+                timeout=10.0,
             )
-            if result.returncode == 0:
+            if result["success"]:
                 services.append({"mode": "dev", "service": "git-sshd", "status": "available", "symbol": "✓"})
             else:
                 services.append({"mode": "dev", "service": "git-sshd", "status": "not_configured", "symbol": "⚠"})
@@ -61,12 +61,12 @@ class GitServiceOps:
             Dict with service_name and status
         """
         try:
-            result = subprocess.run(["systemctl", "--user", "is-active", service_name], capture_output=True, text=True, check=False)
-            if result.returncode == 0:
+            result = self.system_worker.run_systemctl("--user", "is-active", service_name, timeout=10.0)
+            if result["success"]:
                 return {"service": service_name, "status": "active", "symbol": "✓"}
             return {"service": service_name, "status": "inactive", "symbol": "○"}
-        except FileNotFoundError:
-            return {"service": service_name, "status": "error", "message": "systemctl not found", "symbol": "⚠"}
+        except RuntimeError as e:
+            return {"service": service_name, "status": "error", "message": str(e), "symbol": "⚠"}
         except Exception as e:
             return {"service": service_name, "status": "error", "message": str(e), "symbol": "⚠"}
 
@@ -77,8 +77,12 @@ class GitServiceOps:
             mode: Service mode - 'dev' for setup_service.py, 'systemd' for production
         """
         if mode == "dev":
-            result = subprocess.run(["scripts/ami-run.sh", "nodes/scripts/setup_service.py", "profile", "start", "git-server"], check=False)
-            if result.returncode != 0:
+            result = self.system_worker.run_command(
+                "scripts/ami-run.sh",
+                ["nodes/scripts/setup_service.py", "profile", "start", "git-server"],
+                timeout=30.0,
+            )
+            if not result["success"]:
                 raise ServiceError("Failed to start git server services (development mode)")
             return ServiceResult(
                 success=True,
@@ -86,8 +90,8 @@ class GitServiceOps:
                 data={"mode": mode},
             )
         if mode == "systemd":
-            result = subprocess.run(["systemctl", "--user", "start", "git-sshd", "git-daemon"], check=False)
-            if result.returncode != 0:
+            result = self.system_worker.run_systemctl("--user", "start", "git-sshd", "git-daemon", timeout=30.0)
+            if not result["success"]:
                 raise ServiceError("Failed to start git server services (production mode)")
             return ServiceResult(
                 success=True,
@@ -103,8 +107,12 @@ class GitServiceOps:
             mode: Service mode - 'dev' for setup_service.py, 'systemd' for production
         """
         if mode == "dev":
-            result = subprocess.run(["scripts/ami-run.sh", "nodes/scripts/setup_service.py", "profile", "stop", "git-server"], check=False)
-            if result.returncode != 0:
+            result = self.system_worker.run_command(
+                "scripts/ami-run.sh",
+                ["nodes/scripts/setup_service.py", "profile", "stop", "git-server"],
+                timeout=30.0,
+            )
+            if not result["success"]:
                 raise ServiceError("Failed to stop git server services (development mode)")
             return ServiceResult(
                 success=True,
@@ -112,8 +120,8 @@ class GitServiceOps:
                 data={"mode": mode},
             )
         if mode == "systemd":
-            result = subprocess.run(["systemctl", "--user", "stop", "git-sshd", "git-daemon"], check=False)
-            if result.returncode != 0:
+            result = self.system_worker.run_systemctl("--user", "stop", "git-sshd", "git-daemon", timeout=30.0)
+            if not result["success"]:
                 raise ServiceError("Failed to stop git server services (production mode)")
             return ServiceResult(
                 success=True,
@@ -170,18 +178,18 @@ WantedBy=default.target
 
         # Reload systemd
         try:
-            subprocess.run(["systemctl", "--user", "daemon-reload"], check=True)
-        except subprocess.CalledProcessError as e:
+            self.system_worker.run_systemctl("--user", "daemon-reload", timeout=10.0, check=True)
+        except RuntimeError as e:
             raise ServiceError(f"Failed to reload systemd: {e}") from e
 
         # Enable services
         try:
-            subprocess.run(["systemctl", "--user", "enable", "git-sshd", "git-daemon"], check=True)
-        except subprocess.CalledProcessError as e:
+            self.system_worker.run_systemctl("--user", "enable", "git-sshd", "git-daemon", timeout=10.0, check=True)
+        except RuntimeError as e:
             raise ServiceError(f"Failed to enable services: {e}") from e
 
         # Enable lingering
-        subprocess.run(["loginctl", "enable-linger", os.getenv("USER", "")], check=False)
+        self.system_worker.run_command("loginctl", ["enable-linger", os.getenv("USER", "")], timeout=10.0)
 
         return ServiceResult(
             success=True,

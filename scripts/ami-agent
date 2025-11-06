@@ -41,31 +41,7 @@ check_claude_version() {
     return 0
 }
 
-# Determine which claude binary to use (priority order)
-find_claude_binary() {
-    # Priority 1: CLAUDE_CLI_PATH env var (explicit override)
-    if [ -n "${CLAUDE_CLI_PATH:-}" ] && [ -x "${CLAUDE_CLI_PATH:-}" ]; then
-        echo "$CLAUDE_CLI_PATH"
-        return 0
-    fi
-
-    # Priority 2: venv-local claude (npm installed)
-    local venv_claude="$ROOT_DIR/.venv/node_modules/.bin/claude"
-    if [ -x "$venv_claude" ]; then
-        echo "$venv_claude"
-        return 0
-    fi
-
-    # Priority 3: system claude (PATH)
-    if command -v claude &> /dev/null; then
-        command -v claude
-        return 0
-    fi
-
-    return 1
-}
-
-# Install Claude CLI using bootstrapped npm from venv
+# Install Claude CLI using bootstrapped npm from venv (non-interactive)
 install_claude_cli() {
     local npm_bin="$ROOT_DIR/.venv/bin/npm"
 
@@ -74,7 +50,7 @@ install_claude_cli() {
         return 1
     fi
 
-    echo "Installing Claude CLI version $CLAUDE_REQUIRED_VERSION to venv using bootstrapped npm..." >&2
+    echo "Installing Claude CLI version $CLAUDE_REQUIRED_VERSION to venv..." >&2
     if "$npm_bin" install --prefix "$ROOT_DIR/.venv" "@anthropic-ai/claude-code@$CLAUDE_REQUIRED_VERSION"; then
         echo "✓ Successfully installed Claude CLI $CLAUDE_REQUIRED_VERSION to .venv/node_modules/" >&2
         return 0
@@ -84,52 +60,42 @@ install_claude_cli() {
     fi
 }
 
-# Find and verify Claude CLI
-CLAUDE_BIN=$(find_claude_binary)
-if [ -z "$CLAUDE_BIN" ]; then
-    echo "Error: Claude CLI not found." >&2
-    echo "Required version: $CLAUDE_REQUIRED_VERSION" >&2
-    echo "Searched: CLAUDE_CLI_PATH env var, .venv/node_modules/.bin/claude, system PATH" >&2
+# Enforce venv-only Claude CLI (no system fallback)
+CLAUDE_BIN="$ROOT_DIR/.venv/node_modules/.bin/claude"
 
-    read -p "Install Claude CLI $CLAUDE_REQUIRED_VERSION to venv now? (y/N) " -n 1 -r
-    echo
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        if ! install_claude_cli; then
-            exit 1
-        fi
-        CLAUDE_BIN=$(find_claude_binary)
-        if [ -z "$CLAUDE_BIN" ]; then
-            echo "Error: Installation completed but claude binary not found" >&2
-            exit 1
-        fi
-    else
-        echo "Aborted. Please install Claude CLI version $CLAUDE_REQUIRED_VERSION manually." >&2
+# Auto-install if not present
+if [ ! -x "$CLAUDE_BIN" ]; then
+    echo "Claude CLI not found in venv, installing version $CLAUDE_REQUIRED_VERSION..." >&2
+    if ! install_claude_cli; then
+        echo "Error: Failed to install Claude CLI to venv" >&2
+        echo "Run: module_setup.py to bootstrap Node.js first" >&2
         exit 1
     fi
 fi
 
-# Verify version
+# Verify binary exists after installation
+if [ ! -x "$CLAUDE_BIN" ]; then
+    echo "Error: Claude CLI installation completed but binary not found at:" >&2
+    echo "  $CLAUDE_BIN" >&2
+    exit 1
+fi
+
+# Verify version matches requirement
 if ! check_claude_version "$CLAUDE_BIN"; then
     ret=$?
     if [ $ret -eq 2 ]; then
         current=$("$CLAUDE_BIN" --version 2>/dev/null | awk '{print $1}')
-        echo "Error: Claude CLI version mismatch." >&2
-        echo "Required: $CLAUDE_REQUIRED_VERSION, Found: $current" >&2
-        echo "Using: $CLAUDE_BIN" >&2
+        echo "Claude CLI version mismatch. Required: $CLAUDE_REQUIRED_VERSION, Found: $current" >&2
+        echo "Reinstalling correct version..." >&2
 
-        read -p "Install correct version $CLAUDE_REQUIRED_VERSION to venv now? (y/N) " -n 1 -r
-        echo
-        if [[ $REPLY =~ ^[Yy]$ ]]; then
-            if ! install_claude_cli; then
-                exit 1
-            fi
-            CLAUDE_BIN=$(find_claude_binary)
-            if [ -z "$CLAUDE_BIN" ] || ! check_claude_version "$CLAUDE_BIN"; then
-                echo "Error: Installation completed but version check still fails" >&2
-                exit 1
-            fi
-        else
-            echo "Aborted. Please install Claude CLI version $CLAUDE_REQUIRED_VERSION manually." >&2
+        if ! install_claude_cli; then
+            echo "Error: Failed to install correct Claude CLI version" >&2
+            exit 1
+        fi
+
+        # Re-verify after reinstall
+        if ! check_claude_version "$CLAUDE_BIN"; then
+            echo "Error: Version check still fails after reinstall" >&2
             exit 1
         fi
     else
@@ -158,31 +124,7 @@ check_gemini_version() {
     return 0
 }
 
-# Determine which gemini binary to use (priority order)
-find_gemini_binary() {
-    # Priority 1: GEMINI_CLI_PATH env var (explicit override)
-    if [ -n "${GEMINI_CLI_PATH:-}" ] && [ -x "${GEMINI_CLI_PATH:-}" ]; then
-        echo "$GEMINI_CLI_PATH"
-        return 0
-    fi
-
-    # Priority 2: venv-local gemini (npm installed)
-    local venv_gemini="$ROOT_DIR/.venv/node_modules/.bin/gemini"
-    if [ -x "$venv_gemini" ]; then
-        echo "$venv_gemini"
-        return 0
-    fi
-
-    # Priority 3: system gemini (PATH)
-    if command -v gemini &> /dev/null; then
-        command -v gemini
-        return 0
-    fi
-
-    return 1
-}
-
-# Install Gemini CLI using bootstrapped npm from venv
+# Install Gemini CLI using bootstrapped npm from venv (non-interactive)
 install_gemini_cli() {
     local npm_bin="$ROOT_DIR/.venv/bin/npm"
 
@@ -191,7 +133,7 @@ install_gemini_cli() {
         return 1
     fi
 
-    echo "Installing Gemini CLI version $GEMINI_REQUIRED_VERSION to venv using bootstrapped npm..." >&2
+    echo "Installing Gemini CLI version $GEMINI_REQUIRED_VERSION to venv..." >&2
     if "$npm_bin" install --prefix "$ROOT_DIR/.venv" "@google/gemini-cli@$GEMINI_REQUIRED_VERSION"; then
         echo "✓ Successfully installed Gemini CLI $GEMINI_REQUIRED_VERSION to .venv/node_modules/" >&2
         return 0
@@ -201,23 +143,21 @@ install_gemini_cli() {
     fi
 }
 
-# Find and verify Gemini CLI (optional - warn if not found but don't fail)
-GEMINI_BIN=$(find_gemini_binary)
-if [ -z "$GEMINI_BIN" ]; then
-    echo "Warning: Gemini CLI not found (optional)." >&2
-    echo "Required version: $GEMINI_REQUIRED_VERSION" >&2
-    echo "Searched: GEMINI_CLI_PATH env var, .venv/node_modules/.bin/gemini, system PATH" >&2
-    echo "Note: Gemini CLI is only required if automation.yaml uses cli_agent.type: gemini" >&2
+# Enforce venv-only Gemini CLI (optional, no system fallback)
+GEMINI_BIN="$ROOT_DIR/.venv/node_modules/.bin/gemini"
+
+# Note: Gemini is optional, only required if automation.yaml uses cli_agent.type: gemini
+if [ ! -x "$GEMINI_BIN" ]; then
+    echo "Note: Gemini CLI not found in venv (optional)." >&2
+    echo "Only required if automation.yaml uses cli_agent.type: gemini" >&2
 else
-    # Verify version if found
+    # Verify version if present
     if ! check_gemini_version "$GEMINI_BIN"; then
         ret=$?
         if [ $ret -eq 2 ]; then
             current=$("$GEMINI_BIN" --version 2>/dev/null | grep -oP '^\d+\.\d+\.\d+')
-            echo "Warning: Gemini CLI version mismatch." >&2
-            echo "Required: $GEMINI_REQUIRED_VERSION, Found: $current" >&2
-            echo "Using: $GEMINI_BIN" >&2
-            echo "Note: Mismatched Gemini CLI version may cause issues if used by automation" >&2
+            echo "Warning: Gemini CLI version mismatch. Required: $GEMINI_REQUIRED_VERSION, Found: $current" >&2
+            echo "Note: Mismatched version may cause issues if used by automation" >&2
         else
             echo "Warning: Gemini CLI check failed" >&2
         fi

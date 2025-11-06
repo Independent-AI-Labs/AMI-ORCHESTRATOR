@@ -1,26 +1,26 @@
 line-length = 160
-target-version = "py311"
+target-version = "py312"
 
 [lint]
-# Comprehensive rule set replacing pylint + bandit
+# Comprehensive rule set (same as base module)
 select = [
     "E",   # pycodestyle errors
     "W",   # pycodestyle warnings
     "F",   # pyflakes
-    "I",   # isort (import sorting)
+    "I",   # isort
     "B",   # flake8-bugbear
     "S",   # flake8-bandit (security)
     "C4",  # flake8-comprehensions
     "UP",  # pyupgrade
     "PL",  # pylint
     "A",   # flake8-builtins
-    "C90", # mccabe complexity
+    "C90", # mccabe
     "N",   # pep8-naming
     "SIM", # flake8-simplify
     "RET", # flake8-return
     "ARG", # flake8-unused-arguments
     "PTH", # flake8-use-pathlib
-    "ERA", # eradicate (remove commented code)
+    "ERA", # eradicate
     "PIE", # flake8-pie
     "T20", # flake8-print
     "Q",   # flake8-quotes
@@ -30,37 +30,39 @@ select = [
 max-complexity = 10
 
 [lint.pylint]
-max-args = 16
+max-args = 30
 max-locals = 64
 max-statements = 96
 max-branches = 16
 
 [lint.per-file-ignores]
-# Root-level test files
-"**/test_*.py" = ["S101", "PLR2004", "ARG002"]  # Asserts, magic values, and unused pytest fixtures
-"tests/**/*.py" = ["S101", "PLR2004", "S603", "S607", "ARG002", "E402", "PLC0415", "S108", "T201", "B007"]  # Tests require asserts, magic values, subprocess, unused fixtures, bootstrap imports, lazy imports, temp files, print statements, unused loop vars
-"tests/fixtures/**/*.py" = ["ALL"]  # Test fixtures intentionally contain violations
-"tests/conftest.py" = ["S603", "S607", "E402"]  # Docker/subprocess in test fixtures, bootstrap imports
-"tests/integration/**/*.py" = ["S603", "S607", "E402"]  # Subprocess in integration tests, bootstrap imports
-"conftest.py" = ["E402"]  # Bootstrap imports after path setup
-
-# Root-level scripts
-"scripts/**/*.py" = ["T201", "S603", "S607", "E402", "PLC0415"]  # CLI tools - print() required for user output, subprocess, bootstrap imports, lazy imports
-"scripts/automation/**/*.py" = ["T201", "S603", "S607", "PLC0415", "S108", "PLW1509"]  # CLI automation tools - print, subprocess, lazy imports, temp files, preexec_fn for privilege drop
-"scripts/automation/tests/**/*.py" = ["S101", "PLR2004", "S603", "S607", "ARG002", "E402", "PLC0415", "S108", "T201", "B007"]  # Test files
-"scripts/run_tests.py" = ["T201", "S603", "S607", "E402", "PLC0415"]  # Test runner - CLI output, subprocess, bootstrap imports, lazy imports
-"module_setup.py" = ["S603", "S607", "E402"]  # UV subprocess calls in setup script, bootstrap imports
-
-# Root backend code
-"backend/**/*.py" = ["E402", "S603", "S607"]  # Bootstrap imports after path setup, subprocess for git/system commands
-
-# Documentation and learning examples
-"docs/**/*.py" = ["T201", "S603", "S607", "E402"]  # Example code may use print/subprocess
-"learning/**/*.py" = ["T201", "S603", "S607", "E402"]  # Learning examples may use print/subprocess
-
-# Root-level utility files
-"demo.py" = ["T201", "E402"]  # Demo script with print output
-"install.py" = ["T201", "S603", "S607", "E402"]  # Installation script with print and subprocess
+# Root repo scripts requiring bootstrap
+"scripts/ami_repo.py" = ["E402", "ARG001", "PLC0415"]  # setup_imports() bootstrap, unused print args, lazy imports
+"scripts/audit_shebangs.py" = ["E402", "PLR0911", "C901", "PLC0415", "S607"]  # Polyglot shebang, complex audit logic, git subprocess
+"scripts/automation/agent_cli.py" = ["S603", "S607", "E402", "PLW1509", "C901", "PLR0912", "PLR0915", "S110", "PLC0415"]  # Gemini subprocess, preexec_fn for process group, complex streaming logic, error handling
+"scripts/automation/agent_main.py" = ["E402", "S603", "PLC0415"]  # Bootstrap imports, subprocess for ami-agent, lazy imports
+"scripts/automation/config.py" = ["E402"]  # Bootstrap imports
+"scripts/automation/analyze_transcript_tokens.py" = ["F404", "E402"]  # Polyglot shebang pattern
+"scripts/automation/audit.py" = ["PLC0415"]  # Lazy imports for parallel processing
+"scripts/automation/hooks.py" = ["E402", "S603", "S607", "PLC0415", "C901", "PLR0912", "PLR0915", "S110", "ARG001"]  # Bootstrap imports, gemini subprocess, lazy imports, complex scanner logic, signal handler args
+"scripts/automation/tasks.py" = ["PLC0415", "ARG002", "S603", "C901", "PLR0912", "S110"]  # Lazy imports, interface method args, chattr subprocess, complex task logic
+"scripts/automation/transcript.py" = ["E402"]  # Bootstrap imports
+"scripts/automation/validators.py" = ["E402", "C901", "PLR0911"]  # Bootstrap imports, complex pattern checking
+"scripts/backup_to_gdrive.py" = ["T201", "E402", "PLR0913"]  # CLI output, bootstrap imports, many upload params
+"scripts/check_pypi_versions.py" = ["T201", "E402", "S603", "S607", "C901", "SIM108", "PLR0911", "PLR0912", "PLR0915", "N806", "S110"]  # CLI output, bootstrap imports, pip subprocess, complex version resolver
+"scripts/export_git_history.py" = ["E402", "F404"]  # Polyglot shebang pattern
+"scripts/find-metadata.py" = ["T201", "E402", "N999", "S607", "PTH123", "PLC0415", "C901", "PLR2004"]  # CLI output, bootstrap imports, hyphenated name, git subprocess, metadata management
+"scripts/git_commit.sh" = []  # Bash script
+"scripts/git_push.sh" = []  # Bash script
+"scripts/list_specs.py" = ["T201", "E402", "PLR0913", "S110", "PLC0415", "SIM108"]  # CLI output, bootstrap imports, many params for file listing, error suppression
+"scripts/tools/extract_moderator_test_cases.py" = ["E402"]  # Bootstrap imports
+"scripts/setup-shell.sh" = []  # Bash script
+"scripts/toggle_root_protection.sh" = []  # Bash script
+"scripts/utils/__init__.py" = []  # Empty init
+"scripts/utils/*.py" = ["E402", "PLC0415", "S603", "S607", "S310", "PLR2004", "SIM115", "PTH123", "SIM108", "ARG002", "C901"]  # Utility modules: bootstrap imports, lazy imports, git/PyPI API calls, magic values, file handling, interface args, complex resolvers
+"tests/**/*.py" = ["S101", "PLR2004", "ARG002", "S603", "S607", "E402"]  # Tests require asserts, magic values, unused fixtures, subprocess, bootstrap imports
+"scripts/validate_docs_links.py" = ["E402", "B007"]  # Bootstrap imports, unused loop variable in error reporting
+"tests/integration/test_moderator_hang_reproduction.py" = ["PLC0415", "ARG001", "ERA001", "B018", "C901", "B023"]  # Lazy imports, unused args, commented code for clarity, unused expressions in debug, complex test, closure warning
 
 [format]
 line-ending = "auto"

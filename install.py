@@ -1,4 +1,9 @@
-#!/usr/bin/env python3
+#!/usr/bin/env bash
+''':'
+exec "$(dirname "$0")/scripts/ami-run.sh" "$0" "$@"
+'''
+from __future__ import annotations
+
 """AMI Orchestrator installer - bootstraps the development environment.
 
 This script handles one-time setup tasks:
@@ -9,8 +14,6 @@ This script handles one-time setup tasks:
 Run this once to set up the entire orchestrator.
 For updates, run module_setup.py directly.
 """
-
-from __future__ import annotations
 
 import argparse
 import logging
@@ -109,64 +112,57 @@ def _find_shell_configs() -> list[tuple[str, Path]]:
     return shells
 
 
-def _add_alias_to_shell(shell_rc: Path, alias_line: str, header_needed: bool) -> None:
-    """Append alias to shell config file with optional header."""
-    with shell_rc.open("a", encoding="utf-8") as f:
-        if header_needed:
-            f.write("\n# AMI Orchestrator - auto-registered by install.py\n")
-        f.write(f"{alias_line}\n")
-
-
 def _register_aliases_in_shell(shell_rc: Path, alias_run: str, alias_uv: str) -> bool:
-    """Register both aliases in a single shell config file. Returns True if modified."""
+    """Register shell setup by sourcing setup-shell.sh. Returns True if modified."""
     content = shell_rc.read_text(encoding="utf-8")
-    modified = False
 
-    if alias_run not in content:
-        _add_alias_to_shell(shell_rc, alias_run, header_needed=True)
-        modified = True
+    # Check if setup-shell.sh is already sourced
+    if "setup-shell.sh" in content:
+        return False
 
-    if alias_uv not in content:
-        # Re-read in case ami-run was just added
-        content = shell_rc.read_text(encoding="utf-8")
-        # Add header only if ami-run existed originally (wasn't just added above)
-        header_needed = alias_run in content and not modified
-        _add_alias_to_shell(shell_rc, alias_uv, header_needed=header_needed)
-        modified = True
+    # Auto-install by adding source line
+    marker = "# AMI Orchestrator Shell Setup"
+    ami_root = ROOT.resolve()
+    source_line = f'[ -f "{ami_root}/scripts/setup-shell.sh" ] && . "{ami_root}/scripts/setup-shell.sh"'
 
-    return modified
+    with shell_rc.open("a", encoding="utf-8") as f:
+        f.write("\n")
+        f.write(f"{marker}\n")
+        f.write(f"{source_line}\n")
+
+    return True
 
 
 def register_shell_aliases() -> bool:
-    """Register ami-run and ami-uv as shell aliases in ~/.bashrc and ~/.zshrc."""
-    ami_run_path = ROOT / "scripts" / "ami-run.sh"
-    ami_uv_path = ROOT / "scripts" / "ami-uv"
-
-    if not ami_run_path.exists():
-        logger.warning(f"ami-run.sh not found at {ami_run_path}")
+    """Auto-install shell setup by sourcing setup-shell.sh."""
+    setup_script = ROOT / "scripts" / "setup-shell.sh"
+    if not setup_script.exists():
+        logger.warning(f"setup-shell.sh not found at {setup_script}")
         return False
-    if not ami_uv_path.exists():
-        logger.warning(f"ami-uv not found at {ami_uv_path}")
-        return False
-
-    alias_run_line = f'alias ami-run="{ami_run_path}"'
-    alias_uv_line = f'alias ami-uv="{ami_uv_path}"'
 
     shells = _find_shell_configs()
     if not shells:
         logger.warning("No .bashrc or .zshrc found in home directory")
         return False
 
-    for name, shell_rc in shells:
-        modified = _register_aliases_in_shell(shell_rc, alias_run_line, alias_uv_line)
-        if modified:
-            logger.info(f"✓ Registered aliases in ~/.{name}")
-        else:
-            logger.info(f"✓ Aliases already present in ~/.{name}")
+    # Dummy aliases for signature compatibility
+    alias_run = ""
+    alias_uv = ""
 
-    logger.info("\nTo use aliases immediately in this shell:")
-    logger.info("  source ~/.bashrc  # or: source ~/.zshrc")
-    logger.info("Or restart your shell.")
+    installed_count = 0
+    for name, shell_rc in shells:
+        modified = _register_aliases_in_shell(shell_rc, alias_run, alias_uv)
+        if modified:
+            logger.info(f"✓ Installed AMI shell setup in ~/.{name}")
+            installed_count += 1
+        else:
+            logger.info(f"✓ AMI shell setup already present in ~/.{name}")
+
+    if installed_count > 0:
+        logger.info("\nTo activate immediately:")
+        logger.info("  source ~/.bashrc  # or: source ~/.zshrc")
+        logger.info("Or restart your shell.")
+
     return True
 
 

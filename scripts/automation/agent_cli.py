@@ -22,6 +22,8 @@ from typing import Any, TextIO
 
 import yaml
 
+from base.backend.workers.file_subprocess import FileSubprocessSync
+
 from .config import get_config
 from .logger import get_logger
 
@@ -167,28 +169,56 @@ class AgentConfigPresets:
 
     @staticmethod
     def worker(session_id: str) -> AgentConfig:
-        """General worker agent: All tools, hooks enabled.
+        """General worker agent: Most tools except Task/TodoWrite, hooks enabled.
 
         Used for: General automation, --print mode with hooks
         """
         return AgentConfig(
             model="claude-sonnet-4-5",
             session_id=session_id,
-            allowed_tools=None,  # All tools
+            allowed_tools=[
+                "Bash",
+                "BashOutput",
+                "Edit",
+                "ExitPlanMode",
+                "Glob",
+                "Grep",
+                "KillShell",
+                "NotebookEdit",
+                "Read",
+                "SlashCommand",
+                "WebFetch",
+                "WebSearch",
+                "Write",
+            ],
             enable_hooks=True,
             timeout=180,
         )
 
     @staticmethod
     def interactive(session_id: str, mcp_servers: dict[str, Any] | None = None) -> AgentConfig:
-        """Interactive agent: All tools, hooks enabled, MCP servers.
+        """Interactive agent: Most tools except Task/TodoWrite, hooks enabled, MCP servers.
 
         Used for: Interactive sessions with user
         """
         return AgentConfig(
             model="claude-sonnet-4-5",
             session_id=session_id,
-            allowed_tools=None,
+            allowed_tools=[
+                "Bash",
+                "BashOutput",
+                "Edit",
+                "ExitPlanMode",
+                "Glob",
+                "Grep",
+                "KillShell",
+                "NotebookEdit",
+                "Read",
+                "SlashCommand",
+                "WebFetch",
+                "WebSearch",
+                "Write",
+            ],
             enable_hooks=True,
             timeout=None,  # No timeout
             mcp_servers=mcp_servers,
@@ -196,14 +226,28 @@ class AgentConfigPresets:
 
     @staticmethod
     def task_worker(session_id: str) -> AgentConfig:
-        """Task execution worker: All tools, hooks enabled, no timeout.
+        """Task execution worker: Most tools except Task/TodoWrite, hooks enabled, no timeout.
 
         Used for: Executing .md task files with full capabilities
         """
         return AgentConfig(
             model="claude-sonnet-4-5",
             session_id=session_id,
-            allowed_tools=None,  # All tools
+            allowed_tools=[
+                "Bash",
+                "BashOutput",
+                "Edit",
+                "ExitPlanMode",
+                "Glob",
+                "Grep",
+                "KillShell",
+                "NotebookEdit",
+                "Read",
+                "SlashCommand",
+                "WebFetch",
+                "WebSearch",
+                "Write",
+            ],
             enable_hooks=True,
             timeout=None,  # Task-level timeout instead
         )
@@ -224,14 +268,28 @@ class AgentConfigPresets:
 
     @staticmethod
     def sync_worker(session_id: str) -> AgentConfig:
-        """Git sync worker: All tools, hooks enabled, no timeout.
+        """Git sync worker: Most tools except Task/TodoWrite, hooks enabled, no timeout.
 
         Used for: Executing git commit/push operations with full capabilities
         """
         return AgentConfig(
             model="claude-sonnet-4-5",
             session_id=session_id,
-            allowed_tools=None,  # All tools
+            allowed_tools=[
+                "Bash",
+                "BashOutput",
+                "Edit",
+                "ExitPlanMode",
+                "Glob",
+                "Grep",
+                "KillShell",
+                "NotebookEdit",
+                "Read",
+                "SlashCommand",
+                "WebFetch",
+                "WebSearch",
+                "Write",
+            ],
             enable_hooks=True,
             timeout=None,  # Sync-level timeout instead
         )
@@ -255,13 +313,17 @@ class AgentConfigPresets:
         """Completion validation moderator: No tools, analyzes conversation data only.
 
         Used for: Validating WORK DONE and FEEDBACK: completion markers
+
+        Timeout is 100s to allow processing of large contexts (up to 100K tokens).
+        Framework timeout is 120s, ensuring agent timeout triggers first for fail-closed behavior.
+        This prevents silent failures where framework kills process without logging.
         """
         return AgentConfig(
             model="claude-sonnet-4-5",
             session_id=session_id,
             allowed_tools=[],
             enable_hooks=False,
-            timeout=120,
+            timeout=100,
         )
 
 
@@ -344,6 +406,31 @@ class ClaudeAgentCLI(AgentCLI):
         """Initialize Claude Agent CLI."""
         self.config = get_config()
         self.logger = get_logger("agent-cli")
+        self._current_process: subprocess.Popen[str] | None = None  # Track running process for cleanup
+
+    def kill_current_process(self) -> bool:
+        """Kill currently running subprocess if exists.
+
+        Returns:
+            True if process was killed, False if no process or kill failed
+        """
+        if not self._current_process or not self._current_process.pid:
+            return False
+
+        pid = self._current_process.pid
+        try:
+            os.killpg(os.getpgid(pid), signal.SIGKILL)
+            self.logger.info("killed_hung_process", pid=pid)
+            self._current_process = None
+            return True
+        except ProcessLookupError:
+            # Process already dead
+            self.logger.info("process_already_dead", pid=pid)
+            self._current_process = None
+            return False
+        except (PermissionError, OSError) as e:
+            self.logger.error("failed_to_kill_process", pid=pid, error=str(e))
+            return False
 
     @staticmethod
     def compute_disallowed_tools(allowed_tools: list[str] | None) -> list[str]:
@@ -517,6 +604,9 @@ class ClaudeAgentCLI(AgentCLI):
 
         self.logger.info("agent_streaming_subprocess_started", pid=process.pid)
 
+        # Store process reference for cleanup on retry
+        self._current_process = process
+
         # Write stdin and close
         if process.stdin:
             if stdin_data:
@@ -601,7 +691,6 @@ class ClaudeAgentCLI(AgentCLI):
             AgentExecutionError: If JSON parsing fails
         """
         # Print raw JSON
-        print(line, end="", flush=True)
 
         if line_count == 1:
             self.logger.info("agent_streaming_first_line_received")
@@ -688,6 +777,7 @@ class ClaudeAgentCLI(AgentCLI):
         stdin_data: str | None,
         agent_config: AgentConfig,
         cwd: Path | None,
+        audit_log_path: Path | None = None,
     ) -> tuple[str, dict[str, Any] | None]:
         """Execute command with streaming JSON output parsing.
 
@@ -696,6 +786,7 @@ class ClaudeAgentCLI(AgentCLI):
             stdin_data: Optional stdin input
             agent_config: Agent configuration
             cwd: Working directory
+            audit_log_path: Optional path to write streaming output for audit/debugging
 
         Returns:
             Tuple of (accumulated assistant text, metadata dict or None)
@@ -708,20 +799,66 @@ class ClaudeAgentCLI(AgentCLI):
         process = None
         assistant_text: list[str] = []
         metadata: dict[str, Any] | None = None
+        first_output_timeout = 30  # Warn if no output after 30s
 
         try:
             process = self._start_streaming_process(cmd, stdin_data, cwd)
+
+            # Write process start marker to audit log
+            if audit_log_path:
+                try:
+                    with audit_log_path.open("a") as f:
+                        f.write(f"\n=== PROCESS STARTED (PID: {process.pid}) ===\n")
+                except OSError as e:
+                    self.logger.warning("audit_log_write_failed", path=str(audit_log_path), error=str(e))
 
             # Read loop
             line_count = 0
             last_log_time = time.time()
             loop_iterations = 0
+            first_output_received = False
 
-            self.logger.info("agent_streaming_entering_loop", has_timeout=agent_config.timeout is not None)
+            self.logger.info("agent_streaming_entering_loop", has_timeout=agent_config.timeout is not None, pid=process.pid)
 
             while True:
                 loop_iterations += 1
                 elapsed = time.time() - start_time
+
+                # Check for first output timeout
+                if not first_output_received and elapsed > first_output_timeout:
+                    # Check if process is still alive
+                    if process.poll() is not None:
+                        # Process exited without producing output - capture stderr
+                        stderr = process.stderr.read() if process.stderr else ""
+                        self.logger.error(
+                            "agent_streaming_no_output_process_died",
+                            elapsed=elapsed,
+                            exit_code=process.returncode,
+                            stderr_preview=stderr[:2000] if stderr else "",
+                        )
+                        if audit_log_path:
+                            try:
+                                with audit_log_path.open("a") as f:
+                                    f.write(f"\n=== PROCESS DIED WITHOUT OUTPUT (exit code: {process.returncode}) ===\n")
+                                    if stderr:
+                                        f.write(f"STDERR:\n{stderr}\n")
+                            except OSError:
+                                pass
+                        raise AgentExecutionError(
+                            exit_code=process.returncode,
+                            stdout="",
+                            stderr=f"Process exited without producing streaming output after {elapsed:.1f}s\n\nSTDERR:\n{stderr}",
+                            cmd=cmd,
+                        )
+
+                    # Process still alive but no output
+                    self.logger.warning(
+                        "agent_streaming_no_output_still_alive",
+                        elapsed=elapsed,
+                        iterations=loop_iterations,
+                        pid=process.pid,
+                    )
+                    first_output_received = True  # Only warn once
 
                 # Calculate timeout
                 timeout_val, last_log_time = self._calculate_stream_timeout(agent_config, last_log_time, line_count, elapsed, loop_iterations)
@@ -730,11 +867,52 @@ class ClaudeAgentCLI(AgentCLI):
                 line, process_exited = self._read_streaming_line(process, timeout_val, cmd)
 
                 if process_exited:
-                    self.logger.info("agent_streaming_loop_exit", line_count=line_count, iterations=loop_iterations)
+                    # Capture stderr on exit
+                    stderr = ""
+                    if process and process.stderr:
+                        try:
+                            stderr = process.stderr.read()
+                        except OSError as e:
+                            stderr = f"<failed to read stderr: {e}>"
+
+                    if stderr and audit_log_path:
+                        try:
+                            with audit_log_path.open("a") as f:
+                                f.write(f"\n=== PROCESS STDERR ===\n{stderr}\n")
+                        except OSError:
+                            pass
+
+                    self.logger.info(
+                        "agent_streaming_loop_exit",
+                        line_count=line_count,
+                        iterations=loop_iterations,
+                        stderr_preview=stderr[:1000] if stderr else "",
+                    )
                     break
 
                 if line:
+                    if not first_output_received:
+                        first_output_received = True
+                        self.logger.info("agent_streaming_first_output", elapsed=elapsed)
+
+                        # Write timing marker to audit log for test extraction
+                        if audit_log_path:
+                            try:
+                                with audit_log_path.open("a") as f:
+                                    f.write(f"\n=== FIRST OUTPUT: {elapsed:.4f}s ===\n\n")
+                            except Exception:
+                                pass  # Don't fail if audit log write fails
+
                     line_count += 1
+
+                    # Write to audit log BEFORE parsing (captures raw streaming output)
+                    if audit_log_path:
+                        try:
+                            with audit_log_path.open("a") as f:
+                                f.write(line)
+                        except OSError as e:
+                            self.logger.warning("audit_log_write_failed", path=str(audit_log_path), error=str(e))
+
                     text, msg_metadata = self._parse_stream_message(line, cmd, line_count, agent_config)
                     if text:
                         assistant_text.append(text)
@@ -747,6 +925,14 @@ class ClaudeAgentCLI(AgentCLI):
 
             if process.returncode != 0:
                 stderr = process.stderr.read() if process.stderr else ""
+                if audit_log_path:
+                    try:
+                        with audit_log_path.open("a") as f:
+                            f.write(f"\n=== PROCESS FAILED (exit code: {process.returncode}) ===\n")
+                            if stderr:
+                                f.write(f"STDERR:\n{stderr}\n")
+                    except OSError:
+                        pass
                 self.logger.info(
                     "agent_print_complete",
                     exit_code=process.returncode,
@@ -760,12 +946,26 @@ class ClaudeAgentCLI(AgentCLI):
                     cmd=cmd,
                 )
 
+            if audit_log_path:
+                try:
+                    with audit_log_path.open("a") as f:
+                        f.write(f"\n=== PROCESS COMPLETED (exit code: 0, duration: {duration:.1f}s) ===\n")
+                except OSError:
+                    pass
+
             self.logger.info("agent_print_complete", exit_code=process.returncode, duration=round(duration, 1))
             return "".join(assistant_text), metadata
 
         except subprocess.TimeoutExpired as timeout_err:
             duration = time.time() - start_time
             self.logger.error("agent_print_timeout", timeout=agent_config.timeout, duration=round(duration, 1))
+
+            if audit_log_path:
+                try:
+                    with audit_log_path.open("a") as f:
+                        f.write(f"\n=== TIMEOUT EXCEEDED ({agent_config.timeout}s, actual: {duration:.1f}s) ===\n")
+                except OSError:
+                    pass
 
             if process and process.pid:
                 import contextlib
@@ -784,6 +984,7 @@ class ClaudeAgentCLI(AgentCLI):
         stdin_data: str | None,
         agent_config: AgentConfig,
         cwd: Path | None,
+        audit_log_path: Path | None = None,
     ) -> tuple[str, dict[str, Any] | None]:
         """Execute command with timeout handling.
 
@@ -792,6 +993,7 @@ class ClaudeAgentCLI(AgentCLI):
             stdin_data: Optional stdin input
             agent_config: Agent configuration for timeout
             cwd: Working directory
+            audit_log_path: Optional path to write streaming output for audit/debugging
 
         Returns:
             Tuple of (command stdout, metadata dict or None)
@@ -805,101 +1007,69 @@ class ClaudeAgentCLI(AgentCLI):
         # Route to streaming execution if enabled
         if agent_config.enable_streaming:
             self.logger.info("agent_using_streaming_path")
-            return self._execute_streaming(cmd, stdin_data, agent_config, cwd)
+            return self._execute_streaming(cmd, stdin_data, agent_config, cwd, audit_log_path)
 
-        import signal
-
+        # Use FileSubprocessSync for reliable non-streaming execution
         start_time = time.time()
-        process = None
+        env = self._get_unprivileged_env()
 
-        try:
-            # Drop privileges if running as root via sudo
-            preexec_fn = self._drop_privileges if os.environ.get("SUDO_USER") and os.geteuid() == 0 else None
-            env = self._get_unprivileged_env()
+        # Execute using FileSubprocessSync
+        executor = FileSubprocessSync(work_dir=cwd)
+        result = executor.run(
+            cmd=cmd,
+            input_text=stdin_data,
+            timeout=float(agent_config.timeout) if agent_config.timeout else None,
+            env=env,
+        )
 
-            # Use Popen directly to get process handle for cleanup
-            process = subprocess.Popen(
-                cmd,
-                stdin=subprocess.PIPE,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                cwd=cwd,
-                start_new_session=True,  # Create process group for forceful termination
-                preexec_fn=preexec_fn,
-                env=env,
-            )
+        duration = time.time() - start_time
 
-            # Communicate with timeout
-            stdout, stderr = process.communicate(
-                input=stdin_data,
-                timeout=agent_config.timeout,
-            )
-
-            duration = time.time() - start_time
-
-            # Log completion with error details if non-zero exit
-            if process.returncode != 0:
-                self.logger.info(
-                    "agent_print_complete",
-                    exit_code=process.returncode,
-                    duration=round(duration, 1),
-                    stdout_preview=stdout[:1000] if stdout else "",
-                    stderr=stderr[:1000] if stderr else "",
-                )
-                raise AgentExecutionError(
-                    exit_code=process.returncode,
-                    stdout=stdout,
-                    stderr=stderr,
-                    cmd=cmd,
-                )
-
-            # Success case - no need to log stdout (can be large)
-            self.logger.info(
-                "agent_print_complete",
-                exit_code=process.returncode,
-                duration=round(duration, 1),
-            )
-
-            return stdout, None  # No metadata in non-streaming mode
-
-        except subprocess.TimeoutExpired as timeout_err:
-            duration = time.time() - start_time
+        # Check for timeout
+        if result.get("timeout"):
             self.logger.error(
                 "agent_print_timeout",
                 timeout=agent_config.timeout,
                 duration=round(duration, 1),
             )
-
-            # Force kill the process group since SIGTERM didn't work
-            if process and process.pid:
-                try:
-                    os.killpg(os.getpgid(process.pid), signal.SIGKILL)
-                    self.logger.info("agent_print_killed", pid=process.pid)
-                except ProcessLookupError:
-                    # Process already dead, that's fine
-                    self.logger.info("agent_print_already_dead", pid=process.pid)
-                except (PermissionError, OSError) as kill_err:
-                    # Failed to kill - escalate
-                    self.logger.error("agent_print_kill_failed", error=str(kill_err))
-                    raise AgentProcessKillError(
-                        pid=process.pid,
-                        reason=str(kill_err),
-                    ) from kill_err
-
-            # TimeoutExpired only raised when timeout is set
-            if agent_config.timeout is None:
-                raise RuntimeError("TimeoutExpired raised but timeout was None") from timeout_err
-
             raise AgentTimeoutError(
-                timeout=agent_config.timeout,
-                cmd=cmd,
+                timeout=agent_config.timeout or 0,
                 duration=duration,
-            ) from timeout_err
+                cmd=cmd,
+            )
 
-        except FileNotFoundError as e:
-            self.logger.error("command_not_found", command=cmd[0])
-            raise AgentCommandNotFoundError(cmd=cmd[0]) from e
+        # Check for execution error
+        if not result["success"]:
+            returncode = result["returncode"]
+            stdout = result["stdout"]
+            stderr = result["stderr"]
+
+            self.logger.info(
+                "agent_print_complete",
+                exit_code=returncode,
+                duration=round(duration, 1),
+                stdout_preview=stdout[:1000] if stdout else "",
+                stderr=stderr[:1000] if stderr else "",
+            )
+
+            if returncode == -1 and "not found" in stderr.lower():
+                raise AgentCommandNotFoundError(cmd=cmd[0])
+
+            raise AgentExecutionError(
+                exit_code=returncode,
+                stdout=stdout,
+                stderr=stderr,
+                cmd=cmd,
+            )
+
+        # Success case
+        stdout = result["stdout"]
+        self.logger.info(
+            "agent_print_complete",
+            exit_code=result["returncode"],
+            duration=round(duration, 1),
+        )
+
+        return stdout, None  # No metadata in non-streaming mode
 
     def run_print(
         self,
@@ -908,6 +1078,7 @@ class ClaudeAgentCLI(AgentCLI):
         stdin: str | TextIO | None = None,
         agent_config: AgentConfig | None = None,
         cwd: Path | None = None,
+        audit_log_path: Path | None = None,
     ) -> tuple[str, dict[str, Any] | None]:
         """Run Claude Code in --print mode (non-interactive).
 
@@ -917,6 +1088,7 @@ class ClaudeAgentCLI(AgentCLI):
             stdin: Input data
             agent_config: Agent configuration (defaults to worker preset)
             cwd: Working directory for agent execution (defaults to current directory)
+            audit_log_path: Optional path to write streaming output for audit/debugging
 
         Returns:
             Tuple of (agent output text, execution metadata dict or None)
@@ -962,7 +1134,7 @@ class ClaudeAgentCLI(AgentCLI):
         )
 
         try:
-            return self._execute_with_timeout(cmd, stdin_data, agent_config, cwd)
+            return self._execute_with_timeout(cmd, stdin_data, agent_config, cwd, audit_log_path)
         finally:
             # Always cleanup temp files
             if settings_file and settings_file.exists():
