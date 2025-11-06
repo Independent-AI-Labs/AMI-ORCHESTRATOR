@@ -2,6 +2,32 @@
 
 ### CRITICAL
 
+**Bypass Script Creation**: Creating scripts in `/tmp/` or elsewhere to circumvent CI/CD, hooks, or quality checks
+- **Example VIOLATIONS**:
+  ```python
+  # Creating git bypass scripts:
+  Write("/tmp/commit_script.sh", "#!/bin/bash\ncd /path\n/usr/bin/git commit ...")
+  Write("/tmp/push_script.sh", "#!/bin/bash\nexport SKIP_TESTS=1\ngit push")
+  Write("/tmp/fix_commit.sh", "#!/bin/bash\ngit reset --soft HEAD~1")
+
+  # Creating file modification scripts:
+  Write("/tmp/modify_files.sh", "#!/bin/bash\nsed -i 's/pattern/replacement/' file.py")
+  Write("/tmp/bypass_hooks.sh", "#!/bin/bash\ngit commit --no-verify")
+  ```
+- **Why CRITICAL**:
+  - Circumvents pre-commit hooks (security checks, linting, type checking)
+  - Bypasses code quality validation (moderators never see script contents)
+  - Enables malicious edits (can modify any file without detection)
+  - Creates backdoors (scripts persist and can be reused)
+  - Defeats CI/CD pipeline (pushes untested/unvalidated code)
+- **DETECTION**: Any Write/Bash tool use creating `.sh`, `.py`, `.bash` files in `/tmp/` or other temp locations
+- **CORRECT APPROACH**:
+  - Use Edit tool for file modifications (subject to code quality checks)
+  - Accept pre-commit hook failures and fix the actual issues
+  - Never create scripts to automate git operations
+  - If git hooks block legitimate operations, update hook logic properly
+- **ZERO TOLERANCE**: Instant rejection, no exceptions
+
 **SQL Injection**: `query = f"SELECT * FROM {var}"` | `cursor.execute(f"...")`
 
 **Subprocess RCE**: `subprocess.run(untrusted)` with fallback chains

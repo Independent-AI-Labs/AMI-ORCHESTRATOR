@@ -1,0 +1,1 @@
+{"file_path": "base/backend/dataops/implementations/timeseries/prometheus_connection.py", "status": "FAIL", "violations": [{"line": 0, "pattern_id": "llm_audit", "severity": "CRITICAL", "message": "FAIL: Line 79-80: Exception \u2192 logger.error() Only; Line 80: Exception \u2192 False"}], "execution_time": 16.42425775527954}

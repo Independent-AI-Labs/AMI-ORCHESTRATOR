@@ -1,0 +1,1 @@
+{"file_path": "base/backend/utils/uuid_utils.py", "status": "FAIL", "violations": [{"line": 0, "pattern_id": "llm_audit", "severity": "CRITICAL", "message": "FAIL: Line 62: Exception \u2192 Boolean Return (is_uuid7); Line 76: Exception \u2192 Numeric Sentinel (extract_timestamp_from_uuid7)"}], "execution_time": 4.789336204528809}

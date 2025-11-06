@@ -4,6 +4,13 @@
 version: "2.0.0"
 
 hooks:
+  # PreToolUse - Malicious Behavior Detection (RUNS FIRST)
+  # Catches bypass script creation attempts before other checks
+  - event: "PreToolUse"
+    matcher: ["Write", "Edit", "Bash"]
+    command: "malicious-behavior"
+    timeout: 60
+
   # PreToolUse - Command Guard
   - event: "PreToolUse"
     matcher: "Bash"

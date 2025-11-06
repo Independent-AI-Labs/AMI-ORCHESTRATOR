@@ -360,6 +360,103 @@ class HookValidator:
             return 0
 
 
+class MaliciousBehaviorValidator(HookValidator):
+    """Validates Write/Edit/Bash tool usage for malicious bypass attempts.
+
+    This validator runs FIRST before all other checks to catch attempts to:
+    - Bypass CI/CD, hooks, or quality checks via script creation
+    - Circumvent guardrails through file modification scripts
+    - Create backdoors via /tmp or other temp locations
+    - Automate git operations to skip validation
+    """
+
+    def __init__(self, session_id: str | None = None) -> None:
+        """Initialize malicious behavior validator."""
+        super().__init__(session_id)
+        self.prompt_path = self.config.root / "scripts" / "config" / "prompts" / "malicious_behavior_moderator.txt"
+
+    def validate(self, hook_input: HookInput) -> HookResult:
+        """Validate tool usage for malicious bypass attempts.
+
+        Args:
+            hook_input: Hook input containing tool information
+
+        Returns:
+            HookResult with decision (allow/deny) and optional reason
+        """
+        # Only validate Write, Edit, and Bash tools
+        if hook_input.tool_name not in ("Write", "Edit", "Bash"):
+            return HookResult.allow()
+
+        # Skip if no transcript available
+        if not hook_input.transcript_path or not hook_input.transcript_path.exists():
+            return HookResult.allow()
+
+        # Get conversation context
+        try:
+            conversation_context = prepare_moderator_context(hook_input.transcript_path)
+        except Exception as e:
+            self.logger.error("malicious_behavior_context_error", session_id=hook_input.session_id, error=str(e))
+            # Fail open for context errors (not the tool usage itself)
+            return HookResult.allow()
+
+        # Load prompt template
+        if not self.prompt_path.exists():
+            self.logger.error("malicious_behavior_prompt_missing", session_id=hook_input.session_id, path=str(self.prompt_path))
+            return HookResult.allow()
+
+        prompt_template = self.prompt_path.read_text()
+        prompt = prompt_template.replace("{conversation_context}", conversation_context)
+
+        # Execute moderator
+        session_id = hook_input.session_id or "unknown"
+        execution_id = str(uuid.uuid4())[:8]
+
+        self.logger.info("malicious_behavior_moderator_start", session_id=session_id, execution_id=execution_id, tool=hook_input.tool_name)
+
+        try:
+            agent_cli = get_agent_cli()
+            malicious_behavior_config = AgentConfigPresets.completion_moderator(f"malicious-behavior-{session_id}")
+
+            output, _ = agent_cli.run_print(
+                instruction_file=self.prompt_path,
+                stdin=prompt,
+                agent_config=malicious_behavior_config,
+            )
+
+            self.logger.info("malicious_behavior_moderator_output", session_id=session_id, execution_id=execution_id, output=output)
+
+            # Parse decision
+            cleaned_output = parse_code_fence_output(output)
+            xml_match = re.search(r"<decision>\s*(.+?)\s*</decision>", cleaned_output, re.IGNORECASE | re.DOTALL)
+
+            if xml_match:
+                decision_text = xml_match.group(1).strip()
+
+                if re.match(r"^ALLOW$", decision_text, re.IGNORECASE):
+                    self.logger.info("malicious_behavior_allow", session_id=session_id, execution_id=execution_id)
+                    return HookResult.allow()
+
+                if re.match(r"^BLOCK$", decision_text, re.IGNORECASE):
+                    # Extract reason
+                    reason_match = re.search(r"<reason>\s*(.+?)\s*</reason>", cleaned_output, re.IGNORECASE | re.DOTALL)
+                    reason = reason_match.group(1).strip() if reason_match else "Malicious behavior detected"
+
+                    self.logger.warning("malicious_behavior_block", session_id=session_id, execution_id=execution_id, reason=reason[:200])
+                    return HookResult.deny(f"🚨 MALICIOUS BEHAVIOR DETECTED\n\n{reason}\n\nThis operation has been blocked to protect CI/CD integrity.")
+
+            # Unparseable output - fail closed for safety
+            self.logger.warning("malicious_behavior_unparseable", session_id=session_id, execution_id=execution_id, output=cleaned_output[:300])
+            return HookResult.deny(
+                "Malicious behavior check returned unparseable response. Blocking for safety.\n\nThis is likely a temporary issue - please try again."
+            )
+
+        except (AgentError, AgentTimeoutError, AgentExecutionError) as e:
+            self.logger.error("malicious_behavior_moderator_error", session_id=session_id, execution_id=execution_id, error=str(e))
+            # Fail open for moderator execution errors (not malicious behavior itself)
+            return HookResult.allow()
+
+
 class CommandValidator(HookValidator):
     """Validates Bash commands using patterns from YAML configuration."""
 

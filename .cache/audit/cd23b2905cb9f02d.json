@@ -1,0 +1,1 @@
+{"file_path": "base/backend/dataops/implementations/timeseries/prometheus_models.py", "status": "FAIL", "violations": [{"line": 0, "pattern_id": "llm_audit", "severity": "CRITICAL", "message": "FAIL: Line 138: Uncaught Type Conversion (float(value_str)); Line 162: Uncaught Type Conversion (float(value_str))"}], "execution_time": 24.879770755767822}

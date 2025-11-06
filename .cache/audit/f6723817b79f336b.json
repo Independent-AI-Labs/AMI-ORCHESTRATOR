@@ -1,0 +1,1 @@
+{"file_path": "base/backend/dataops/models/storage_config_factory.py", "status": "FAIL", "violations": [{"line": 0, "pattern_id": "llm_audit", "severity": "CRITICAL", "message": "FAIL: Line 58-61: Exception \u2192 Continue (list comprehension equivalent) - KeyError/ValueError during config loading suppressed instead of raised"}], "execution_time": 6.449585676193237}

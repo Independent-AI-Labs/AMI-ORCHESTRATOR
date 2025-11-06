@@ -1,0 +1,1 @@
+{"file_path": "base/backend/dataops/implementations/vault/__init__.py", "status": "FAIL", "violations": [{"line": 0, "pattern_id": "llm_audit", "severity": "CRITICAL", "message": "FAIL: Non-Empty __init__.py"}], "execution_time": 4.465822696685791}

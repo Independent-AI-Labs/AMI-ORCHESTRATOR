@@ -1,0 +1,1 @@
+{"file_path": "base/backend/dataops/security/encryption.py", "status": "FAIL", "violations": [{"line": 0, "pattern_id": "llm_audit", "severity": "CRITICAL", "message": "FAIL: Line 100: Exception \u2192 String Sentinel; Line 134: TODO/Production Comments"}], "execution_time": 12.357795476913452}

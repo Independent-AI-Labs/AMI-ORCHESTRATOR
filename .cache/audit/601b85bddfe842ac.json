@@ -1,0 +1,1 @@
+{"file_path": "base/scripts/quality/check_config_ignores.py", "status": "FAIL", "violations": [{"line": 0, "pattern_id": "llm_audit", "severity": "CRITICAL", "message": "FAIL: Line 13: Missing Exception Handling (StopIteration from next()); Line 70-71: Exception \u2192 Continue (UnicodeDecodeError/OSError silently skip files)"}], "execution_time": 16.21724557876587}

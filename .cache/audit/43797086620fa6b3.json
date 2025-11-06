@@ -1,0 +1,1 @@
+{"file_path": "base/backend/workers/file_subprocess.py", "status": "FAIL", "violations": [{"line": 0, "pattern_id": "llm_audit", "severity": "CRITICAL", "message": "FAIL: Line 155: Exception \u2192 Response Object; Line 262: Exception \u2192 Response Object"}], "execution_time": 13.654720306396484}

@@ -82,6 +82,7 @@ from scripts.automation.config import get_config
 from scripts.automation.hooks import (
     CodeQualityValidator,
     CommandValidator,
+    MaliciousBehaviorValidator,
     ResponseScanner,
     ShebangValidator,
 )
@@ -278,12 +279,13 @@ def mode_hook(validator_name: str) -> int:
     """Hook validator mode - Validate hook input from stdin.
 
     Args:
-        validator_name: Name of validator (command-guard, code-quality, response-scanner, shebang-check)
+        validator_name: Name of validator (malicious-behavior, command-guard, code-quality, response-scanner, shebang-check)
 
     Returns:
         Exit code (0=success, 1=failure)
     """
     validators = {
+        "malicious-behavior": MaliciousBehaviorValidator,
         "command-guard": CommandValidator,
         "code-quality": CodeQualityValidator,
         "response-scanner": ResponseScanner,
@@ -503,7 +505,7 @@ def main() -> int:
     parser.add_argument(
         "--hook",
         metavar="VALIDATOR",
-        help="Hook validator mode (command-guard, code-quality, response-scanner, shebang-check)",
+        help="Hook validator mode (malicious-behavior, command-guard, code-quality, response-scanner, shebang-check)",
     )
 
     parser.add_argument(
