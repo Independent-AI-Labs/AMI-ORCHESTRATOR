@@ -13,6 +13,12 @@ except ImportError:
     AuditEngine = None
     FileResult = None
 
+# Test constants
+EXECUTION_TIME = 1.23
+TWO_FILES = 2
+THREE_FILES = 3
+LOG_NUMBER = 42
+
 
 class TestFileResult:
     """Unit tests for FileResult dataclass."""
@@ -24,13 +30,13 @@ class TestFileResult:
             file_path=Path("/test/file.py"),
             status="PASS",
             violations=[],
-            execution_time=1.23,
+            execution_time=EXECUTION_TIME,
         )
 
         assert result.file_path == Path("/test/file.py")
         assert result.status == "PASS"
         assert result.violations == []
-        assert result.execution_time == 1.23
+        assert result.execution_time == EXECUTION_TIME
 
 
 class TestAuditEngine:
@@ -122,7 +128,7 @@ class TestAuditEngine:
             files = list(engine._find_files(tmpdir_path))
 
             # Should find both .py files
-            assert len(files) == 2
+            assert len(files) == TWO_FILES
             assert all(f.suffix == ".py" for f in files)
 
     @pytest.mark.skipif(AuditEngine is None, reason="AuditEngine not implemented yet")

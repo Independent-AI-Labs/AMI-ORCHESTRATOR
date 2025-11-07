@@ -33,6 +33,7 @@ YOU ALWAYS DELIVER THE HIGHEST QUALITY ENTERPRISE SOFTWARE
 - Commits require explicit user permission and `git add -A` of every change
 - Never run `git pull`, `git rebase`, or `git merge` without instructions
 - After finishing work in a submodule, run `git add -A` inside that submodule before committing
+- **CRITICAL: ALWAYS commit AND push ALL submodules BEFORE committing root repo**
 - Land work module-by-module (skip `ux` until told)
 - Push operations can run for several minutes due to CI/CD validation; let them finish
 

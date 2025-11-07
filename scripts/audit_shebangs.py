@@ -19,6 +19,7 @@ Usage:
 """
 
 import argparse
+import subprocess
 import sys
 from pathlib import Path
 
@@ -101,40 +102,33 @@ def check_shebang(file_path: Path, verbose: bool = False) -> tuple[bool, str]:
         Tuple of (is_correct, issue_description)
     """
     line1, line2, line3 = get_shebang_lines(file_path)
-
-    # Check if file is executable (should have shebang)
     is_executable = file_path.stat().st_mode & 0o111
 
-    # No shebang
+    # No shebang - only fail if executable
     if not line1.startswith("#!"):
-        if is_executable:
-            return False, "Executable file with no shebang"
-        if verbose:
-            return True, "Not executable, no shebang needed"
-        return True, ""
+        verbose_msg = "Not executable, no shebang needed" if verbose else ""
+        return (False, "Executable file with no shebang") if is_executable else (True, verbose_msg)
+
+    # Read content once for all pattern checks
+    with file_path.open("rb") as f:
+        content = f.read(200)
 
     # Check for security patterns first
-    with file_path.open("rb") as f:
-        content = f.read(200)  # Check first 200 bytes
-
-    for pattern, description in SECURITY_PATTERNS:
-        if pattern in content:
-            return False, f"SECURITY RISK: {description}"
+    security_issue = next((f"SECURITY RISK: {desc}" for pat, desc in SECURITY_PATTERNS if pat in content), None)
+    if security_issue:
+        return False, security_issue
 
     # Check for incorrect patterns
-    for pattern, description in INCORRECT_PATTERNS:
-        if pattern in content:
-            return False, description
+    incorrect_issue = next((desc for pat, desc in INCORRECT_PATTERNS if pat in content), None)
+    if incorrect_issue:
+        return False, incorrect_issue
 
-    # Check if using ami-run correctly (check all three lines for polyglot pattern)
-    if "ami-run.sh" in line2 or "ami-run.sh" in line3 or "ami-run.sh" in line1:
+    # Check if using ami-run correctly
+    has_ami_run = any("ami-run.sh" in line for line in (line1, line2, line3))
+    if has_ami_run:
         return True, "Correct ami-run shebang"
 
-    # Has shebang but not ami-run
-    if line1.startswith("#!/"):
-        return False, f"Non-ami-run shebang: {line1[:50]}"
-
-    return True, ""
+    return False, f"Non-ami-run shebang: {line1[:50]}"
 
 
 def get_correct_shebang(file_path: Path) -> tuple[str, str]:
@@ -171,6 +165,50 @@ exec {ami_run_path} {script_ref} "$@"
         return "", ""
 
 
+def _skip_old_shebang(lines: list[str]) -> int:
+    """Find index after old shebang and polyglot lines.
+
+    Returns:
+        Index of first line after shebang/polyglot pattern
+    """
+    if not lines or not lines[0].startswith("#!"):
+        return 0
+
+    idx = 1
+    # Skip multiline polyglot: ''':', exec line, '''
+    if len(lines) > idx and lines[idx].strip() in ("''':'", '"""\''):
+        idx += 1
+        if len(lines) > idx and "exec" in lines[idx]:
+            idx += 1
+        if len(lines) > idx and lines[idx].strip() in ("'''", '"""'):
+            idx += 1
+    # Skip old single-line polyglot: """'exec...'"""
+    elif len(lines) > idx and "exec" in lines[idx] and '"""' in lines[idx]:
+        idx += 1
+
+    return idx
+
+
+def _extract_future_import(lines: list[str], start_idx: int) -> tuple[str, int]:
+    """Extract __future__ import if present.
+
+    Returns:
+        Tuple of (future_import_line, new_start_idx)
+    """
+    if len(lines) <= start_idx:
+        return "", start_idx
+
+    if lines[start_idx].strip().startswith("from __future__ import"):
+        future_import = lines[start_idx]
+        start_idx += 1
+        # Skip blank line after future import
+        if len(lines) > start_idx and not lines[start_idx].strip():
+            start_idx += 1
+        return future_import, start_idx
+
+    return "", start_idx
+
+
 def fix_shebang(file_path: Path) -> bool:
     """Fix shebang in file.
 
@@ -182,41 +220,18 @@ def fix_shebang(file_path: Path) -> bool:
         return False
 
     try:
-        # Read current content
         content = file_path.read_text(encoding="utf-8")
         lines = content.splitlines(keepends=True)
 
-        # Skip existing shebang and polyglot lines
-        start_idx = 0
-        if lines and lines[0].startswith("#!"):
-            start_idx = 1
-            # Skip polyglot patterns: ''':', exec line, '''
-            if len(lines) > start_idx and lines[start_idx].strip() in ("''':'", '"""\''):
-                start_idx += 1
-                # Skip exec line
-                if len(lines) > start_idx and "exec" in lines[start_idx]:
-                    start_idx += 1
-                # Skip closing '''
-                if len(lines) > start_idx and lines[start_idx].strip() in ("'''", '"""'):
-                    start_idx += 1
-            # Skip old single-line polyglot: """'exec...'"""
-            elif len(lines) > start_idx and "exec" in lines[start_idx] and '"""' in lines[start_idx]:
-                start_idx += 1
+        # Skip old shebang/polyglot
+        start_idx = _skip_old_shebang(lines)
 
-        # Preserve from __future__ import if present
-        future_import = ""
-        if len(lines) > start_idx and lines[start_idx].strip().startswith("from __future__ import"):
-            future_import = lines[start_idx]
-            start_idx += 1
-            # Skip blank line after future import
-            if len(lines) > start_idx and not lines[start_idx].strip():
-                start_idx += 1
+        # Preserve __future__ import if present
+        future_import, start_idx = _extract_future_import(lines, start_idx)
 
-        # Write new content with polyglot shebang + future import + rest
-        if future_import:
-            new_content = f"{line1}\n{line2}\n{future_import}\n" + "".join(lines[start_idx:])
-        else:
-            new_content = f"{line1}\n{line2}\n\n" + "".join(lines[start_idx:])
+        # Build new content
+        header = f"{line1}\n{line2}\n{future_import}\n" if future_import else f"{line1}\n{line2}\n\n"
+        new_content = header + "".join(lines[start_idx:])
         file_path.write_text(new_content, encoding="utf-8")
 
         logger.info(f"✓ Fixed: {file_path.relative_to(ROOT)}")
@@ -233,8 +248,6 @@ def get_staged_python_files(scan_dir: Path) -> list[Path]:
     Returns:
         List of staged Python file paths
     """
-    import subprocess
-
     try:
         result = subprocess.run(
             ["git", "diff", "--cached", "--name-only", "--diff-filter=ACM"],
@@ -351,6 +364,10 @@ def audit_repository(
 
 def main() -> int:
     """Main entry point."""
+    # Configure logger to write to stdout instead of stderr
+    logger.remove()
+    logger.add(sys.stdout, format="{time:YYYY-MM-DD HH:mm:ss.SSS} | {level:<8} | {name}:{function}:{line} - {message}")
+
     parser = argparse.ArgumentParser(description="Audit Python script shebangs across AMI Orchestrator")
     parser.add_argument(
         "--fix",

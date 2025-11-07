@@ -15,6 +15,12 @@ from scripts.automation.transcript import (
     is_actual_user_message,
 )
 
+# Test constants
+TWO_MESSAGES = 2
+THREE_MESSAGES = 3
+FIRST_MESSAGE_INDEX = 0
+SECOND_MESSAGE_INDEX = 1
+
 
 def create_test_transcript(messages: list[dict[str, str]]) -> Path:
     """Create a temporary JSONL transcript file for testing using REAL Claude transcript format.
@@ -188,12 +194,12 @@ class TestGetLastNMessages:
         transcript = create_test_transcript(messages)
 
         try:
-            result = get_last_n_messages(transcript, 2)
-            assert len(result) == 2
-            assert result[0]["type"] == "user"
-            assert result[0]["text"] == "Third message"
-            assert result[1]["type"] == "assistant"
-            assert result[1]["text"] == "Fourth message"
+            result = get_last_n_messages(transcript, TWO_MESSAGES)
+            assert len(result) == TWO_MESSAGES
+            assert result[FIRST_MESSAGE_INDEX]["type"] == "user"
+            assert result[FIRST_MESSAGE_INDEX]["text"] == "Third message"
+            assert result[SECOND_MESSAGE_INDEX]["type"] == "assistant"
+            assert result[SECOND_MESSAGE_INDEX]["text"] == "Fourth message"
         finally:
             transcript.unlink()
 
@@ -262,9 +268,9 @@ class TestGetLastNMessages:
         try:
             result = get_last_n_messages(transcript, 10)
             # Should only get 2 valid messages, skipping malformed line
-            assert len(result) == 2
-            assert result[0]["text"] == "Valid message"
-            assert result[1]["text"] == "Second valid"
+            assert len(result) == TWO_MESSAGES
+            assert result[FIRST_MESSAGE_INDEX]["text"] == "Valid message"
+            assert result[SECOND_MESSAGE_INDEX]["text"] == "Second valid"
         finally:
             transcript.unlink()
 
@@ -301,10 +307,10 @@ class TestGetMessagesUntilLastUser:
         try:
             result = get_messages_until_last_user(transcript)
             # Should include everything up to "Second user"
-            assert len(result) == 3
-            assert result[0]["type"] == "user"
-            assert result[0]["text"] == "First user"
-            assert result[1]["type"] == "assistant"
+            assert len(result) == THREE_MESSAGES
+            assert result[FIRST_MESSAGE_INDEX]["type"] == "user"
+            assert result[FIRST_MESSAGE_INDEX]["text"] == "First user"
+            assert result[SECOND_MESSAGE_INDEX]["type"] == "assistant"
             assert result[2]["type"] == "user"
             assert result[2]["text"] == "Second user"
         finally:
@@ -333,8 +339,8 @@ class TestGetMessagesUntilLastUser:
 
         try:
             result = get_messages_until_last_user(transcript)
-            assert len(result) == 2
-            assert result[1]["text"] == "User 2"
+            assert len(result) == TWO_MESSAGES
+            assert result[SECOND_MESSAGE_INDEX]["text"] == "User 2"
         finally:
             transcript.unlink()
 

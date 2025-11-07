@@ -206,13 +206,13 @@ class TestModeratorAgentBehavior:
     Expected behavior: Moderator should output ALLOW (work is complete)
     """
 
-    def _run_moderator(self, fixture_path: Path, moderator_prompt: Path, orchestrator_root: Path) -> str:
+    def _run_moderator(self, fixture_path: Path, moderator_prompt: Path, _orchestrator_root: Path) -> str:
         """Run moderator agent on a fixture and return output.
 
         Args:
             fixture_path: Path to transcript fixture
             moderator_prompt: Path to moderator prompt file
-            orchestrator_root: Path to orchestrator root
+            _orchestrator_root: Path to orchestrator root
 
         Returns:
             Moderator agent output

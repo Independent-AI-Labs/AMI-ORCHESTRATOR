@@ -14,6 +14,9 @@ import yaml
 
 from scripts.automation.agent_cli import AgentConfigPresets, ClaudeAgentCLI
 
+# Test constants
+BASH_HOOK_TIMEOUT = 10
+
 
 class TestBashHooksEnforcement:
     """Tests for bash command guard being ALWAYS enabled."""
@@ -199,7 +202,7 @@ class TestBashGuardIntegration:
             if hook.get("event") == "PreToolUse" and hook.get("matcher") == "Bash":
                 bash_hook_found = True
                 assert hook.get("command") == "command-guard"
-                assert hook.get("timeout") == 10
+                assert hook.get("timeout") == BASH_HOOK_TIMEOUT
                 break
 
         assert bash_hook_found, "Bash command guard not found in hooks.yaml"

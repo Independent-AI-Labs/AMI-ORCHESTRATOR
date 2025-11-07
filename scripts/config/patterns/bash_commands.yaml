@@ -11,6 +11,13 @@ deny_patterns:
   - pattern: '\bdocker\b'
     message: "Use setup_service.py to manage containers"
 
+  # Inline python execution - BLOCK FIRST (more specific than general python block)
+  - pattern: '\bpython3?\s+-c\b'
+    message: "Inline python execution forbidden - bypasses code quality validation. Write scripts and use ami-run instead"
+
+  - pattern: '\|\s*python3?\b'
+    message: "Piping to python forbidden - bypasses code quality validation. Write scripts and use ami-run instead"
+
   - pattern: '\bpython3?\b'
     message: "Use ami-run instead of direct python"
 
@@ -23,7 +30,7 @@ deny_patterns:
   - pattern: '(?<![/\w])pytest\s+'
     message: "Use ami-run scripts/run_tests.py instead of direct pytest"
 
-  - pattern: '(?<!ami-)\bruff\s+'
+  - pattern: '(?<!ami-)\bruff\b'
     message: "Use scripts/git_commit.sh instead of direct ruff - pre-commit checks handle linting"
 
   # File operations - use dedicated tools to enforce code quality validation
@@ -40,7 +47,7 @@ deny_patterns:
   - pattern: '--no-verify'
     message: "Git hook bypass forbidden"
 
-  - pattern: '\bgit\b.*\bcommit\b'
+  - pattern: '\bgit\s+commit\b(?!-)'
     message: "Use scripts/git_commit.sh"
 
   - pattern: '\bgit\b.*\bpush\b'
@@ -54,6 +61,9 @@ deny_patterns:
 
   - pattern: '\bgit\b.*\bcheckout\b'
     message: "Git checkout forbidden - modifies working tree"
+
+  - pattern: '^\s*cd\b'
+    message: "Use absolute paths or cwd parameter - scripts like git_commit.sh take module paths as arguments"
 
   - pattern: '\bgit\b.*\bpull\b'
     message: "Git pull forbidden - modifies working tree"

@@ -1,0 +1,1 @@
+{"file_path": "base/backend/opsec/crypto/jwt_utils.py", "status": "FAIL", "violations": [{"line": 0, "pattern_id": "llm_audit", "severity": "CRITICAL", "message": "FAIL: Line 221-223: Exception \u2192 None (masks token parse failures); Line 293-295: Exception \u2192 False"}], "execution_time": 16.914363861083984}

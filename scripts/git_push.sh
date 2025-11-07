@@ -1,17 +1,28 @@
 #!/usr/bin/env bash
 # Safe git push wrapper - runs tests before pushing
-# Usage: git_push.sh <module-path> [remote] [branch]
+# Usage: git_push.sh [--only-ready] <module-path> [remote] [branch]
 
 set -euo pipefail
 
 if [ $# -lt 1 ]; then
     echo "Error: Module path required"
-    echo "Usage: $0 <module-path> [remote] [branch]"
+    echo "Usage: $0 [--only-ready] <module-path> [remote] [branch]"
+    echo ""
+    echo "Options:"
+    echo "  --only-ready    Skip dirty check, push already committed work only"
     echo ""
     echo "Examples:"
     echo "  $0 . origin main"
+    echo "  $0 --only-ready . origin main"
     echo "  $0 clients/irisai/demo"
     exit 1
+fi
+
+# Parse flags
+ONLY_READY=false
+if [ "$1" = "--only-ready" ]; then
+    ONLY_READY=true
+    shift
 fi
 
 MODULE_PATH="$1"
@@ -33,6 +44,21 @@ if [ ! -e "$MODULE_ROOT/.git" ]; then
 fi
 
 cd "$MODULE_ROOT"
+
+# Check for uncommitted or unstaged changes (unless --only-ready)
+if [ "$ONLY_READY" = false ]; then
+    if ! git diff-index --quiet HEAD --; then
+        echo "✗ BLOCKED: Uncommitted or unstaged changes detected"
+        echo ""
+        echo "Working tree must be clean before push."
+        echo "Either:"
+        echo "  1. Commit all changes with scripts/git_commit.sh"
+        echo "  2. Use --only-ready flag to push already committed work"
+        echo ""
+        git status --short
+        exit 1
+    fi
+fi
 
 # Check if this is orchestrator root or a submodule
 if [ -f "$MODULE_ROOT/.git" ]; then
@@ -79,11 +105,23 @@ echo "✓ All tests passed!"
 echo ""
 echo "Pushing to remote..."
 
-# Push with arguments or defaults
+# Push with arguments or defaults and capture result
 if [ $# -eq 0 ]; then
-    git push
+    if git push; then
+        echo ""
+        echo "✓ Push completed successfully"
+    else
+        echo ""
+        echo "✗ Push failed - see error above"
+        exit 1
+    fi
 else
-    git push "$@"
+    if git push "$@"; then
+        echo ""
+        echo "✓ Push completed successfully"
+    else
+        echo ""
+        echo "✗ Push failed - see error above"
+        exit 1
+    fi
 fi
-
-echo "✓ Push completed successfully"

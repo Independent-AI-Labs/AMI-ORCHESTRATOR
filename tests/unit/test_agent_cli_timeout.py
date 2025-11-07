@@ -23,6 +23,11 @@ except ImportError:
     AgentTimeoutError = None
     AgentProcessKillError = None
 
+# Test constants
+SHORT_TIMEOUT = 5
+DEFAULT_TIMEOUT = 180
+TEST_PID = 11111
+
 
 class TestTimeoutEnforcement:
     """Tests that timeout is enforced and hung processes are killed."""
@@ -54,17 +59,17 @@ class TestTimeoutEnforcement:
         # Simulate timeout
         mock_process = MagicMock()
         mock_process.pid = 12345
-        mock_process.communicate.side_effect = subprocess.TimeoutExpired(cmd=["claude"], timeout=5)
+        mock_process.communicate.side_effect = subprocess.TimeoutExpired(cmd=["claude"], timeout=SHORT_TIMEOUT)
 
         with patch("subprocess.Popen", return_value=mock_process), patch("os.killpg") as mock_killpg, patch("os.getpgid", return_value=12345):
-            config = AgentConfig(model="test", session_id="test-session", timeout=5)
+            config = AgentConfig(model="test", session_id="test-session", timeout=SHORT_TIMEOUT)
 
             # Verify AgentTimeoutError raised
             with pytest.raises(AgentTimeoutError) as exc_info:
                 cli.run_print(instruction="test", agent_config=config)
 
             # Verify timeout details in exception
-            assert exc_info.value.timeout == 5
+            assert exc_info.value.timeout == SHORT_TIMEOUT
             assert exc_info.value.duration is not None
 
             # Verify SIGKILL sent to process group
@@ -81,11 +86,11 @@ class TestTimeoutEnforcement:
             mock_process.returncode = 0
             mock_popen.return_value = mock_process
 
-            config = AgentConfig(model="test", session_id="test-session", timeout=180)
+            config = AgentConfig(model="test", session_id="test-session", timeout=DEFAULT_TIMEOUT)
             result = cli.run_print(instruction="test", agent_config=config)
 
             # Verify timeout parameter passed to communicate()
-            assert mock_process.communicate.call_args[1]["timeout"] == 180
+            assert mock_process.communicate.call_args[1]["timeout"] == DEFAULT_TIMEOUT
             assert result == ("ok", None)
 
     @pytest.mark.skipif(ClaudeAgentCLI is None, reason="ClaudeAgentCLI not implemented yet")
@@ -172,7 +177,7 @@ class TestTimeoutLogging:
         with (
             patch("subprocess.Popen", return_value=mock_process),
             patch("os.killpg", side_effect=PermissionError("Operation not permitted")),
-            patch("os.getpgid", return_value=11111),
+            patch("os.getpgid", return_value=TEST_PID),
             patch.object(cli.logger, "error") as mock_error,
         ):
             config = AgentConfig(model="test", session_id="test-session", timeout=20)
@@ -181,7 +186,7 @@ class TestTimeoutLogging:
             with pytest.raises(AgentProcessKillError) as exc_info:
                 cli.run_print(instruction="test", agent_config=config)
 
-            assert exc_info.value.pid == 11111
+            assert exc_info.value.pid == TEST_PID
             assert "Operation not permitted" in exc_info.value.reason
 
             # Verify error logged

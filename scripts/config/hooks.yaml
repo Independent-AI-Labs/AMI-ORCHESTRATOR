@@ -17,10 +17,33 @@ hooks:
     command: "command-guard"
     timeout: 10
 
-  # PreToolUse - Code Quality Guard
+  # PreToolUse - Research Validator
+  # Validates adequate research before code changes (docs, codebase inspection)
+  # Skips trivial changes (< 5 lines)
+  - event: "PreToolUse"
+    matcher: ["Write", "Edit", "NotebookEdit"]
+    command: "research-validator"
+    timeout: 120
+
+  # PreToolUse - Core Quality Guard (STEP 1: Cross-language patterns)
+  # Runs on all Edit/Write operations, checks patterns_core.txt
   - event: "PreToolUse"
     matcher: ["Edit", "Write"]
-    command: "code-quality"
+    command: "code-quality-core"
+    timeout: 60
+
+  # PreToolUse - Python Quality Guard (STEP 2: Python-specific patterns)
+  # Only runs on Python files, checks patterns_python.txt
+  - event: "PreToolUse"
+    matcher: ["Edit", "Write"]
+    command: "code-quality-python"
+    timeout: 60
+
+  # PreToolUse - Todo Completion Validator
+  # Validates todos being marked complete are actually done
+  - event: "PreToolUse"
+    matcher: "TodoWrite"
+    command: "todo-validator"
     timeout: 60
 
   # Stop - Response Scanner

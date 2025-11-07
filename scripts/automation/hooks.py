@@ -5,10 +5,13 @@ Ref: https://docs.claude.com/en/docs/claude-code/hooks.md
 
 import json
 import re
+import signal
 import sys
+import time
 import uuid
 from collections.abc import Iterator
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Literal, cast
 
@@ -18,7 +21,13 @@ from scripts.automation.agent_cli import AgentConfigPresets, AgentError, AgentEx
 from scripts.automation.config import get_config
 from scripts.automation.logger import get_logger
 from scripts.automation.transcript import format_messages_for_prompt, get_last_n_messages, is_actual_user_message
-from scripts.automation.validators import load_bash_patterns, load_exemptions, parse_code_fence_output, validate_python_full
+from scripts.automation.validators import (
+    load_bash_patterns,
+    load_exemptions,
+    parse_code_fence_output,
+    run_moderator_with_retry,
+    validate_diff_llm,
+)
 
 # Resource limits (DoS protection)
 MAX_HOOK_INPUT_SIZE = 10 * 1024 * 1024  # 10MB
@@ -51,7 +60,38 @@ def count_tokens(text: str) -> int:
     return len(encoding.encode(text))
 
 
-def prepare_moderator_context(transcript_path: Path) -> str:
+def load_session_todos(session_id: str) -> list[dict[str, Any]]:
+    """Load todo list for a given session.
+
+    Args:
+        session_id: Claude Code session ID
+
+    Returns:
+        List of todo items, or empty list if file doesn't exist or can't be read
+    """
+    todo_file = Path.home() / ".claude" / "todos" / f"{session_id}-agent-{session_id}.json"
+
+    try:
+        if not todo_file.exists():
+            return []
+
+        with todo_file.open() as f:
+            todos = json.load(f)
+
+        # Validate it's a list
+        if not isinstance(todos, list):
+            return []
+
+        return todos
+    except Exception:
+        # Fail gracefully if we can't read the todo file
+        return []
+
+
+def prepare_moderator_context(
+    transcript_path: Path,
+    todos: list[dict[str, Any]] | None = None,
+) -> str:
     """Prepare conversation context for moderator with token and message count limits.
 
     Gets LAST N messages from transcript and applies:
@@ -66,6 +106,8 @@ def prepare_moderator_context(transcript_path: Path) -> str:
 
     Args:
         transcript_path: Path to transcript JSONL file
+        todos: Optional list of todo items to append to context
+        background_tasks: Optional list of background tasks to append to context
 
     Returns:
         Formatted conversation context string ready for moderator
@@ -132,6 +174,17 @@ def prepare_moderator_context(transcript_path: Path) -> str:
             truncated_tokens=truncated_token_count,
             max_tokens=MAX_MODERATOR_CONTEXT_TOKENS,
         )
+
+    # Append todo list if provided
+    if todos:
+        todo_section = "\n\n# Current Task List\n\n"
+        for i, todo in enumerate(todos, 1):
+            status = todo.get("status", "unknown")
+            content = todo.get("content", "Unknown task")
+            status_emoji = {"pending": "⏳", "in_progress": "🔄", "completed": "✅"}.get(status, "❓")
+            todo_section += f"{i}. [{status_emoji} {status}] {content}\n"
+
+        conversation_context += todo_section
 
     return conversation_context
 
@@ -210,6 +263,9 @@ class HookResult:
             if self.reason:
                 output["hookSpecificOutput"]["permissionDecisionReason"] = self.reason
 
+            if self.system_message:
+                output["systemMessage"] = self.system_message
+
             return json.dumps(output)
         # Stop/SubagentStop hooks use decision/reason/systemMessage format
         # Note: Stop hooks use "approve"/"block" not "allow"/"deny"
@@ -238,16 +294,17 @@ class HookResult:
         return cls()
 
     @classmethod
-    def deny(cls, reason: str) -> "HookResult":
+    def deny(cls, reason: str, system_message: str | None = None) -> "HookResult":
         """Deny operation (PreToolUse).
 
         Args:
             reason: Denial reason
+            system_message: Optional UI message to display to user
 
         Returns:
             Deny result
         """
-        return cls(decision="deny", reason=reason)
+        return cls(decision="deny", reason=reason, system_message=system_message)
 
     @classmethod
     def block(cls, reason: str) -> "HookResult":
@@ -417,44 +474,93 @@ class MaliciousBehaviorValidator(HookValidator):
         try:
             agent_cli = get_agent_cli()
             malicious_behavior_config = AgentConfigPresets.completion_moderator(f"malicious-behavior-{session_id}")
+            malicious_behavior_config.enable_streaming = True
 
-            output, _ = agent_cli.run_print(
+            # Create audit log for hang detection
+            config = get_config()
+            audit_dir = config.root / "logs" / "agent-cli"
+            audit_dir.mkdir(parents=True, exist_ok=True)
+            audit_log_path = audit_dir / f"malicious-behavior-{execution_id}.log"
+
+            output, _ = run_moderator_with_retry(
+                cli=agent_cli,
                 instruction_file=self.prompt_path,
                 stdin=prompt,
                 agent_config=malicious_behavior_config,
+                audit_log_path=audit_log_path,
+                moderator_name="malicious_behavior",
+                session_id=session_id,
+                execution_id=execution_id,
+                max_attempts=2,
+                first_output_timeout=3.5,
             )
 
             self.logger.info("malicious_behavior_moderator_output", session_id=session_id, execution_id=execution_id, output=output)
 
-            # Parse decision
+            # Parse decision - simple ALLOW or BLOCK: format
+            # Strip preamble before decision marker for robustness
             cleaned_output = parse_code_fence_output(output)
-            xml_match = re.search(r"<decision>\s*(.+?)\s*</decision>", cleaned_output, re.IGNORECASE | re.DOTALL)
 
-            if xml_match:
-                decision_text = xml_match.group(1).strip()
+            # Find first occurrence of ALLOW or BLOCK: (ignores preamble)
+            allow_match = re.search(r"\bALLOW\b", cleaned_output, re.IGNORECASE)
+            block_match = re.search(r"\bBLOCK:\s*", cleaned_output, re.IGNORECASE)
 
-                if re.match(r"^ALLOW$", decision_text, re.IGNORECASE):
-                    self.logger.info("malicious_behavior_allow", session_id=session_id, execution_id=execution_id)
-                    return HookResult.allow()
+            if allow_match and (not block_match or allow_match.start() < block_match.start()):
+                # ALLOW appears before BLOCK (or no BLOCK)
+                self.logger.info("malicious_behavior_allow", session_id=session_id, execution_id=execution_id)
+                return HookResult.allow()
 
-                if re.match(r"^BLOCK$", decision_text, re.IGNORECASE):
-                    # Extract reason
-                    reason_match = re.search(r"<reason>\s*(.+?)\s*</reason>", cleaned_output, re.IGNORECASE | re.DOTALL)
-                    reason = reason_match.group(1).strip() if reason_match else "Malicious behavior detected"
-
-                    self.logger.warning("malicious_behavior_block", session_id=session_id, execution_id=execution_id, reason=reason[:200])
-                    return HookResult.deny(f"🚨 MALICIOUS BEHAVIOR DETECTED\n\n{reason}\n\nThis operation has been blocked to protect CI/CD integrity.")
+            if block_match:
+                # Extract reason after BLOCK:
+                reason_start = block_match.end()
+                reason = cleaned_output[reason_start:].strip()
+                if not reason:
+                    reason = "Malicious behavior detected"
+                self.logger.warning("malicious_behavior_block", session_id=session_id, execution_id=execution_id, reason=reason[:200])
+                return HookResult.deny(
+                    reason=f"🚨 QUALITY VIOLATION - ADDITIONAL TOKENS INCURRED FOR MODERATION\n\n"
+                    f"Hook: PreToolUse ({hook_input.tool_name})\n"
+                    f"Validator: MaliciousBehaviorValidator\n\n"
+                    f"🚨 MALICIOUS BEHAVIOR DETECTED\n\n{reason}\n\n"
+                    f"This operation has been blocked to protect CI/CD integrity.",
+                    system_message="🚫 Malicious behavior detected - operation blocked",
+                )
 
             # Unparseable output - fail closed for safety
             self.logger.warning("malicious_behavior_unparseable", session_id=session_id, execution_id=execution_id, output=cleaned_output[:300])
             return HookResult.deny(
-                "Malicious behavior check returned unparseable response. Blocking for safety.\n\nThis is likely a temporary issue - please try again."
+                reason=f"🚨 QUALITY VIOLATION - ADDITIONAL TOKENS INCURRED FOR MODERATION\n\n"
+                f"Hook: PreToolUse ({hook_input.tool_name})\n"
+                f"Validator: MaliciousBehaviorValidator (Unparseable)\n\n"
+                f"Malicious behavior check returned unparseable response. Blocking for safety.\n\n"
+                f"This is likely a temporary issue - please try again.",
+                system_message="⚠️ Security check failed - moderator error",
             )
 
-        except (AgentError, AgentTimeoutError, AgentExecutionError) as e:
-            self.logger.error("malicious_behavior_moderator_error", session_id=session_id, execution_id=execution_id, error=str(e))
-            # Fail open for moderator execution errors (not malicious behavior itself)
-            return HookResult.allow()
+        except (AgentTimeoutError, AgentExecutionError) as e:
+            self.logger.error("malicious_behavior_moderator_error_fail_closed", session_id=session_id, execution_id=execution_id, error=str(e))
+            # FAIL-CLOSED: Block on timeout/execution errors to prevent bypass
+            return HookResult.deny(
+                reason=f"🚨 QUALITY VIOLATION - ADDITIONAL TOKENS INCURRED FOR MODERATION\n\n"
+                f"Hook: PreToolUse ({hook_input.tool_name})\n"
+                f"Validator: MaliciousBehaviorValidator (Timeout)\n\n"
+                f"Malicious behavior check timed out after retry. Blocking for safety.\n\n"
+                f"Moderator error: {type(e).__name__}\n\n"
+                f"Please retry the operation.",
+                system_message="⚠️ Security check timeout - operation blocked",
+            )
+        except AgentError as e:
+            self.logger.error("malicious_behavior_moderator_error_fail_closed", session_id=session_id, execution_id=execution_id, error=str(e))
+            # FAIL-CLOSED: Block on other agent errors too
+            return HookResult.deny(
+                reason=f"🚨 QUALITY VIOLATION - ADDITIONAL TOKENS INCURRED FOR MODERATION\n\n"
+                f"Hook: PreToolUse ({hook_input.tool_name})\n"
+                f"Validator: MaliciousBehaviorValidator (Error)\n\n"
+                f"Malicious behavior check failed. Blocking for safety.\n\n"
+                f"Moderator error: {type(e).__name__}\n\n"
+                f"Please retry the operation.",
+                system_message="⚠️ Security check error - operation blocked",
+            )
 
 
 class CommandValidator(HookValidator):
@@ -490,48 +596,186 @@ class CommandValidator(HookValidator):
         # Load patterns from YAML
         deny_patterns = load_bash_patterns()
 
-        # Check all strings in tool_input (handles nested structures)
-        all_strings = list(self._extract_strings(hook_input.tool_input))
+        # SECURITY: Only validate the command field, not description/metadata
+        #
+        # Per Claude Code Bash tool specification (https://docs.claude.com/en/docs/claude-code/tools.md#bash):
+        # Bash tool_input structure:
+        # {
+        #   "command": "echo hello",           # <-- EXECUTED by shell (MUST validate)
+        #   "description": "Print hello",      # <-- Metadata only (never executed)
+        #   "timeout": 30,                     # <-- Numeric config (never executed)
+        #   "run_in_background": false         # <-- Boolean config (never executed)
+        # }
+        #
+        # Only "command" is passed to subprocess - description is logging metadata.
+        # Checking all fields causes false positives when descriptions mention tools:
+        #   Example: Bash(command="scripts/git_commit.sh", description="Commit ruff config")
+        #   Would incorrectly block because "ruff" appears in description, not command.
+        #
+        # Malicious code MUST be in command field to execute - checking description adds
+        # no security value since it's never passed to shell.
+        command = hook_input.tool_input.get("command", "")
 
         for pattern_config in deny_patterns:
             pattern = pattern_config.get("pattern", "")
             message = pattern_config.get("message", "Pattern violation detected")
 
-            for string in all_strings:
-                if re.search(pattern, string):
-                    return HookResult.deny(f"{message} (pattern: {pattern})")
+            if re.search(pattern, command):
+                return HookResult.deny(
+                    f"🚨 QUALITY VIOLATION - ADDITIONAL TOKENS INCURRED FOR MODERATION\n\n"
+                    f"Hook: PreToolUse (Bash)\n"
+                    f"Validator: CommandValidator\n\n"
+                    f"{message}\n"
+                    f"Pattern: {pattern}"
+                )
 
         return HookResult.allow()
 
 
-class CodeQualityValidator(HookValidator):
-    """Validates code changes for quality regressions using LLM-based audit."""
+class CoreQualityValidator(HookValidator):
+    """Validates code changes for cross-language quality patterns using LLM-based audit."""
 
     def _extract_old_new_code(self, hook_input: HookInput) -> tuple[str, str]:
-        """Extract old and new code from hook input.
+        """Extract old and new code with FULL file context for proper validation.
+
+        For Edit operations, reads the complete file and applies the transformation
+        to provide full context to validators. This prevents false positives when
+        validators need to check patterns like lazy imports that require knowing
+        the complete file structure.
 
         Args:
             hook_input: Hook input containing file edits
 
         Returns:
-            Tuple of (old_code, new_code)
+            Tuple of (full_old_content, full_new_content) with complete file context
         """
         if hook_input.tool_input is None:
             return "", ""
 
         file_path = hook_input.tool_input.get("file_path", "")
+        file_path_obj = Path(file_path)
 
         if hook_input.tool_name == "Edit":
-            old_code = hook_input.tool_input.get("old_string", "")
-            new_code = hook_input.tool_input.get("new_string", "")
-        else:  # Write
-            old_code = Path(file_path).read_text() if Path(file_path).exists() else ""
-            new_code = hook_input.tool_input.get("content", "")
+            # Read FULL current file content for proper context
+            if not file_path_obj.exists():
+                return "", ""
 
-        return old_code, new_code
+            full_old_content = file_path_obj.read_text()
+            old_string = hook_input.tool_input.get("old_string", "")
+            new_string = hook_input.tool_input.get("new_string", "")
+
+            # Apply edit to get FULL new content
+            if old_string in full_old_content:
+                full_new_content = full_old_content.replace(old_string, new_string, 1)
+            else:
+                # Edit will fail anyway, but return fragments so validator can see what was attempted
+                return old_string, new_string
+
+            return full_old_content, full_new_content
+
+        # Write operation - already has full content
+        old_content = file_path_obj.read_text() if file_path_obj.exists() else ""
+        new_content = hook_input.tool_input.get("content", "")
+        return old_content, new_content
 
     def validate(self, hook_input: HookInput) -> HookResult:
-        """Validate code quality using patterns and LLM diff audit.
+        """Validate code quality using cross-language patterns.
+
+        Args:
+            hook_input: Hook input
+
+        Returns:
+            Validation result
+        """
+        # Early exit for invalid inputs
+        if hook_input.tool_name not in ("Edit", "Write") or hook_input.tool_input is None:
+            return HookResult.allow()
+
+        # Extract file path
+        file_path = hook_input.tool_input.get("file_path", "")
+
+        # Extract old/new code
+        old_code, new_code = self._extract_old_new_code(hook_input)
+
+        # Load exemptions from YAML
+
+        exemptions = load_exemptions()
+
+        # Check if file is exempt from pattern checks
+        # Support both endswith (extensions) and contains (path patterns)
+        is_pattern_exempt = any(file_path.endswith(exempt) or exempt in file_path for exempt in exemptions)
+
+        # Skip validation for exempt files
+        if is_pattern_exempt:
+            return HookResult.allow()
+
+        # Use shared validation logic with patterns_core.txt
+        is_valid, reason = validate_diff_llm(
+            file_path=file_path,
+            old_content=old_code,
+            new_content=new_code,
+            session_id=hook_input.session_id,
+            patterns_file="patterns_core.txt",
+        )
+
+        if is_valid:
+            return HookResult.allow()
+        return HookResult.deny(
+            f"🚨 QUALITY VIOLATION - ADDITIONAL TOKENS INCURRED FOR MODERATION\n\n"
+            f"Hook: PreToolUse ({hook_input.tool_name})\n"
+            f"Validator: CoreQualityValidator\n\n"
+            f"{reason}"
+        )
+
+
+class PythonQualityValidator(HookValidator):
+    """Validates Python code changes for Python-specific quality patterns using LLM-based audit."""
+
+    def _extract_old_new_code(self, hook_input: HookInput) -> tuple[str, str]:
+        """Extract old and new code with FULL file context for proper validation.
+
+        For Edit operations, reads the complete file and applies the transformation
+        to provide full context to validators. This prevents false positives when
+        validators need to check patterns like lazy imports that require knowing
+        the complete file structure.
+
+        Args:
+            hook_input: Hook input containing file edits
+
+        Returns:
+            Tuple of (full_old_content, full_new_content) with complete file context
+        """
+        if hook_input.tool_input is None:
+            return "", ""
+
+        file_path = hook_input.tool_input.get("file_path", "")
+        file_path_obj = Path(file_path)
+
+        if hook_input.tool_name == "Edit":
+            # Read FULL current file content for proper context
+            if not file_path_obj.exists():
+                return "", ""
+
+            full_old_content = file_path_obj.read_text()
+            old_string = hook_input.tool_input.get("old_string", "")
+            new_string = hook_input.tool_input.get("new_string", "")
+
+            # Apply edit to get FULL new content
+            if old_string in full_old_content:
+                full_new_content = full_old_content.replace(old_string, new_string, 1)
+            else:
+                # Edit will fail anyway, but return fragments so validator can see what was attempted
+                return old_string, new_string
+
+            return full_old_content, full_new_content
+
+        # Write operation - already has full content
+        old_content = file_path_obj.read_text() if file_path_obj.exists() else ""
+        new_content = hook_input.tool_input.get("content", "")
+        return old_content, new_content
+
+    def validate(self, hook_input: HookInput) -> HookResult:
+        """Validate Python code quality using Python-specific patterns.
 
         Args:
             hook_input: Hook input
@@ -550,26 +794,34 @@ class CodeQualityValidator(HookValidator):
         old_code, new_code = self._extract_old_new_code(hook_input)
 
         # Load exemptions from YAML
+
         exemptions = load_exemptions()
 
         # Check if file is exempt from pattern checks
-        is_pattern_exempt = any(file_path.endswith(exempt) for exempt in exemptions)
+        # Support both endswith (extensions) and contains (path patterns)
+        is_pattern_exempt = any(file_path.endswith(exempt) or exempt in file_path for exempt in exemptions)
 
         # Skip validation for exempt files
         if is_pattern_exempt:
             return HookResult.allow()
 
-        # Use shared validation logic (eliminates duplication with files/backend validators)
-        is_valid, reason = validate_python_full(
+        # Use shared validation logic with patterns_python.txt
+        is_valid, reason = validate_diff_llm(
             file_path=file_path,
             old_content=old_code,
             new_content=new_code,
             session_id=hook_input.session_id,
+            patterns_file="patterns_python.txt",
         )
 
         if is_valid:
             return HookResult.allow()
-        return HookResult.deny(reason)
+        return HookResult.deny(
+            f"🚨 QUALITY VIOLATION - ADDITIONAL TOKENS INCURRED FOR MODERATION\n\n"
+            f"Hook: PreToolUse ({hook_input.tool_name})\n"
+            f"Validator: PythonQualityValidator\n\n"
+            f"{reason}"
+        )
 
 
 class ShebangValidator(HookValidator):
@@ -625,7 +877,12 @@ class ShebangValidator(HookValidator):
 
         for pattern, description in security_issues:
             if pattern in first_lines:
-                return HookResult.deny(f"SECURITY: {description} in {file_path_str}")
+                return HookResult.deny(
+                    f"🚨 QUALITY VIOLATION - ADDITIONAL TOKENS INCURRED FOR MODERATION\n\n"
+                    f"Hook: PreToolUse ({hook_input.tool_name})\n"
+                    f"Validator: ShebangValidator\n\n"
+                    f"SECURITY: {description} in {file_path_str}"
+                )
 
         # Incorrect patterns
         incorrect_patterns = [
@@ -637,7 +894,12 @@ class ShebangValidator(HookValidator):
 
         for pattern, description in incorrect_patterns:
             if pattern in first_lines and b"ami-run.sh" not in first_lines:
-                return HookResult.deny(f"Shebang issue: {description} in {file_path_str}. Use ami-run wrapper instead.")
+                return HookResult.deny(
+                    f"🚨 QUALITY VIOLATION - ADDITIONAL TOKENS INCURRED FOR MODERATION\n\n"
+                    f"Hook: PreToolUse ({hook_input.tool_name})\n"
+                    f"Validator: ShebangValidator\n\n"
+                    f"Shebang issue: {description} in {file_path_str}. Use ami-run wrapper instead."
+                )
 
         return HookResult.allow()
 
@@ -653,6 +915,10 @@ class ResponseScanner(HookValidator):
         (r"\bi\s+see\s+the\s+(problem|issue)\b", "I see the problem"),
         (r"\bthat'?s\s+(absolutely|completely|totally|exactly)\s+(correct|right|spot-on)\b", "that's absolutely correct/right"),
         (r"\bspot-on\b", "spot-on"),
+        (r"\bpre-existing\b", "pre-existing (avoidance)"),
+        (r"\bpre\s+existing\b", "pre existing (avoidance)"),
+        (r"\balready\s+exists?\b", "already exists (avoidance)"),
+        (r"\bexisting\s+(issue|problem|violation|bug|error)s?\b", "existing issues (avoidance)"),
     ]
 
     COMPLETION_MARKERS = ["WORK DONE", "FEEDBACK:"]
@@ -727,12 +993,15 @@ class ResponseScanner(HookValidator):
 
         if has_completion_marker:
             # Completion marker found - let moderator validate everything
-            return self._validate_completion(hook_input.session_id, transcript_path)
+            return self._validate_completion(hook_input.session_id, transcript_path, last_message)
 
         # No completion markers - apply communication rules
         for pattern, description in self.PROHIBITED_PATTERNS:
             if re.search(pattern, last_message, re.IGNORECASE):
                 return HookResult.block(
+                    f"🚨 QUALITY VIOLATION - ADDITIONAL TOKENS INCURRED FOR MODERATION\n\n"
+                    f"Hook: Stop\n"
+                    f"Validator: ResponseScanner\n\n"
                     f'CRITICAL COMMUNICATION RULES VIOLATION: "{description}" detected.\n\n'
                     '- NEVER say "The issue is clear", "You are right", "I see the problem", '
                     "or similar definitive statements without FIRST reading and verifying the actual source code/data.\n"
@@ -743,6 +1012,9 @@ class ResponseScanner(HookValidator):
 
         # No completion markers found, block stop
         return HookResult.block(
+            "🚨 QUALITY VIOLATION - ADDITIONAL TOKENS INCURRED FOR MODERATION\n\n"
+            "Hook: Stop\n"
+            "Validator: ResponseScanner\n\n"
             "COMPLETION MARKER REQUIRED.\n\n"
             "You must signal completion before stopping:\n"
             "- Add 'WORK DONE' when task is complete\n"
@@ -778,45 +1050,66 @@ class ResponseScanner(HookValidator):
             if re.search(phrase_pattern, cleaned_output, re.IGNORECASE):
                 self.logger.warning("completion_moderator_conversational", session_id=session_id, phrase=phrase_pattern, output_preview=cleaned_output[:200])
                 return HookResult.block(
-                    "COMPLETION VALIDATION ERROR\n\n"
-                    "Moderator returned conversational text instead of structured decision.\n"
-                    "This indicates a prompt following failure.\n\n"
+                    f"🚨 QUALITY VIOLATION - ADDITIONAL TOKENS INCURRED FOR MODERATION\n\n"
+                    f"Hook: Stop\n"
+                    f"Validator: ResponseScanner\n\n"
+                    f"COMPLETION VALIDATION ERROR\n\n"
+                    f"Moderator returned conversational text instead of structured decision.\n"
+                    f"This indicates a prompt following failure.\n\n"
                     f"Output preview: {cleaned_output[:300]}\n\n"
-                    "Defaulting to BLOCK for safety."
+                    f"Defaulting to BLOCK for safety."
                 )
 
-        # Try to extract XML decision tags (new format)
-        xml_match = re.search(r"<decision>\s*(.+?)\s*</decision>", cleaned_output, re.IGNORECASE | re.DOTALL)
-        if xml_match:
-            decision_text = xml_match.group(1).strip()
+        # Check for ALLOW: format (with explanation) - NEW FORMAT
+        allow_with_reason_match = re.search(r"\bALLOW:\s*(.+)", cleaned_output, re.IGNORECASE | re.DOTALL)
+        # Check for legacy bare ALLOW format - BACKWARDS COMPATIBILITY
+        allow_bare_match = re.search(r"\bALLOW\b(?!:)", cleaned_output, re.IGNORECASE)
+        # Check for BLOCK: format
+        block_match = re.search(r"\bBLOCK:\s*", cleaned_output, re.IGNORECASE)
 
-            # Check if it's ALLOW
-            if re.match(r"^ALLOW$", decision_text, re.IGNORECASE):
-                self.logger.info("completion_moderator_allow", session_id=session_id, format="xml")
-                return HookResult(decision="allow", system_message="✅ Completion validated - work meets requirements")
+        if allow_with_reason_match:
+            # New format: ALLOW: explanation
+            explanation = allow_with_reason_match.group(1).strip()
+            # Truncate at BLOCK if present (shouldn't happen but be safe)
+            if "BLOCK" in explanation.upper():
+                explanation = explanation[: explanation.upper().index("BLOCK")].strip()
 
-            # Check if it's BLOCK with reason
-            block_xml_match = re.match(r"^BLOCK:\s*(.+)$", decision_text, re.IGNORECASE | re.DOTALL)
-            if block_xml_match:
-                reason = block_xml_match.group(1).strip()
-                self.logger.info("completion_moderator_block", session_id=session_id, reason=reason[:100], format="xml")
-                return HookResult.block(f"❌ COMPLETION VALIDATION FAILED\n\n{reason}\n\nWork is not complete. Continue working or provide clarification.")
+            system_message = f"✅ MODERATOR: {explanation}"
+            self.logger.info("completion_moderator_allow", session_id=session_id, explanation=explanation[:200])
+            return HookResult(decision="allow", system_message=system_message)
 
-        # Fallback: Check for plain ALLOW/BLOCK (backward compatibility)
-        if re.search(r"\bALLOW\b", cleaned_output, re.IGNORECASE):
-            self.logger.info("completion_moderator_allow", session_id=session_id, format="plain")
-            return HookResult(decision="allow", system_message="✅ Completion validated - work meets requirements")
+        if allow_bare_match and (not block_match or allow_bare_match.start() < block_match.start()):
+            # Legacy format: bare ALLOW (backwards compatibility)
+            self.logger.warning(
+                "completion_moderator_allow_no_explanation", session_id=session_id, note="Moderator used legacy ALLOW format without explanation"
+            )
+            system_message = "✅ MODERATOR: Completion validated (no explanation provided - legacy format)"
+            return HookResult(decision="allow", system_message=system_message)
 
-        block_match = re.search(r"\bBLOCK:\s*(.+)", cleaned_output, re.IGNORECASE | re.DOTALL)
         if block_match:
-            reason = block_match.group(1).strip()
-            self.logger.info("completion_moderator_block", session_id=session_id, reason=reason[:100], format="plain")
-            return HookResult.block(f"❌ COMPLETION VALIDATION FAILED\n\n{reason}\n\nWork is not complete. Continue working or provide clarification.")
+            # Extract reason after BLOCK:
+            reason_start = block_match.end()
+            reason = cleaned_output[reason_start:].strip()
+            if not reason:
+                reason = "Work incomplete or validation failed"
+            self.logger.info("completion_moderator_block", session_id=session_id, reason=reason[:200])
+            return HookResult.block(
+                f"🚨 QUALITY VIOLATION - ADDITIONAL TOKENS INCURRED FOR MODERATION\n\n"
+                f"Hook: Stop\n"
+                f"Validator: ResponseScanner\n\n"
+                f"❌ MODERATOR: {reason}\n\n"
+                f"Continue working or provide clarification."
+            )
 
         # No clear decision - fail closed
-        self.logger.warning("completion_moderator_unclear", session_id=session_id, output=cleaned_output[:200])
+        self.logger.warning("completion_moderator_unclear", session_id=session_id, output=cleaned_output[:500], raw_output=output[:500])
         return HookResult.block(
-            f"COMPLETION VALIDATION UNCLEAR\n\nModerator output:\n{output}\n\nCannot determine if work is complete. Defaulting to BLOCK for safety."
+            f"🚨 QUALITY VIOLATION - ADDITIONAL TOKENS INCURRED FOR MODERATION\n\n"
+            f"Hook: Stop\n"
+            f"Validator: ResponseScanner\n\n"
+            f"COMPLETION VALIDATION UNCLEAR\n\n"
+            f"Moderator output (cleaned):\n{cleaned_output[:500]}\n\n"
+            f"Expected 'ALLOW: explanation' or 'BLOCK: reason'. Defaulting to BLOCK for safety."
         )
 
     def _load_moderator_context(self, session_id: str, execution_id: str, transcript_path: Path) -> tuple[str | None, HookResult | None]:
@@ -831,7 +1124,10 @@ class ResponseScanner(HookValidator):
             Tuple of (conversation_context, error_result). If error_result is not None, validation should return it.
         """
         try:
-            conversation_context = prepare_moderator_context(transcript_path)
+            # Load session todos to provide moderator with task context
+            todos = load_session_todos(session_id)
+
+            conversation_context = prepare_moderator_context(transcript_path, todos=todos)
             if not conversation_context:
                 return None, HookResult.allow()
 
@@ -850,7 +1146,11 @@ class ResponseScanner(HookValidator):
         except Exception as e:
             self.logger.error("completion_moderator_transcript_error", session_id=session_id, execution_id=execution_id, error=str(e))
             error_result = HookResult.block(
-                f"COMPLETION VALIDATION ERROR\n\nFailed to read conversation context: {e}\n\nCannot verify completion without context."
+                f"🚨 QUALITY VIOLATION - ADDITIONAL TOKENS INCURRED FOR MODERATION\n\n"
+                f"Hook: Stop\n"
+                f"Validator: ResponseScanner\n\n"
+                f"COMPLETION VALIDATION ERROR\n\nFailed to read conversation context: {e}\n\n"
+                f"Cannot verify completion without context."
             )
             return None, error_result
 
@@ -874,6 +1174,9 @@ class ResponseScanner(HookValidator):
                 actual_duration=error.duration,
             )
             return HookResult.block(
+                f"🚨 QUALITY VIOLATION - ADDITIONAL TOKENS INCURRED FOR MODERATION\n\n"
+                f"Hook: Stop\n"
+                f"Validator: ResponseScanner\n\n"
                 f"❌ COMPLETION VALIDATION TIMEOUT\n\n"
                 f"Moderator exceeded {error.timeout}s timeout while analyzing conversation.\n\n"
                 f"This typically indicates:\n"
@@ -895,6 +1198,9 @@ class ResponseScanner(HookValidator):
             )
             stderr_preview = error.stderr[:500] if error.stderr else "No stderr output"
             return HookResult.block(
+                f"🚨 QUALITY VIOLATION - ADDITIONAL TOKENS INCURRED FOR MODERATION\n\n"
+                f"Hook: Stop\n"
+                f"Validator: ResponseScanner\n\n"
                 f"❌ COMPLETION VALIDATION ERROR\n\n"
                 f"Agent execution failed with exit code {error.exit_code}\n\n"
                 f"Error output:\n{stderr_preview}\n\n"
@@ -902,253 +1208,23 @@ class ResponseScanner(HookValidator):
             )
         if isinstance(error, AgentError):
             self.logger.error("completion_moderator_error", session_id=session_id, execution_id=execution_id, error=str(error))
-            return HookResult.block(f"❌ COMPLETION VALIDATION ERROR\n\n{error}\n\nCannot verify completion due to moderator failure.")
+            return HookResult.block(
+                f"🚨 QUALITY VIOLATION - ADDITIONAL TOKENS INCURRED FOR MODERATION\n\n"
+                f"Hook: Stop\n"
+                f"Validator: ResponseScanner\n\n"
+                f"❌ COMPLETION VALIDATION ERROR\n\n{error}\n\n"
+                f"Cannot verify completion due to moderator failure."
+            )
         self.logger.error("completion_moderator_error", session_id=session_id, execution_id=execution_id, error=str(error))
         raise error
 
-    def _check_first_output_in_audit_log(self, audit_log_path: Path) -> bool:
-        """Check if audit log contains first output marker.
-
-        Args:
-            audit_log_path: Path to audit log file
-
-        Returns:
-            True if first output marker found, False otherwise
-        """
-        if not audit_log_path or not audit_log_path.exists():
-            return False
-
-        try:
-            with audit_log_path.open() as f:
-                for line in f:
-                    if "=== FIRST OUTPUT:" in line:
-                        return True
-        except OSError:
-            pass
-
-        return False
-
-    def _check_decision_in_output(self, output: str) -> bool:
-        """Check if moderator output contains a decision tag.
-
-        Args:
-            output: Moderator output string
-
-        Returns:
-            True if <decision> tag found, False otherwise
-        """
-        if not output:
-            return False
-        return "<decision>" in output.lower()
-
-    def _run_moderator_with_first_output_monitoring(
-        self,
-        session_id: str,
-        execution_id: str,
-        cli: Any,
-        moderator_prompt: Path,
-        conversation_context: str,
-        completion_moderator_config: Any,
-        audit_log_path: Path | None,
-        max_attempts: int = 2,
-        first_output_timeout: float = 3.5,
-    ) -> tuple[str, dict[str, Any] | None]:
-        """Run moderator with automatic restart if hangs during startup or analysis.
-
-        Monitors for TWO types of hangs:
-        1. **Startup hang**: No first output within first_output_timeout (default 3.5s)
-           - Claude never starts streaming
-           - Process appears stuck before any output
-
-        2. **Analysis hang**: First output produced but no <decision> tag
-           - Claude starts streaming (system init message)
-           - But hangs during thinking/analysis phase
-           - Never produces final <decision> output
-
-        If either hang detected, automatically restarts (up to max_attempts total).
-
-        This fixes two historical issues:
-        - execution 90858109: hung during analysis phase after first output
-        - execution 9101bf43: hung during analysis, no decision after first output
-
-        Args:
-            session_id: Session ID
-            execution_id: Execution ID
-            cli: Agent CLI instance
-            moderator_prompt: Path to moderator prompt file
-            conversation_context: Conversation context string
-            completion_moderator_config: Agent config
-            audit_log_path: Audit log path (required for monitoring)
-            max_attempts: Maximum attempts (default 2: original + 1 restart)
-            first_output_timeout: Seconds to wait for first output (default 3.5s)
-
-        Returns:
-            Tuple of (output, metadata)
-
-        Raises:
-            AgentTimeoutError: All attempts hung without first output
-            AgentError: Other execution errors
-        """
-        import time
-
-        if not audit_log_path:
-            # No audit log - cannot monitor for first output, run directly
-            result: tuple[str, dict[str, Any] | None] = cli.run_print(
-                instruction_file=moderator_prompt,
-                stdin=conversation_context,
-                agent_config=completion_moderator_config,
-                audit_log_path=audit_log_path,
-            )
-            return result
-
-        # Use shorter timeout to detect hangs quickly
-        # first_output_timeout determines how quickly we detect and retry on hangs
-        original_timeout = completion_moderator_config.timeout
-        hang_detection_timeout = max(int(first_output_timeout * 2), 10)  # At least 2x first_output_timeout
-
-        for attempt in range(1, max_attempts + 1):
-            attempt_execution_id = f"{execution_id}-attempt{attempt}"
-
-            # Clear audit log for this attempt
-            if audit_log_path.exists():
-                audit_log_path.unlink()
-
-            self.logger.info(
-                "completion_moderator_attempt_starting",
-                session_id=session_id,
-                execution_id=attempt_execution_id,
-                attempt=attempt,
-                max_attempts=max_attempts,
-                timeout=hang_detection_timeout,
-            )
-
-            # Set shorter timeout for hang detection
-            completion_moderator_config.timeout = hang_detection_timeout
-
-            try:
-                start_time = time.time()
-
-                # Start moderator execution
-                # Note: first_output_timeout monitoring happens via audit log polling
-                # If no first output within first_output_timeout, we check audit log and retry
-                output, metadata = cli.run_print(
-                    instruction_file=moderator_prompt,
-                    stdin=conversation_context,
-                    agent_config=completion_moderator_config,
-                    audit_log_path=audit_log_path,
-                )
-
-                # Success - verify first output was produced
-                has_first_output = self._check_first_output_in_audit_log(audit_log_path)
-                has_decision = self._check_decision_in_output(output)
-                elapsed = time.time() - start_time
-
-                if has_first_output and has_decision:
-                    # Complete success - both first output and decision present
-                    self.logger.info(
-                        "completion_moderator_attempt_success",
-                        session_id=session_id,
-                        execution_id=attempt_execution_id,
-                        attempt=attempt,
-                        elapsed=round(elapsed, 2),
-                    )
-                    # Restore original timeout
-                    completion_moderator_config.timeout = original_timeout
-                    return output, metadata
-
-                if has_first_output and not has_decision:
-                    # Analysis hang: first output present but no decision
-                    # This is the case where Claude starts streaming but hangs during analysis
-                    if attempt < max_attempts:
-                        # Kill hung process before retry
-                        cli.kill_current_process()
-
-                        self.logger.warning(
-                            "completion_moderator_analysis_hang_restarting",
-                            session_id=session_id,
-                            execution_id=attempt_execution_id,
-                            attempt=attempt,
-                            max_attempts=max_attempts,
-                            reason="First output present but no decision tag - Claude hung during analysis",
-                            output_preview=output[:500] if output else "",
-                            output_length=len(output) if output else 0,
-                            has_streaming_messages=bool(output and '{"type"' in output),
-                            elapsed=elapsed,
-                        )
-                        continue  # Retry
-                    # Last attempt - return output even without decision
-                    # Parsing will handle missing decision (fail-closed)
-                    self.logger.error(
-                        "completion_moderator_analysis_hang_exhausted",
-                        session_id=session_id,
-                        execution_id=attempt_execution_id,
-                        attempt=attempt,
-                        reason="No decision tag after all attempts",
-                    )
-                    completion_moderator_config.timeout = original_timeout
-                    return output, metadata
-
-                # No first output but completed (shouldn't happen, but handle it)
-                self.logger.warning(
-                    "completion_moderator_no_first_output_but_completed",
-                    session_id=session_id,
-                    execution_id=attempt_execution_id,
-                    attempt=attempt,
-                )
-                # Still return the output - this is unexpected but not necessarily wrong
-                completion_moderator_config.timeout = original_timeout
-                return output, metadata
-
-            except (AgentTimeoutError, AgentExecutionError) as e:
-                # Check if first output was produced before failure
-                has_first_output = self._check_first_output_in_audit_log(audit_log_path)
-
-                if not has_first_output and attempt < max_attempts:
-                    # No first output - this is a hang, retry
-                    # Kill hung process before retry
-                    cli.kill_current_process()
-
-                    # Get audit log size for debugging
-                    audit_log_size = audit_log_path.stat().st_size if audit_log_path and audit_log_path.exists() else 0
-
-                    self.logger.warning(
-                        "completion_moderator_hang_detected_restarting",
-                        session_id=session_id,
-                        execution_id=attempt_execution_id,
-                        attempt=attempt,
-                        max_attempts=max_attempts,
-                        error_type=type(e).__name__,
-                        reason="No first output within timeout - likely Claude hang",
-                        audit_log_size=audit_log_size,
-                        elapsed=time.time() - start_time,
-                    )
-
-                    # Restore timeout before retry
-                    completion_moderator_config.timeout = original_timeout
-                    continue  # Retry
-
-                # First output was produced OR last attempt - re-raise
-                completion_moderator_config.timeout = original_timeout
-                raise
-
-            except Exception:
-                # Other errors - re-raise immediately
-                completion_moderator_config.timeout = original_timeout
-                raise
-
-        # All attempts exhausted without success
-        raise AgentTimeoutError(
-            timeout=int(hang_detection_timeout * max_attempts),
-            cmd=["claude", "--print"],  # Simplified cmd for error reporting
-            duration=float(hang_detection_timeout * max_attempts),
-        )
-
-    def _validate_completion(self, session_id: str, transcript_path: Path) -> HookResult:
+    def _validate_completion(self, session_id: str, transcript_path: Path, last_message: str) -> HookResult:
         """Validate completion marker using moderator agent.
 
         Args:
             session_id: Session ID for logging
             transcript_path: Path to transcript file
+            last_message: Last assistant message text (to check which completion marker was used)
 
         Returns:
             Validation result (ALLOW if work complete, BLOCK if not)
@@ -1157,6 +1233,23 @@ class ResponseScanner(HookValidator):
 
         if not self.config.get("response_scanner.completion_moderator_enabled", True):
             return HookResult.allow()
+
+        # Check for incomplete todos - BLOCK immediately if found
+        # BUT: Only check when "WORK DONE" is present (not for "FEEDBACK:" which reports blockers)
+        if "WORK DONE" in last_message:
+            todos = load_session_todos(session_id)
+            if todos:
+                incomplete = [t for t in todos if t.get("status") in ("pending", "in_progress")]
+                if incomplete:
+                    task_list = "\n".join([f"  - {t.get('content', 'Unknown task')}" for t in incomplete])
+                    return HookResult.block(
+                        f"🚨 QUALITY VIOLATION - ADDITIONAL TOKENS INCURRED FOR MODERATION\n\n"
+                        f"Hook: Stop\n"
+                        f"Validator: ResponseScanner\n\n"
+                        f"INCOMPLETE TASKS\n\n"
+                        f"The following tasks are not complete:\n\n{task_list}\n\n"
+                        f"Complete all tasks before claiming WORK DONE."
+                    )
 
         # Load conversation context
         conversation_context, error_result = self._load_moderator_context(session_id, execution_id, transcript_path)
@@ -1179,8 +1272,6 @@ class ResponseScanner(HookValidator):
         audit_log_path = audit_dir / f"completion-moderator-{execution_id}.log"
 
         try:
-            from datetime import datetime
-
             with audit_log_path.open("w") as f:
                 f.write(f"=== MODERATOR EXECUTION {execution_id} ===\n")
                 if conversation_context:
@@ -1206,9 +1297,6 @@ class ResponseScanner(HookValidator):
         # - If framework times out first: process killed → hook framework fails-open (ALLOW)
         # - Timeouts must be aligned to ensure fail-closed behavior (agent < framework)
         try:
-            import signal
-            import time
-
             # Set up alarm for framework timeout detection
             # Framework timeout is 120s, set alarm at 115s to log before kill
             framework_timeout = 120
@@ -1238,14 +1326,15 @@ class ResponseScanner(HookValidator):
             if not conversation_context:
                 return HookResult.block("Cannot validate completion - no conversation context")
 
-            output, _ = self._run_moderator_with_first_output_monitoring(
+            output, _ = run_moderator_with_retry(
+                cli=cli,
+                instruction_file=moderator_prompt,
+                stdin=conversation_context,
+                agent_config=completion_moderator_config,
+                audit_log_path=audit_log_path,
+                moderator_name="completion_moderator",
                 session_id=session_id,
                 execution_id=execution_id,
-                cli=cli,
-                moderator_prompt=moderator_prompt,
-                conversation_context=conversation_context,
-                completion_moderator_config=completion_moderator_config,
-                audit_log_path=audit_log_path,
                 max_attempts=2,  # Original + 1 restart
                 first_output_timeout=3.5,  # Seconds to wait for first output
             )
@@ -1270,7 +1359,11 @@ class ResponseScanner(HookValidator):
                     threshold_seconds=slow_threshold_seconds,
                 )
 
-            self.logger.info("completion_moderator_raw_output", session_id=session_id, execution_id=execution_id, output=output)
+            # Log both raw and cleaned output for debugging
+            cleaned_output = parse_code_fence_output(output)
+            self.logger.info(
+                "completion_moderator_raw_output", session_id=session_id, execution_id=execution_id, raw_output=output, cleaned_output=cleaned_output
+            )
             return self._parse_moderator_decision(session_id, output)
         except Exception as e:
             return self._handle_moderator_error(session_id, execution_id, e)
@@ -1298,3 +1391,442 @@ class ResponseScanner(HookValidator):
                 self.logger.warning("transcript_parse_error", line=line[:100], error=str(e))
                 continue
         return last_text
+
+
+class ResearchValidator(HookValidator):
+    """Validates that assistant performed adequate research before making code changes."""
+
+    def __init__(self, session_id: str | None = None) -> None:
+        """Initialize research validator hook."""
+        super().__init__(session_id)
+        self.prompt_path = self.config.root / "scripts" / "config" / "prompts" / "research_validator_moderator.txt"
+        self.skip_threshold_lines = self.config.get("research_validator.skip_threshold_lines", 5)
+        self.lookback_messages = self.config.get("research_validator.lookback_messages", 30)
+
+    def _count_lines_changed(self, tool_name: str, tool_input: dict[str, Any]) -> int:
+        """Count lines changed in Write/Edit/NotebookEdit operation.
+
+        Args:
+            tool_name: Name of tool (Write, Edit, NotebookEdit)
+            tool_input: Tool input parameters
+
+        Returns:
+            Number of lines added/removed/modified
+        """
+        if tool_name == "Write":
+            content = tool_input.get("content", "")
+            return len(content.splitlines())
+        if tool_name == "Edit":
+            old_string = tool_input.get("old_string", "")
+            new_string = tool_input.get("new_string", "")
+            old_lines = len(old_string.splitlines())
+            new_lines = len(new_string.splitlines())
+            # Return max to catch both additions and deletions
+            return max(old_lines, new_lines)
+        if tool_name == "NotebookEdit":
+            new_source = tool_input.get("new_source", "")
+            return len(new_source.splitlines())
+        return 0
+
+    def _generate_change_info(self, tool_name: str, tool_input: dict[str, Any]) -> str:
+        """Generate diff or change description for moderator prompt.
+
+        Args:
+            tool_name: Name of tool (Write, Edit, NotebookEdit)
+            tool_input: Tool input parameters
+
+        Returns:
+            String describing the change or diff, or error message if Edit string not found
+        """
+        if tool_name == "Write":
+            file_path = tool_input.get("file_path", "unknown")
+            content = tool_input.get("content", "")
+            lines = len(content.splitlines())
+            return f"Writing {lines} lines to {file_path}"
+
+        if tool_name == "Edit":
+            file_path = tool_input.get("file_path", "unknown")
+            old_string = tool_input.get("old_string", "")
+            new_string = tool_input.get("new_string", "")
+
+            # Try to read the file and check if old_string exists
+            try:
+                file_path_obj = Path(file_path)
+                if not file_path_obj.exists():
+                    return f"ERROR: File {file_path} does not exist. Cannot verify Edit operation."
+
+                current_content = file_path_obj.read_text()
+
+                if old_string not in current_content:
+                    # String not found - this Edit will fail
+                    old_preview = old_string[:200] + "..." if len(old_string) > 200 else old_string
+                    return (
+                        f"ERROR: Edit will FAIL. String to replace not found in {file_path}.\n\n"
+                        f"String being searched for (first 200 chars):\n{old_preview}\n\n"
+                        f"This indicates assistant has not read the file or is using incorrect string match."
+                    )
+
+                # Generate unified diff
+                old_lines = current_content.splitlines(keepends=True)
+                new_content = current_content.replace(old_string, new_string, 1)
+                new_lines = new_content.splitlines(keepends=True)
+
+                import difflib
+
+                diff_lines = list(difflib.unified_diff(old_lines, new_lines, fromfile=f"a/{file_path}", tofile=f"b/{file_path}", lineterm=""))
+                diff_text = "\n".join(diff_lines)
+
+                return f"Edit operation on {file_path}:\n\n{diff_text}"
+
+            except Exception as e:
+                return f"ERROR: Could not read {file_path} to verify Edit: {e}"
+
+        if tool_name == "NotebookEdit":
+            notebook_path = tool_input.get("notebook_path", "unknown")
+            cell_id = tool_input.get("cell_id", "unknown")
+            new_source = tool_input.get("new_source", "")
+            lines = len(new_source.splitlines())
+            return f"Editing notebook {notebook_path} cell {cell_id} ({lines} lines)"
+
+        return "Unknown change type"
+
+    def validate(self, hook_input: HookInput) -> HookResult:
+        """Validate research adequacy before code changes.
+
+        Args:
+            hook_input: Hook input containing Write/Edit/NotebookEdit data
+
+        Returns:
+            HookResult with decision (allow/deny)
+        """
+        # Only validate Write/Edit/NotebookEdit
+        if hook_input.tool_name not in ("Write", "Edit", "NotebookEdit"):
+            return HookResult.allow()
+
+        # Skip if no tool input
+        if not hook_input.tool_input:
+            return HookResult.allow()
+
+        # Count lines changed
+        lines_changed = self._count_lines_changed(hook_input.tool_name, hook_input.tool_input)
+
+        # Skip if below threshold (trivial changes)
+        if lines_changed < self.skip_threshold_lines:
+            self.logger.info(
+                "research_validator_skip_trivial",
+                session_id=hook_input.session_id,
+                tool_name=hook_input.tool_name,
+                lines_changed=lines_changed,
+                threshold=self.skip_threshold_lines,
+            )
+            return HookResult.allow()
+
+        # Skip if no transcript available
+        if not hook_input.transcript_path or not hook_input.transcript_path.exists():
+            return HookResult.allow()
+
+        # Get conversation context (last N messages for research tool analysis)
+        try:
+            # Get last N messages for research tool detection
+            messages = get_last_n_messages(hook_input.transcript_path, self.lookback_messages)
+            conversation_context = format_messages_for_prompt(messages)
+        except Exception as e:
+            self.logger.error("research_validator_context_error", session_id=hook_input.session_id, error=str(e))
+            # Fail open for context errors
+            return HookResult.allow()
+
+        # Load prompt
+        if not self.prompt_path.exists():
+            self.logger.error("research_validator_prompt_missing", session_id=hook_input.session_id, path=str(self.prompt_path))
+            return HookResult.allow()
+
+        # Execute moderator
+        session_id = hook_input.session_id or "unknown"
+        execution_id = str(uuid.uuid4())[:8]
+
+        self.logger.info(
+            "research_validator_start",
+            session_id=session_id,
+            execution_id=execution_id,
+            tool_name=hook_input.tool_name,
+            lines_changed=lines_changed,
+        )
+
+        try:
+            agent_cli = get_agent_cli()
+            research_validator_config = AgentConfigPresets.completion_moderator(f"research-validator-{session_id}")
+            research_validator_config.enable_streaming = True
+
+            # Create audit log
+            audit_dir = self.config.root / "logs" / "agent-cli"
+            audit_dir.mkdir(parents=True, exist_ok=True)
+            audit_log_path = audit_dir / f"research-validator-{execution_id}.log"
+
+            # Generate change info (diff or error if Edit string not found)
+            change_info = self._generate_change_info(hook_input.tool_name, hook_input.tool_input)
+            full_context = f"{conversation_context}\n\n---\n\n## CHANGE BEING MADE\n\n{change_info}\n"
+
+            output, _ = run_moderator_with_retry(
+                cli=agent_cli,
+                instruction_file=self.prompt_path,
+                stdin=full_context,
+                agent_config=research_validator_config,
+                audit_log_path=audit_log_path,
+                moderator_name="research_validator",
+                session_id=session_id,
+                execution_id=execution_id,
+                max_attempts=2,
+                first_output_timeout=3.5,
+            )
+
+            self.logger.info("research_validator_output", session_id=session_id, execution_id=execution_id, output=output[:500])
+
+            # Parse decision - simple ALLOW or BLOCK: format
+            cleaned_output = parse_code_fence_output(output)
+
+            # Find first occurrence of ALLOW or BLOCK: (ignores preamble)
+            allow_match = re.search(r"\bALLOW:\s*", cleaned_output, re.IGNORECASE)
+            block_match = re.search(r"\bBLOCK:\s*", cleaned_output, re.IGNORECASE)
+
+            if allow_match and (not block_match or allow_match.start() < block_match.start()):
+                # ALLOW appears before BLOCK (or no BLOCK)
+                self.logger.info("research_validator_allow", session_id=session_id, execution_id=execution_id)
+                return HookResult.allow()
+
+            if block_match:
+                # Extract reason after BLOCK:
+                reason_start = block_match.end()
+                reason = cleaned_output[reason_start:].strip()
+                if not reason:
+                    reason = "Inadequate research before code changes. Read docs and existing code before implementing."
+
+                self.logger.warning("research_validator_block", session_id=session_id, execution_id=execution_id, reason=reason[:200])
+
+                file_path = hook_input.tool_input.get("file_path", "unknown file")
+                return HookResult.deny(
+                    reason=f"🚨 QUALITY VIOLATION - ADDITIONAL TOKENS INCURRED FOR MODERATION\n\n"
+                    f"Hook: PreToolUse ({hook_input.tool_name})\n"
+                    f"Validator: ResearchValidator\n\n"
+                    f"RESEARCH VALIDATION FAILED\n\n{reason}\n\n"
+                    f"File: {file_path}\n"
+                    f"Lines changed: {lines_changed}\n\n"
+                    f"Before making code changes:\n"
+                    f"- Read official documentation for external APIs/libraries\n"
+                    f"- Use Read/Grep/Glob to understand existing code patterns\n"
+                    f"- Verify claims with tools before implementing\n",
+                    system_message=f"⚠️ Research validation blocked: {reason[:100]}",
+                )
+
+            # No clear decision found - fail closed for safety
+            self.logger.warning("research_validator_unclear", session_id=session_id, execution_id=execution_id, output=cleaned_output[:200])
+            return HookResult.deny(
+                reason=f"🚨 QUALITY VIOLATION - ADDITIONAL TOKENS INCURRED FOR MODERATION\n\n"
+                f"Hook: PreToolUse ({hook_input.tool_name})\n"
+                f"Validator: ResearchValidator\n\n"
+                f"MODERATOR OUTPUT UNCLEAR\n\n"
+                f"Moderator did not output clear ALLOW or BLOCK decision. Failing closed for safety.\n\n"
+                f"Moderator output (first 500 chars):\n{cleaned_output[:500]}\n",
+                system_message="⚠️ Research validation unclear - failed closed",
+            )
+
+        except AgentTimeoutError:
+            self.logger.error("research_validator_timeout", session_id=session_id, execution_id=execution_id)
+            # Fail open on timeout to avoid blocking workflow
+            return HookResult.allow()
+
+        except AgentExecutionError as error:
+            self.logger.error("research_validator_execution_error", session_id=session_id, execution_id=execution_id, exit_code=error.exit_code)
+            # Fail open on agent errors
+            return HookResult.allow()
+
+        except AgentError as error:
+            self.logger.error("research_validator_error", session_id=session_id, execution_id=execution_id, error=str(error))
+            # Fail open on general agent errors
+            return HookResult.allow()
+
+
+class TodoValidatorHook(HookValidator):
+    """Validates TodoWrite operations - ensures work is actually complete before marking todos complete or editing todo content."""
+
+    def __init__(self, session_id: str | None = None) -> None:
+        """Initialize todo validator hook."""
+        super().__init__(session_id)
+        self.prompt_path = self.config.root / "scripts" / "config" / "prompts" / "todo_validator_moderator.txt"
+
+    def validate(self, hook_input: HookInput) -> HookResult:
+        """Validate todo completion against conversation context.
+
+        Args:
+            hook_input: Hook input containing TodoWrite data
+
+        Returns:
+            HookResult with decision (allow/deny)
+        """
+        # Only validate TodoWrite
+        if hook_input.tool_name != "TodoWrite":
+            return HookResult.allow()
+
+        # Skip if no transcript available
+        if not hook_input.transcript_path or not hook_input.transcript_path.exists():
+            return HookResult.allow()
+
+        # Extract todos from tool_input
+        if not hook_input.tool_input or "todos" not in hook_input.tool_input:
+            return HookResult.allow()
+
+        todos = hook_input.tool_input.get("todos", [])
+        if not todos:
+            return HookResult.allow()
+
+        # Load previous todo state to detect changes
+        previous_todos = load_session_todos(hook_input.session_id)
+
+        # Find todos being marked as completed in this operation
+        completed_todos = [t for t in todos if t.get("status") == "completed"]
+
+        # Find todos with edited content (excluding newly added todos)
+        edited_todos = []
+        if previous_todos:
+            # Create lookup by index position (todos are ordered lists)
+            for i, new_todo in enumerate(todos):
+                if i < len(previous_todos):
+                    prev_todo = previous_todos[i]
+                    new_content = new_todo.get("content", "")
+                    prev_content = prev_todo.get("content", "")
+                    # Check if content changed (not just status)
+                    if new_content != prev_content:
+                        edited_todos.append(new_todo)
+
+        # If nothing to validate, allow
+        if not completed_todos and not edited_todos:
+            return HookResult.allow()
+
+        # Get conversation context using unified function
+        try:
+            conversation_context = prepare_moderator_context(hook_input.transcript_path)
+        except Exception as e:
+            self.logger.error("todo_validator_context_error", session_id=hook_input.session_id, error=str(e))
+            # Fail open for context errors
+            return HookResult.allow()
+
+        # Load prompt template
+        if not self.prompt_path.exists():
+            self.logger.error("todo_validator_prompt_missing", session_id=hook_input.session_id, path=str(self.prompt_path))
+            return HookResult.allow()
+
+        prompt_template = self.prompt_path.read_text()
+
+        # Build todo list for validation (both completed and edited)
+        validation_todos = []
+        if completed_todos:
+            validation_todos.append("## Todos marked as completed:")
+            for t in completed_todos:
+                validation_todos.append(f"- {t.get('content', 'Unknown task')}")
+        if edited_todos:
+            validation_todos.append("\n## Todos with edited content:")
+            for t in edited_todos:
+                validation_todos.append(f"- {t.get('content', 'Unknown task')}")
+
+        todo_list = "\n".join(validation_todos)
+
+        # Replace placeholders
+        prompt = prompt_template.replace("{conversation_context}", conversation_context)
+        prompt = prompt.replace("{completed_todos}", todo_list)
+
+        # Execute moderator
+        session_id = hook_input.session_id or "unknown"
+        execution_id = str(uuid.uuid4())[:8]
+
+        self.logger.info(
+            "todo_validator_start", session_id=session_id, execution_id=execution_id, completed_count=len(completed_todos), edited_count=len(edited_todos)
+        )
+
+        try:
+            agent_cli = get_agent_cli()
+            todo_validator_config = AgentConfigPresets.completion_moderator(f"todo-validator-{session_id}")
+            todo_validator_config.enable_streaming = True
+
+            # Create audit log for hang detection
+            config = get_config()
+            audit_dir = config.root / "logs" / "agent-cli"
+            audit_dir.mkdir(parents=True, exist_ok=True)
+            audit_log_path = audit_dir / f"todo-validator-{execution_id}.log"
+
+            output, _ = run_moderator_with_retry(
+                cli=agent_cli,
+                instruction_file=self.prompt_path,
+                stdin=prompt,
+                agent_config=todo_validator_config,
+                audit_log_path=audit_log_path,
+                moderator_name="todo_validator",
+                session_id=session_id,
+                execution_id=execution_id,
+                max_attempts=2,
+                first_output_timeout=3.5,
+            )
+
+            self.logger.info("todo_validator_output", session_id=session_id, execution_id=execution_id, output=output)
+
+            # Parse decision - simple ALLOW or BLOCK: format
+            cleaned_output = parse_code_fence_output(output)
+
+            # Find first occurrence of ALLOW or BLOCK: (ignores preamble)
+            allow_match = re.search(r"\bALLOW\b", cleaned_output, re.IGNORECASE)
+            block_match = re.search(r"\bBLOCK:\s*", cleaned_output, re.IGNORECASE)
+
+            if allow_match and (not block_match or allow_match.start() < block_match.start()):
+                # ALLOW appears before BLOCK (or no BLOCK)
+                self.logger.info("todo_validator_allow", session_id=session_id, execution_id=execution_id)
+                return HookResult.allow()
+
+            if block_match:
+                # Extract reason after BLOCK:
+                reason_start = block_match.end()
+                reason = cleaned_output[reason_start:].strip()
+                if not reason:
+                    reason = "Todo changes do not reflect actual work done"
+                self.logger.warning("todo_validator_block", session_id=session_id, execution_id=execution_id, reason=reason[:200])
+                return HookResult.deny(
+                    reason=f"🚨 QUALITY VIOLATION - ADDITIONAL TOKENS INCURRED FOR MODERATION\n\n"
+                    f"Hook: PreToolUse (TodoWrite)\n"
+                    f"Validator: TodoValidatorHook\n\n"
+                    f"TODO VALIDATION FAILED\n\n{reason}\n\n"
+                    f"Do not mark todos complete or edit todo content until work is actually done.",
+                    system_message=f"⚠️ Todo validation blocked: {reason}",
+                )
+
+            # Unparseable output - fail closed for safety
+            self.logger.warning("todo_validator_unparseable", session_id=session_id, execution_id=execution_id, output=cleaned_output[:300])
+            return HookResult.deny(
+                reason="🚨 QUALITY VIOLATION - ADDITIONAL TOKENS INCURRED FOR MODERATION\n\n"
+                "Hook: PreToolUse (TodoWrite)\n"
+                "Validator: TodoValidatorHook (Unparseable)\n\n"
+                "Todo validation returned unparseable response. Blocking for safety.\n\n"
+                "This is likely a temporary issue - please try again.",
+                system_message="⚠️ Todo validation failed - moderator error",
+            )
+
+        except (AgentTimeoutError, AgentExecutionError) as e:
+            self.logger.error("todo_validator_error_fail_closed", session_id=session_id, execution_id=execution_id, error=str(e))
+            # FAIL-CLOSED: Block on timeout/execution errors
+            return HookResult.deny(
+                reason=f"🚨 QUALITY VIOLATION - ADDITIONAL TOKENS INCURRED FOR MODERATION\n\n"
+                f"Hook: PreToolUse (TodoWrite)\n"
+                f"Validator: TodoValidatorHook (Timeout)\n\n"
+                f"Todo validation timed out after retry. Blocking for safety.\n\n"
+                f"Moderator error: {type(e).__name__}\n\n"
+                f"Please retry the operation.",
+                system_message="⚠️ Todo validation timeout - operation blocked",
+            )
+        except AgentError as e:
+            self.logger.error("todo_validator_error_fail_closed", session_id=session_id, execution_id=execution_id, error=str(e))
+            # FAIL-CLOSED: Block on other agent errors too
+            return HookResult.deny(
+                reason=f"🚨 QUALITY VIOLATION - ADDITIONAL TOKENS INCURRED FOR MODERATION\n\n"
+                f"Hook: PreToolUse (TodoWrite)\n"
+                f"Validator: TodoValidatorHook (Error)\n\n"
+                f"Todo validation failed. Blocking for safety.\n\n"
+                f"Moderator error: {type(e).__name__}\n\n"
+                f"Please retry the operation.",
+                system_message="⚠️ Todo validation error - operation blocked",
+            )

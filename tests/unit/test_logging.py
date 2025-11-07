@@ -7,6 +7,9 @@ from unittest.mock import Mock
 
 from scripts.automation.logger import JSONFormatter, StructuredLogger, get_logger
 
+# Test constants
+TEST_NUMBER = 42
+
 
 class TestJSONFormatter:
     """Unit tests for JSONFormatter."""
@@ -56,13 +59,13 @@ class TestJSONFormatter:
         formatter = JSONFormatter()
 
         record = logging.LogRecord(name="test", level=logging.INFO, pathname="", lineno=0, msg="test", args=(), exc_info=None)
-        record.extra_fields = {"key": "value", "number": 42}
+        record.extra_fields = {"key": "value", "number": TEST_NUMBER}
 
         result = formatter.format(record)
         data = json.loads(result)
 
         assert data["key"] == "value"
-        assert data["number"] == 42
+        assert data["number"] == TEST_NUMBER
 
 
 class TestStructuredLogger:
@@ -75,7 +78,7 @@ class TestStructuredLogger:
         assert logger is not None
         assert isinstance(logger, StructuredLogger)
 
-    def test_info_logging(self, caplog):
+    def test_info_logging(self):
         """logger.info() logs with extra fields."""
         # This test would require actual log capture
         # Simplified version that checks the method exists
@@ -93,7 +96,7 @@ class TestStructuredLogger:
         assert hasattr(logger, "error")
         assert callable(logger.error)
 
-    def test_file_handler_created(self, tmp_path, monkeypatch):
+    def test_file_handler_created(self, tmp_path):
         """Logger creates daily log file."""
         # Mock config to use temp directory
         mock_config = Mock()

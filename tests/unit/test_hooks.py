@@ -424,7 +424,7 @@ class TestHookValidatorBase:
 
         # Create a validator that raises an exception
         class FailingValidator(HookValidator):
-            def validate(self, hook_input):
+            def validate(self, _hook_input):
                 raise ValueError("Test error")
 
         validator = FailingValidator()
@@ -472,7 +472,7 @@ class TestSessionIdLogging:
 
         # Create a simple validator
         class SimpleValidator(HookValidator):
-            def validate(self, hook_input):
+            def validate(self, _hook_input):
                 return HookResult.allow()
 
         validator = SimpleValidator()
@@ -515,7 +515,7 @@ class TestSessionIdLogging:
         mocker.patch("scripts.automation.hooks.get_logger", return_value=mock_logger)
 
         class SimpleValidator(HookValidator):
-            def validate(self, hook_input):
+            def validate(self, _hook_input):
                 return HookResult.deny("test reason")
 
         validator = SimpleValidator()
@@ -552,7 +552,7 @@ class TestSessionIdLogging:
         mocker.patch("scripts.automation.hooks.get_logger", return_value=mock_logger)
 
         class FailingValidator(HookValidator):
-            def validate(self, hook_input):
+            def validate(self, _hook_input):
                 raise RuntimeError("Validation failed")
 
         validator = FailingValidator()
@@ -588,7 +588,7 @@ class TestSessionIdLogging:
         mocker.patch("scripts.automation.hooks.get_logger", return_value=mock_logger)
 
         class SimpleValidator(HookValidator):
-            def validate(self, hook_input):
+            def validate(self, _hook_input):
                 return HookResult.allow()
 
         validator = SimpleValidator()

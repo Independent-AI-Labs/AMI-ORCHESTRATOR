@@ -1,0 +1,1 @@
+{"file_path": "base/tests/unit/scripts/test_modules.py", "status": "ERROR", "violations": [{"line": 0, "pattern_id": "audit_format_violation", "severity": "ERROR", "message": "Audit agent violated output format. Expected 'PASS' or 'FAIL: <reasons>', got: I need to analyze this code for violations by reading it systematically."}], "execution_time": 14.325106859207153}

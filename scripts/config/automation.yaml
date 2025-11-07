@@ -28,11 +28,37 @@ hooks:
   timeout: 30
   parallel: false
 
-# Claude Code CLI settings (abstraction layer in code)
+# Agent CLI settings (multi-provider support)
+agent:
+  provider: "claude"  # Global default provider: claude or gemini
+
+  # Worker defaults (for task execution, code generation)
+  worker:
+    provider: "${AMI_AGENT_WORKER_PROVIDER:claude}"  # claude or gemini
+    model: "${AMI_AGENT_WORKER_MODEL:}"  # Empty = use provider's model_default
+
+  # Moderator defaults (for validation, verification)
+  moderator:
+    provider: "${AMI_AGENT_MODERATOR_PROVIDER:claude}"  # claude or gemini
+    model: "${AMI_AGENT_MODERATOR_MODEL:}"  # Empty = use provider's model_default
+
+  # Claude Code CLI settings
+  claude:
+    command: "{root}/.venv/node_modules/.bin/claude"  # Use venv Claude, not system
+    model_default: "claude-sonnet-4-5"
+    model_audit: "claude-sonnet-4-5"  # 100% accuracy requirement
+
+  # Gemini CLI settings
+  gemini:
+    command: "gemini"  # Or: "{root}/.venv/node_modules/.bin/gemini"
+    model_default: "gemini-2.5-pro"
+    model_audit: "gemini-2.5-flash"  # Faster for hooks
+
+# Legacy claude_cli config (for backward compatibility - will be deprecated)
 claude_cli:
-  command: "{root}/.venv/node_modules/.bin/claude"  # Use venv Claude, not system
+  command: "{root}/.venv/node_modules/.bin/claude"
   model_default: "claude-sonnet-4-5"
-  model_audit: "claude-sonnet-4-5"  # 100% accuracy requirement
+  model_audit: "claude-sonnet-4-5"
 
 # MCP Servers (Model Context Protocol)
 mcp:
@@ -68,6 +94,11 @@ prompts:
 # Response Scanner
 response_scanner:
   completion_moderator_enabled: true  # Validate completion markers with moderator
+
+# Research Validator
+research_validator:
+  skip_threshold_lines: 5  # Skip validation for diffs < 5 lines (trivial changes)
+  lookback_messages: 30    # Check last 30 messages for research tools (WebFetch, Read, Grep)
 
 # Audit
 audit:

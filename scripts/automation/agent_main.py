@@ -51,6 +51,7 @@ Examples:
     ami-agent --docs docs/
 """
 
+import argparse
 import json
 import subprocess
 import sys
@@ -67,6 +68,11 @@ from base.scripts.env.paths import setup_imports
 
 ORCHESTRATOR_ROOT, MODULE_ROOT = setup_imports()
 
+# Load .env file before importing automation modules (ensures env vars available for Config)
+from dotenv import load_dotenv
+
+load_dotenv(ORCHESTRATOR_ROOT / ".env")
+
 # Ensure scripts.automation is importable
 sys.path.insert(0, str(ORCHESTRATOR_ROOT))
 
@@ -79,14 +85,20 @@ from scripts.automation.agent_cli import (
 )
 from scripts.automation.audit import AuditEngine
 from scripts.automation.config import get_config
+from scripts.automation.docs import DocsExecutor
 from scripts.automation.hooks import (
-    CodeQualityValidator,
     CommandValidator,
+    CoreQualityValidator,
     MaliciousBehaviorValidator,
+    PythonQualityValidator,
+    ResearchValidator,
     ResponseScanner,
     ShebangValidator,
+    TodoValidatorHook,
 )
 from scripts.automation.logger import get_logger
+from scripts.automation.sync import SyncExecutor
+from scripts.automation.tasks import TaskExecutor
 
 
 def _create_mcp_config_file(config: Any) -> Path | None:
@@ -279,7 +291,9 @@ def mode_hook(validator_name: str) -> int:
     """Hook validator mode - Validate hook input from stdin.
 
     Args:
-        validator_name: Name of validator (malicious-behavior, command-guard, code-quality, response-scanner, shebang-check)
+        validator_name: Name of validator (malicious-behavior, command-guard, research-validator,
+                        code-quality-core, code-quality-python, response-scanner, shebang-check,
+                        todo-validator)
 
     Returns:
         Exit code (0=success, 1=failure)
@@ -287,9 +301,12 @@ def mode_hook(validator_name: str) -> int:
     validators = {
         "malicious-behavior": MaliciousBehaviorValidator,
         "command-guard": CommandValidator,
-        "code-quality": CodeQualityValidator,
+        "research-validator": ResearchValidator,
+        "code-quality-core": CoreQualityValidator,
+        "code-quality-python": PythonQualityValidator,
         "response-scanner": ResponseScanner,
         "shebang-check": ShebangValidator,
+        "todo-validator": TodoValidatorHook,
     }
 
     validator_class = validators.get(validator_name)
@@ -360,8 +377,6 @@ def mode_tasks(path: str, root_dir: str | None = None, parallel: bool = False, u
     if root_path and not root_path.exists():
         return 1
 
-    from scripts.automation.tasks import TaskExecutor
-
     executor = TaskExecutor()
 
     # Execute tasks (handles both file and directory)
@@ -406,8 +421,6 @@ def mode_sync(module_path: str, user_instruction: str | None = None) -> int:
     if not (module / ".git").exists():
         return 1
 
-    from scripts.automation.sync import SyncExecutor
-
     executor = SyncExecutor()
 
     # Sync module
@@ -447,8 +460,6 @@ def mode_docs(directory_path: str, root_dir: str | None = None, parallel: bool =
     if root_path and not root_path.exists():
         return 1
 
-    from scripts.automation.docs import DocsExecutor
-
     executor = DocsExecutor()
 
     # Execute docs maintenance
@@ -483,8 +494,6 @@ def mode_docs(directory_path: str, root_dir: str | None = None, parallel: bool =
 
 def main() -> int:
     """Main entry point - Route to appropriate mode."""
-    import argparse
-
     parser = argparse.ArgumentParser(
         description="AMI Agent - Unified automation entry point",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -505,7 +514,10 @@ def main() -> int:
     parser.add_argument(
         "--hook",
         metavar="VALIDATOR",
-        help="Hook validator mode (malicious-behavior, command-guard, code-quality, response-scanner, shebang-check)",
+        help=(
+            "Hook validator mode (malicious-behavior, command-guard, research-validator, "
+            "code-quality-core, code-quality-python, response-scanner, shebang-check, todo-validator)"
+        ),
     )
 
     parser.add_argument(

@@ -51,9 +51,9 @@ if [[ ! -d "$VENV_DIR" ]]; then
         echo "Error: Source venv not found at $VENV_SOURCE" >&2
         exit 1
     fi
-    echo "Bootstrapping .venv from .venv-linux..." >&2
+    echo "Bootstrapping .venv from .venv-linux..."
     cp -a "$VENV_SOURCE" "$VENV_DIR"
-    echo "✓ Created .venv from .venv-linux" >&2
+    echo "✓ Created .venv from .venv-linux"
 fi
 
 if [[ ! -x "$VENV_PYTHON" ]]; then

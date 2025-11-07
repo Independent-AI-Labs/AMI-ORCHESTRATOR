@@ -9,6 +9,14 @@ import pytest
 
 from scripts.automation.sync import SyncAttempt, SyncExecutor, SyncResult
 
+# Test constants
+SINGLE_ATTEMPT = 1
+TWO_ATTEMPTS = 2
+FIRST_ATTEMPT_INDEX = 0
+SECOND_ATTEMPT_INDEX = 1
+TOTAL_DURATION = 2.0
+ATTEMPT_DURATION = 1.23
+
 
 class TestSyncResult:
     """Tests for SyncResult dataclass."""
@@ -39,12 +47,12 @@ class TestSyncResult:
             module_path=Path("/test/module"),
             status="synced",
             attempts=[attempt],
-            total_duration=2.0,
+            total_duration=TOTAL_DURATION,
         )
 
-        assert len(result.attempts) == 1
-        assert result.attempts[0].attempt_num == 1
-        assert result.total_duration == 2.0
+        assert len(result.attempts) == SINGLE_ATTEMPT
+        assert result.attempts[FIRST_ATTEMPT_INDEX].attempt_num == SINGLE_ATTEMPT
+        assert result.total_duration == TOTAL_DURATION
 
 
 class TestSyncAttempt:
@@ -56,13 +64,13 @@ class TestSyncAttempt:
             attempt_num=1,
             worker_output="test output",
             moderator_decision="PASS",
-            duration=1.23,
+            duration=ATTEMPT_DURATION,
         )
 
-        assert attempt.attempt_num == 1
+        assert attempt.attempt_num == SINGLE_ATTEMPT
         assert attempt.worker_output == "test output"
         assert attempt.moderator_decision == "PASS"
-        assert attempt.duration == 1.23
+        assert attempt.duration == ATTEMPT_DURATION
 
 
 class TestSyncExecutor:
@@ -81,7 +89,7 @@ class TestSyncExecutor:
         return config
 
     @pytest.fixture
-    def executor(self, mock_config: Mock, monkeypatch: pytest.MonkeyPatch) -> Generator[SyncExecutor, None, None]:
+    def executor(self, mock_config: Mock) -> Generator[SyncExecutor, None, None]:
         """Create SyncExecutor with mocked dependencies."""
         with (
             patch("scripts.automation.sync.get_config") as mock_get_config,
@@ -117,10 +125,10 @@ class TestSyncExecutor:
         result = executor.sync_module(module_path)
 
         assert result.status == "synced"
-        assert len(result.attempts) == 1
-        assert result.attempts[0].attempt_num == 1
-        assert "WORK DONE" in result.attempts[0].worker_output
-        assert "PASS" in result.attempts[0].moderator_decision
+        assert len(result.attempts) == SINGLE_ATTEMPT
+        assert result.attempts[FIRST_ATTEMPT_INDEX].attempt_num == SINGLE_ATTEMPT
+        assert "WORK DONE" in result.attempts[FIRST_ATTEMPT_INDEX].worker_output
+        assert "PASS" in result.attempts[FIRST_ATTEMPT_INDEX].moderator_decision
         assert result.error is None
 
     def test_sync_module_feedback_then_success(self, executor: SyncExecutor, tmp_path: Path) -> None:
@@ -141,11 +149,11 @@ class TestSyncExecutor:
         result = executor.sync_module(module_path)
 
         assert result.status == "synced"
-        assert len(result.attempts) == 2
-        assert "FEEDBACK" in result.attempts[0].worker_output
-        assert "FAIL" in result.attempts[0].moderator_decision
-        assert "WORK DONE" in result.attempts[1].worker_output
-        assert "PASS" in result.attempts[1].moderator_decision
+        assert len(result.attempts) == TWO_ATTEMPTS
+        assert "FEEDBACK" in result.attempts[FIRST_ATTEMPT_INDEX].worker_output
+        assert "FAIL" in result.attempts[FIRST_ATTEMPT_INDEX].moderator_decision
+        assert "WORK DONE" in result.attempts[SECOND_ATTEMPT_INDEX].worker_output
+        assert "PASS" in result.attempts[SECOND_ATTEMPT_INDEX].moderator_decision
 
     def test_sync_module_timeout(self, executor: SyncExecutor, tmp_path: Path) -> None:
         """Sync times out if worker never completes."""
@@ -190,7 +198,7 @@ class TestSyncExecutor:
         result = executor.sync_module(module_path)
 
         assert result.status == "synced"
-        assert len(result.attempts) == 2
+        assert len(result.attempts) == TWO_ATTEMPTS
 
     def test_sync_module_creates_progress_file(self, executor: SyncExecutor, tmp_path: Path) -> None:
         """Sync creates and cleans up progress file."""
@@ -231,7 +239,7 @@ class TestSyncExecutor:
         result = executor.sync_module(module_path)
 
         assert result.status == "synced"
-        assert len(result.attempts) == 2
+        assert len(result.attempts) == TWO_ATTEMPTS
 
     def test_sync_module_custom_timeout(self, executor: SyncExecutor, tmp_path: Path) -> None:
         """Sync respects custom timeout configuration."""

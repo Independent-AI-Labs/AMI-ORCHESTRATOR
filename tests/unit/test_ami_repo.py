@@ -18,6 +18,9 @@ sys.path.insert(0, str(scripts_dir))
 
 from ami_repo import GitRepoManager
 
+# Test constants
+AUTHORIZED_KEYS_MODE = 0o600
+
 from backend.git_server.results import RepositoryError, SSHKeyError
 
 
@@ -251,7 +254,7 @@ class TestSSHKeyManagement:
         manager.add_ssh_key(key_file, "test-key")
 
         assert manager.keys_path.exists()
-        assert manager.keys_path.stat().st_mode & 0o777 == 0o600
+        assert manager.keys_path.stat().st_mode & 0o777 == AUTHORIZED_KEYS_MODE
 
     def test_add_key_with_restrictions(self, tmp_path):
         """add_ssh_key adds proper SSH restrictions."""

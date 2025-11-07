@@ -1,0 +1,122 @@
+# PATTERN CONSOLIDATION INSTRUCTION
+
+You are updating a consolidated audit report with new patterns from individual file audits.
+
+## YOUR TASK
+
+1. Read the CURRENT CONSOLIDATED REPORT (provided below)
+2. Read the NEW AUDIT REPORT (provided below)
+3. Identify violation patterns in the NEW AUDIT REPORT
+4. Check if these patterns already exist in CONSOLIDATED REPORT
+5. If new patterns found, UPDATE the consolidated report file using Write or Edit tool
+6. Keep patterns GENERIC and HIGH-LEVEL (not file-specific)
+
+## OUTPUT FORMAT
+
+Output EXACTLY one of:
+- `UPDATED` - if consolidated report was updated
+- `NO_CHANGES` - if no new patterns found
+
+**CRITICAL:** After updating the file, output only "UPDATED" or "NO_CHANGES". No other text.
+
+---
+
+## PATTERN EXTRACTION RULES
+
+### What to Extract
+- Violation TYPE (e.g., "Exception → False Return", "Continue on Error")
+- Severity (CRITICAL, HIGH, MEDIUM, LOW)
+- Generic pattern code (NOT file-specific)
+- General impact description
+
+### What to IGNORE
+- Specific file names
+- Specific line numbers
+- Specific variable names
+- File-specific implementation details
+
+### Pattern Format
+
+```markdown
+### N. <Violation Type>
+- **Severity**: CRITICAL/HIGH/MEDIUM/LOW
+- **Pattern**: `<generic code pattern>`
+- **Impact**: <brief impact description>
+```
+
+Example:
+```markdown
+### 5. Exception → Empty List Return
+- **Severity**: HIGH
+- **Pattern**: `try: results = query(); except: return []`
+- **Impact**: Silent failures, missing data, wrong semantics
+```
+
+---
+
+## CONSOLIDATION RULES
+
+1. **Merge Similar Patterns**: If new pattern is similar to existing, DON'T duplicate
+   - "Exception → False" and "Exception → None" → Same pattern category
+   - "Continue in for loop" and "Continue in while loop" → Same pattern
+
+2. **Keep Patterns Generic**: Remove file-specific details
+   - ❌ "PostgreSQL connection error returns empty list"
+   - ✅ "Database error → empty list return"
+
+3. **Short and List-Like**: Each pattern = 3-4 lines max
+   - Violation type
+   - Severity
+   - Generic pattern
+   - Brief impact
+
+4. **Number Patterns Sequentially**: 1, 2, 3, ...
+
+5. **Update Metadata**: Update "Last Updated" timestamp at top
+
+---
+
+## EXAMPLES
+
+### Good Pattern Entry
+```markdown
+### 3. Import Failure Suppression
+- **Severity**: HIGH
+- **Pattern**: `try: import X; except ImportError: X = None`
+- **Impact**: Silent dependency failures, late runtime errors
+```
+
+### Bad Pattern Entry (TOO SPECIFIC)
+```markdown
+### 3. DgraphDAO Import Fails in factory.py Line 54
+- **Severity**: HIGH
+- **Pattern**: `try: from implementations.graph.dgraph_dao import DgraphDAO; except ImportError: logger.warning("Could not register DgraphDAO")`
+- **Impact**: When DgraphDAO import fails in the factory registration function, the system logs a warning but continues, causing the GRAPH storage type to be unavailable which leads to runtime failures when users try to create graph storage DAOs
+```
+
+---
+
+## FILE UPDATE PROCESS
+
+1. Use Read tool to load current consolidated report file
+2. Parse current patterns
+3. Extract patterns from new audit report
+4. Check for duplicates
+5. If new patterns exist:
+   - Use Edit tool to update the file
+   - OR use Write tool to overwrite the file
+   - Update the "Last Updated" timestamp
+   - Output: `UPDATED`
+6. If no new patterns:
+   - Do NOT modify the file
+   - Output: `NO_CHANGES`
+
+---
+
+## REMEMBER
+
+- Use Read, Write, or Edit tools to update the file
+- Output ONLY "UPDATED" or "NO_CHANGES" after file operations
+- Keep patterns SHORT, GENERIC, LIST-LIKE
+- Merge similar patterns
+- Update timestamp when changing file

@@ -1,0 +1,130 @@
+# Bash Command Validation Patterns
+# Used by CommandValidator in scripts/automation/hooks.py
+#
+# These patterns define forbidden bash commands and operators that should be blocked
+# in favor of Claude Code's dedicated tools or approved wrappers.
+
+version: "1.0.0"
+
+deny_patterns:
+  # Tool wrappers - use approved abstractions
+  - pattern: '\bdocker\b'
+    message: "Use setup_service.py to manage containers"
+
+  # Inline python execution - BLOCK FIRST (more specific than general python block)
+  - pattern: '\bpython3?\s+-c\b'
+    message: "Inline python execution forbidden - bypasses code quality validation. Write scripts and use ami-run instead"
+
+  - pattern: '\|\s*python3?\b'
+    message: "Piping to python forbidden - bypasses code quality validation. Write scripts and use ami-run instead"
+
+  - pattern: '\bpython3?\b'
+    message: "Use ami-run instead of direct python"
+
+  - pattern: '\bpip3?\b'
+    message: "Add to pyproject.toml and use ami-uv sync"
+
+  - pattern: '(?<!ami-)\buv\s+'
+    message: "Use ami-uv wrapper"
+
+  - pattern: '(?<![/\w])pytest\s+'
+    message: "Use ami-run scripts/run_tests.py instead of direct pytest"
+
+  - pattern: '(?<!ami-)\bruff\s+'
+    message: "Use scripts/git_commit.sh instead of direct ruff - pre-commit checks handle linting"
+
+  # File operations - use dedicated tools to enforce code quality validation
+  - pattern: '\bcat\s+>'
+    message: "Use Write/Edit tools instead of cat - bypasses code quality validation"
+
+  - pattern: '\becho\s+.*>'
+    message: "Use Write/Edit tools instead of echo - bypasses code quality validation"
+
+  - pattern: '\btee\s+'
+    message: "Use Write/Edit tools instead of tee - bypasses code quality validation"
+
+  # Git operations - use approved scripts or forbidden entirely
+  - pattern: '--no-verify'
+    message: "Git hook bypass forbidden"
+
+  - pattern: '\bgit\b.*\bcommit\b(?!-)'
+    message: "Use scripts/git_commit.sh"
+
+  - pattern: '\bgit\b.*\bpush\b'
+    message: "Use scripts/git_push.sh"
+
+  - pattern: '\bgit\b.*\brestore\b'
+    message: "Git restore forbidden - modifies staging/working tree"
+
+  - pattern: '\bgit\b.*\breset\b'
+    message: "Git reset forbidden - modifies HEAD/staging/working tree"
+
+  - pattern: '\bgit\b.*\bcheckout\b'
+    message: "Git checkout forbidden - modifies working tree"
+
+  - pattern: '\bgit\b.*\bpull\b'
+    message: "Git pull forbidden - modifies working tree"
+
+  - pattern: '\bgit\b.*\brebase\b'
+    message: "Git rebase forbidden - rewrites history"
+
+  - pattern: '\bgit\b.*\bmerge\b'
+    message: "Git merge forbidden - modifies working tree"
+
+  - pattern: '\bgit\b.*\brm\b.*--cached'
+    message: "Git rm --cached forbidden - removes files from git index"
+
+  # Shell operators - use separate Bash calls or dedicated tools
+  # NOTE: Check && before & to avoid false matches (second & in && would match &(?!&))
+  - pattern: '&&'
+    message: "Use separate Bash calls instead of &&"
+
+  - pattern: '&(?!&)'
+    message: "Use run_in_background parameter instead of &"
+
+  - pattern: ';'
+    message: "Use separate Bash calls instead of ;"
+
+  - pattern: '\|\|'
+    message: "Use separate Bash calls instead of ||"
+
+  - pattern: '\|'
+    message: "Use dedicated tools (Read/Grep) instead of pipes"
+
+  - pattern: '>>'
+    message: "Use Edit/Write tools instead of >>"
+
+  # Text processing - use Claude Code tools
+  - pattern: '\bsed\b'
+    message: "Use Edit tool instead of sed"
+
+  - pattern: '\bawk\b'
+    message: "Use Read/Grep tools instead of awk"
+
+  # Network operations
+  - pattern: '\bwget\b'
+    message: "Use Read/WebFetch tools instead of wget"
+
+  # Node.js operations
+  - pattern: '\bnode\b'
+    message: "Use nodes launcher for Node.js operations"
+
+  # Process management - use KillShell tool
+  - pattern: '\bpkill\b'
+    message: "Use KillShell tool for background process management"
+
+  - pattern: '\bkill\b'
+    message: "Use KillShell tool for background process management"
+
+  - pattern: '\bkillall\b'
+    message: "Use KillShell tool for background process management"
+
+  # System security
+  - pattern: '\bsudo\b'
+    message: "Sudo commands not allowed (except in approved scripts)"
+
+  - pattern: '(?<!--)\bchmod\b'
+    message: "File permission changes not allowed (git update-index --chmod is allowed)"
+
+  - pattern: '\bchown\b'
+    message: "File ownership changes not allowed"

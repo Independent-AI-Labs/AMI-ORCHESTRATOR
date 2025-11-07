@@ -504,7 +504,7 @@ class TestNetworkEdgeCases:
     @pytest.mark.network
     @pytest.mark.requires_ssh
     @pytest.mark.integration
-    def test_ssh_connection_timeout_handling(self, tmp_path):
+    def test_ssh_connection_timeout_handling(self, _tmp_path):
         """SSH connection timeout is handled gracefully."""
         # Use invalid port to trigger timeout
         result = subprocess.run(

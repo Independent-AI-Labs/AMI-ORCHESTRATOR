@@ -1,0 +1,165 @@
+# RUFF VIOLATIONS REMOVED FROM ruff.toml - MUST BE FIXED
+
+## CODE QUALITY / COMPLEXITY (LAZY - MUST REFACTOR)
+PLC0415 - Lazy imports (import inside function) - 14 files
+C901 - Function too complex (complexity > 10) - 11 files
+PLR0911 - Too many return statements (> 6) - 4 files
+PLR0912 - Too many branches (> 16) - 6 files
+PLR0915 - Too many statements (> 96) - 5 files
+PLR0913 - Too many arguments (> 30) - 2 files
+
+## SECURITY (MUST FIX PROPERLY)
+S603 - subprocess.call without shell=False - can be exploited
+S607 - subprocess with partial executable path - can be hijacked
+S110 - try/except pass - silently swallows errors
+
+## CODE QUALITY / STYLE (LAZY - MUST FIX)
+ARG001 - Unused function argument - should remove or use
+ARG002 - Unused method argument - should remove or use
+SIM108 - Use ternary operator instead of if-else - simplify
+N806 - Variable name not lowercase - fix naming
+PTH123 - open() instead of Path.open() - use pathlib
+PLR2004 - Magic number in comparison - extract to constant
+SIM115 - Use context manager for file operations - fix properly
+B007 - Unused loop variable - use _ or fix logic
+ERA001 - Commented out code - remove or uncomment
+B018 - Useless expression statement - fix or remove
+B023 - Function uses loop variable in closure - fix binding
+
+## FILES AFFECTED (42 VIOLATIONS REMOVED):
+
+scripts/ami_repo.py:
+  - PLC0415 (lazy imports)
+
+scripts/audit_shebangs.py:
+  - PLC0415 (lazy imports)
+  - PLR0911 (too many returns)
+  - C901 (too complex)
+
+scripts/automation/agent_cli.py:
+  - PLC0415 (lazy imports)
+  - C901 (too complex)
+  - PLR0912 (too many branches)
+  - PLR0915 (too many statements)
+
+scripts/automation/agent_main.py:
+  - PLC0415 (lazy imports)
+
+scripts/automation/audit.py:
+  - PLC0415 (lazy imports)
+
+scripts/automation/hooks.py:
+  - PLC0415 (lazy imports)
+  - C901 (too complex)
+  - PLR0912 (too many branches)
+  - PLR0915 (too many statements)
+  - PLR0911 (too many returns)
+
+scripts/automation/tasks.py:
+  - PLC0415 (lazy imports)
+  - C901 (too complex)
+  - PLR0912 (too many branches)
+
+scripts/automation/validators.py:
+  - C901 (too complex)
+  - PLR0911 (too many returns)
+
+scripts/backup_to_gdrive.py:
+  - PLC0415 (lazy imports)
+  - PLR0913 (too many arguments)
+
+scripts/check_pypi_versions.py:
+  - C901 (too complex)
+  - PLR0911 (too many returns)
+  - PLR0912 (too many branches)
+  - PLR0915 (too many statements)
+
+scripts/find-metadata.py:
+  - PLC0415 (lazy imports)
+  - C901 (too complex)
+
+scripts/list_specs.py:
+  - PLC0415 (lazy imports)
+  - PLR0913 (too many arguments)
+
+scripts/utils/*.py:
+  - PLC0415 (lazy imports)
+  - C901 (too complex)
+
+tests/integration/test_moderator_hang_reproduction.py:
+  - PLC0415 (lazy imports)
+  - C901 (too complex)
+
+## ADDITIONAL VIOLATIONS TO REMOVE NOW:
+
+scripts/automation/agent_cli.py:
+  - S603 (subprocess without shell=False)
+  - S607 (subprocess partial path)
+  - S110 (try/except pass)
+
+scripts/automation/agent_main.py:
+  - S603 (subprocess without shell=False)
+
+scripts/automation/tasks.py:
+  - S603 (subprocess without shell=False)
+  - S110 (try/except pass)
+  - ARG002 (unused method argument)
+
+scripts/backup_to_gdrive.py:
+  (none additional)
+
+scripts/check_pypi_versions.py:
+  - S603 (subprocess without shell=False)
+  - S607 (subprocess partial path)
+  - S110 (try/except pass)
+  - SIM108 (use ternary)
+  - N806 (variable naming)
+
+scripts/ami_repo.py:
+  - ARG001 (unused argument)
+
+scripts/audit_shebangs.py:
+  - S607 (subprocess partial path)
+
+scripts/find-metadata.py:
+  - S607 (subprocess partial path)
+  - PTH123 (open instead of Path.open)
+
+scripts/list_specs.py:
+  - S110 (try/except pass)
+  - SIM108 (use ternary)
+
+scripts/utils/*.py:
+  - S603 (subprocess without shell=False)
+  - S607 (subprocess partial path)
+  - S310 (urllib.open without timeout)
+  - PTH123 (open instead of Path.open)
+  - SIM108 (use ternary)
+  - ARG002 (unused method argument)
+  - PLR2004 (magic numbers)
+  - SIM115 (use context manager)
+
+scripts/automation/hooks.py:
+  - S603 (subprocess without shell=False)
+  - S607 (subprocess partial path)
+  - S110 (try/except pass)
+  - ARG001 (unused argument)
+
+scripts/validate_docs_links.py:
+  - B007 (unused loop variable)
+
+tests/integration/test_moderator_hang_reproduction.py:
+  - ARG001 (unused argument)
+  - ERA001 (commented code)
+  - B018 (useless expression)
+  - B023 (closure warning)
+
+## LEGITIMATE EXEMPTIONS (KEEP):
+E402 - Module level import not at top (bootstrap pattern - legitimate)
+F404 - Import may be undefined (polyglot shebang - legitimate)
+T201 - print() used (CLI scripts - legitimate)
+N999 - Invalid module name (hyphenated script names - legitimate)
+PLW1509 - preexec_fn in subprocess (process group management - legitimate but verify)
+S101 - assert used (tests - legitimate)
+
+## TOTAL VIOLATIONS TO FIX: ~80+

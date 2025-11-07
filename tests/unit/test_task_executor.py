@@ -9,6 +9,12 @@ import pytest
 
 from scripts.automation.tasks import TaskExecutor
 
+# Test constants
+TWO_FILES = 2
+THREE_FILES = 3
+TWO_COMMANDS = 2
+FIRST_INDEX = 0
+
 
 @pytest.fixture(autouse=True)
 def mock_sudo_password(monkeypatch):
@@ -33,8 +39,8 @@ class TestTaskExecutorFindTaskFiles:
             task_files = executor._find_task_files(tmpdir_path)
 
             # Should find task1.md and task2.md (README.md excluded by default)
-            assert len(task_files) == 2
-            assert task_files[0].name == "task1.md"
+            assert len(task_files) == TWO_FILES
+            assert task_files[FIRST_INDEX].name == "task1.md"
             assert task_files[1].name == "task2.md"
 
     def test_exclude_feedback_files(self):
@@ -101,8 +107,8 @@ class TestTaskExecutorFindTaskFiles:
             task_files = executor._find_task_files(tmpdir_path)
 
             # Should be sorted
-            assert len(task_files) == 3
-            assert task_files[0].name == "task1.md"
+            assert len(task_files) == THREE_FILES
+            assert task_files[FIRST_INDEX].name == "task1.md"
             assert task_files[1].name == "task2.md"
             assert task_files[2].name == "task3.md"
 
@@ -120,7 +126,7 @@ class TestTaskExecutorFindTaskFiles:
             task_files = executor._find_task_files(tmpdir_path)
 
             # Should find both files
-            assert len(task_files) == 2
+            assert len(task_files) == TWO_FILES
             assert any(f.name == "task1.md" for f in task_files)
             assert any(f.name == "task2.md" for f in task_files)
 
@@ -360,10 +366,10 @@ class TestTaskExecutorFileLocking:
                 executor._unlock_file(test_file)
 
                 # Verify subprocess was called with correct commands
-                assert mock_popen.call_count == 2
+                assert mock_popen.call_count == TWO_COMMANDS
                 calls = mock_popen.call_args_list
-                assert calls[0][0][0] == ["sudo", "-S", "chattr", "+i", str(test_file)]
-                assert calls[1][0][0] == ["sudo", "-S", "chattr", "-i", str(test_file)]
+                assert calls[FIRST_INDEX][FIRST_INDEX][FIRST_INDEX] == ["sudo", "-S", "chattr", "+i", str(test_file)]
+                assert calls[1][FIRST_INDEX][FIRST_INDEX] == ["sudo", "-S", "chattr", "-i", str(test_file)]
 
     def test_lock_file_failure_raises_error(self, monkeypatch, tmp_path):
         """Lock file raises CalledProcessError when chattr fails."""

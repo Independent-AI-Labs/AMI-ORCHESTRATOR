@@ -68,7 +68,7 @@ class TestCompletionModeratorIntegration:
             result = scanner.validate(hook_input)
 
             # Should have called _validate_completion
-            mock_validate.assert_called_once_with("test-session", test_transcript)
+            mock_validate.assert_called_once_with("test-session", test_transcript, "I created hello.py with the function.\n\nWORK DONE")
             assert result.decision is None  # allow() returns None decision
 
     def test_validate_blocks_without_completion_marker(self, scanner: ResponseScanner) -> None:
@@ -106,7 +106,7 @@ class TestCompletionModeratorIntegration:
         """Test that moderator is skipped when disabled in config."""
         cast(Mock, scanner.config.get).return_value = False  # disabled
 
-        result = scanner._validate_completion("test-session", test_transcript)
+        result = scanner._validate_completion("test-session", test_transcript, "WORK DONE")
 
         # Should allow without running moderator
         assert result.decision is None  # allow() returns None
@@ -126,11 +126,14 @@ class TestCompletionModeratorIntegration:
             mock_cli.run_print.return_value = ("ALLOW", None)
             mock_get_cli.return_value = mock_cli
 
-            result = scanner._validate_completion("test-session", test_transcript)
+            result = scanner._validate_completion("test-session", test_transcript, "WORK DONE")
 
             # Should allow
             assert result.decision == "allow"
-            cast(Mock, scanner.logger.info).assert_called_with("completion_moderator_allow", session_id="test-session", format="plain")
+            # Bare "ALLOW" triggers legacy format warning, not info log
+            cast(Mock, scanner.logger.warning).assert_any_call(
+                "completion_moderator_allow_no_explanation", session_id="test-session", note="Moderator used legacy ALLOW format without explanation"
+            )
 
     def test_validate_completion_block_decision(self, scanner: ResponseScanner, test_transcript: Path) -> None:
         """Test parsing BLOCK decision from moderator output."""
@@ -147,7 +150,7 @@ class TestCompletionModeratorIntegration:
             mock_cli.run_print.return_value = ("BLOCK: Tests are failing, bug still present", None)
             mock_get_cli.return_value = mock_cli
 
-            result = scanner._validate_completion("test-session", test_transcript)
+            result = scanner._validate_completion("test-session", test_transcript, "WORK DONE")
 
             # Should block
             assert result.decision == "block"
@@ -169,7 +172,7 @@ class TestCompletionModeratorIntegration:
             mock_cli.run_print.return_value = ("Some unclear output with no decision", None)
             mock_get_cli.return_value = mock_cli
 
-            result = scanner._validate_completion("test-session", test_transcript)
+            result = scanner._validate_completion("test-session", test_transcript, "WORK DONE")
 
             # Should fail-closed (block)
             assert result.decision == "block"
@@ -186,7 +189,7 @@ class TestCompletionModeratorIntegration:
         }.get(key, default)
         cast(Any, scanner.config).root = Path("/home/ami/Projects/AMI-ORCHESTRATOR")
 
-        result = scanner._validate_completion("test-session", test_transcript)
+        result = scanner._validate_completion("test-session", test_transcript, "WORK DONE")
 
         # Should fail-closed (block)
         assert result.decision == "block"
@@ -199,7 +202,7 @@ class TestCompletionModeratorIntegration:
         cast(Mock, scanner.config.get).return_value = True
 
         # Non-existent transcript
-        result = scanner._validate_completion("test-session", Path("/nonexistent/transcript.jsonl"))
+        result = scanner._validate_completion("test-session", Path("/nonexistent/transcript.jsonl"), "WORK DONE")
 
         # Should fail-closed (block)
         assert result.decision == "block"
@@ -221,7 +224,7 @@ class TestCompletionModeratorIntegration:
             mock_cli.run_print.side_effect = AgentTimeoutError(120, ["claude"], 120.0)
             mock_get_cli.return_value = mock_cli
 
-            result = scanner._validate_completion("test-session", test_transcript)
+            result = scanner._validate_completion("test-session", test_transcript, "WORK DONE")
 
             # Should fail-closed (block)
             assert result.decision == "block"
@@ -261,6 +264,71 @@ class TestCompletionModeratorIntegration:
         finally:
             transcript.unlink()
 
+    def test_validate_completion_feedback_skips_incomplete_todo_check(self, scanner: ResponseScanner) -> None:
+        """Test that FEEDBACK: marker skips incomplete todo check (allows stop even with open todos)."""
+        # Create transcript with FEEDBACK: marker
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as tmp:
+            assistant_msg = {
+                "type": "assistant",
+                "message": {"content": [{"type": "text", "text": "FEEDBACK: Hook already has complete propagation"}]},
+            }
+            tmp.write(json.dumps(assistant_msg) + "\n")
+            transcript_path = tmp.name
+
+        transcript = Path(transcript_path)
+
+        try:
+            cast(Mock, scanner.config.get).side_effect = lambda key, default=None: {
+                "response_scanner.completion_moderator_enabled": True,
+                "prompts.dir": "scripts/config/prompts",
+                "prompts.completion_moderator": "completion_moderator.txt",
+                "hooks.file": "scripts/config/hooks.yaml",
+            }.get(key, default)
+            cast(Any, scanner.config).root = Path("/home/ami/Projects/AMI-ORCHESTRATOR")
+
+            # Mock load_session_todos to return incomplete todos
+            with patch("scripts.automation.hooks.load_session_todos") as mock_load_todos:
+                mock_load_todos.return_value = [
+                    {"status": "pending", "content": "Fix bug"},
+                    {"status": "in_progress", "content": "Run tests"},
+                ]
+
+                # Mock agent CLI to return ALLOW
+                with patch("scripts.automation.hooks.get_agent_cli") as mock_get_cli:
+                    mock_cli = Mock()
+                    mock_cli.run_print.return_value = ("ALLOW", None)
+                    mock_get_cli.return_value = mock_cli
+
+                    # Call _validate_completion with FEEDBACK message
+                    result = scanner._validate_completion("test-session", transcript, "FEEDBACK: Hook already has complete propagation")
+
+                    # Should NOT block on incomplete todos when FEEDBACK is present
+                    # Should proceed to moderator and allow
+                    assert result.decision == "allow"
+        finally:
+            transcript.unlink()
+
+    def test_validate_completion_work_done_checks_incomplete_todos(self, scanner: ResponseScanner, test_transcript: Path) -> None:
+        """Test that WORK DONE marker still checks for incomplete todos and blocks."""
+        cast(Mock, scanner.config.get).return_value = True
+
+        # Mock load_session_todos to return incomplete todos
+        with patch("scripts.automation.hooks.load_session_todos") as mock_load_todos:
+            mock_load_todos.return_value = [
+                {"status": "pending", "content": "Fix bug"},
+                {"status": "in_progress", "content": "Run tests"},
+            ]
+
+            # Call _validate_completion with WORK DONE message
+            result = scanner._validate_completion("test-session", test_transcript, "WORK DONE")
+
+            # Should BLOCK on incomplete todos when WORK DONE is present
+            assert result.decision == "block"
+            assert result.reason is not None
+            assert "INCOMPLETE TASKS" in result.reason
+            assert "Fix bug" in result.reason
+            assert "Run tests" in result.reason
+
     def test_validate_completion_markdown_code_block(self, scanner: ResponseScanner, test_transcript: Path) -> None:
         """Test parsing ALLOW/BLOCK from markdown code blocks."""
         cast(Mock, scanner.config.get).side_effect = lambda key, default=None: {
@@ -277,8 +345,11 @@ class TestCompletionModeratorIntegration:
             mock_cli.run_print.return_value = ("```\nALLOW\n```", None)
             mock_get_cli.return_value = mock_cli
 
-            result = scanner._validate_completion("test-session", test_transcript)
+            result = scanner._validate_completion("test-session", test_transcript, "WORK DONE")
 
             # Should still parse ALLOW correctly
             assert result.decision == "allow"
-            cast(Mock, scanner.logger.info).assert_called_with("completion_moderator_allow", session_id="test-session", format="plain")
+            # Bare "ALLOW" in code fence triggers legacy format warning, not info log
+            cast(Mock, scanner.logger.warning).assert_any_call(
+                "completion_moderator_allow_no_explanation", session_id="test-session", note="Moderator used legacy ALLOW format without explanation"
+            )

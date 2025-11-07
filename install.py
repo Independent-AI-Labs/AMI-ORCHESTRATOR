@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-''':'
+""":'
 exec "$(dirname "$0")/scripts/ami-run.sh" "$0" "$@"
-'''
+"""
+
 from __future__ import annotations
 
 """AMI Orchestrator installer - bootstraps the development environment.

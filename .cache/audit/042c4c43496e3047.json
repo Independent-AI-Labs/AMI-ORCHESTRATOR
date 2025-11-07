@@ -1,0 +1,1 @@
+{"file_path": "base/tests/unit/quality/test_scanner.py", "status": "ERROR", "violations": [{"line": 0, "pattern_id": "audit_format_violation", "severity": "ERROR", "message": "Audit agent violated output format. Expected 'PASS' or 'FAIL: <reasons>', got: I need to analyze this test file for code quality violations."}], "execution_time": 5.109864711761475}

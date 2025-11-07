@@ -9,6 +9,9 @@ import yaml
 
 from scripts.automation import agent_main
 
+# Test constants
+HOOK_TIMEOUT_MS = 60000
+
 
 class TestCreateMCPConfigFile:
     """Tests for _create_mcp_config_file function."""
@@ -228,7 +231,7 @@ class TestCreateSettingsFile:
             settings = json.load(f)
 
         hook_command = settings["hooks"]["PreToolUse"][0]["hooks"][0]
-        assert hook_command["timeout"] == 60000
+        assert hook_command["timeout"] == HOOK_TIMEOUT_MS
 
         result.unlink()
 

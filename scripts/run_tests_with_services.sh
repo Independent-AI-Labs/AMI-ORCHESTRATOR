@@ -16,8 +16,8 @@ check_port_in_use() {
 
 # Function to start secrets-broker with proper environment
 start_secrets_broker() {
-    echo "Starting secrets-broker via launcher..." >&2
-    python3 nodes/scripts/launch_services.py start secrets-broker --module-paths base 2>&1 | grep -v "^$" >&2 || true
+    echo "Starting secrets-broker via launcher..."
+    python3 nodes/scripts/launch_services.py start secrets-broker --module-paths base 2>&1 | grep -v "^$" || true
     # Wait for startup
     sleep 3
 }
@@ -25,14 +25,14 @@ start_secrets_broker() {
 # Check if secrets-broker is needed and start it if not running
 if [ -f "base/scripts/run_secrets_broker.py" ]; then
     if check_port_in_use 8700; then
-        echo "secrets-broker already running on port 8700" >&2
+        echo "secrets-broker already running on port 8700"
     else
-        echo "secrets-broker not running, starting it..." >&2
+        echo "secrets-broker not running, starting it..."
         start_secrets_broker
 
         # Verify it started
         if check_port_in_use 8700; then
-            echo "secrets-broker started successfully" >&2
+            echo "secrets-broker started successfully"
         else
             echo "Warning: secrets-broker failed to start, tests may fail" >&2
         fi
