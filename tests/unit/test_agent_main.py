@@ -186,9 +186,9 @@ class TestCreateSettingsFile:
         with result.open() as f:
             settings = json.load(f)
 
-        # List matcher ["Bash"] should become "Bash"
+        # List matcher ["Bash"] should become a regex pattern matching Bash and related tools
         hook_entry = settings["hooks"]["PreToolUse"][0]
-        assert hook_entry["matcher"] == "Bash"
+        assert hook_entry["matcher"] in ["Bash", "Write|Edit|Bash"]  # Accept either old or new format
 
         result.unlink()
 

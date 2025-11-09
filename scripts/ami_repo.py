@@ -118,6 +118,9 @@ class GitRepoManager:
                         _print_info(f"Description: {repo['description']}", 1)
                     if verbose and "branches" in repo:
                         _print_info(f"Branches: {repo['branches']}", 1)
+            else:
+                # Print message when no repositories exist
+                _print_info("No repositories found")
         except (RepositoryError, GitServerError):
             sys.exit(1)
 
@@ -129,7 +132,8 @@ class GitRepoManager:
             protocol: URL protocol (file, ssh, http)
         """
         try:
-            self.repo_ops.get_repo_url(name, protocol)
+            result = self.repo_ops.get_repo_url(name, protocol)
+            _print_info(result.url)  # Print the URL to stdout
         except (RepositoryError, GitServerError):
             sys.exit(1)
 
@@ -231,6 +235,9 @@ class GitRepoManager:
                         _print_info(f"Type: {key['type']}", 1)
                     if "fingerprint" in key:
                         _print_info(f"Fingerprint: {key['fingerprint']}", 1)
+            else:
+                # Print message when no SSH keys exist
+                _print_info("No SSH keys configured")
         except (SSHKeyError, GitServerError):
             sys.exit(1)
 

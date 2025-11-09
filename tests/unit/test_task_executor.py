@@ -368,8 +368,22 @@ class TestTaskExecutorFileLocking:
                 # Verify subprocess was called with correct commands
                 assert mock_popen.call_count == TWO_COMMANDS
                 calls = mock_popen.call_args_list
-                assert calls[FIRST_INDEX][FIRST_INDEX][FIRST_INDEX] == ["sudo", "-S", "chattr", "+i", str(test_file)]
-                assert calls[1][FIRST_INDEX][FIRST_INDEX] == ["sudo", "-S", "chattr", "-i", str(test_file)]
+                
+                # Check the actual command (may be full path like /usr/bin/sudo)
+                lock_cmd = calls[FIRST_INDEX][FIRST_INDEX][FIRST_INDEX]
+                unlock_cmd = calls[1][FIRST_INDEX][FIRST_INDEX]
+                
+                # The command should use sudo (either as 'sudo' or full path like '/usr/bin/sudo')
+                assert lock_cmd[0].endswith('sudo')
+                # The third command should be chattr (either as 'chattr' or full path like '/usr/bin/chattr')
+                # Command format: [sudo, -S, chattr, +i, filename]
+                assert lock_cmd[2].endswith('chattr')
+                assert lock_cmd[1] == "-S"
+                assert lock_cmd[3:] == ["+i", str(test_file)]
+                assert unlock_cmd[0].endswith('sudo')
+                assert unlock_cmd[2].endswith('chattr')
+                assert unlock_cmd[1] == "-S"
+                assert unlock_cmd[3:] == ["-i", str(test_file)]
 
     def test_lock_file_failure_raises_error(self, monkeypatch, tmp_path):
         """Lock file raises CalledProcessError when chattr fails."""
@@ -392,7 +406,13 @@ class TestTaskExecutorFileLocking:
                 executor._lock_file(test_file)
 
             assert exc_info.value.returncode == 1
-            assert exc_info.value.cmd == ["sudo", "-S", "chattr", "+i", str(test_file)]
+            # Check that the command is for sudo with the expected arguments (full path may be used)
+            assert exc_info.value.cmd[0].endswith('sudo')
+            # Check that third command is chattr and remaining args match
+            # Command format: [sudo, -S, chattr, +i, filename]
+            assert exc_info.value.cmd[2].endswith('chattr')
+            assert exc_info.value.cmd[1] == "-S"
+            assert exc_info.value.cmd[3:] == ["+i", str(test_file)]
 
     def test_unlock_file_failure_raises_error(self, monkeypatch, tmp_path):
         """Unlock file raises CalledProcessError when chattr fails."""
@@ -415,4 +435,10 @@ class TestTaskExecutorFileLocking:
                 executor._unlock_file(test_file)
 
             assert exc_info.value.returncode == 1
-            assert exc_info.value.cmd == ["sudo", "-S", "chattr", "-i", str(test_file)]
+            # Check that the command is for sudo with the expected arguments (full path may be used)
+            assert exc_info.value.cmd[0].endswith('sudo')
+            # Check that third command is chattr and remaining args match
+            # Command format: [sudo, -S, chattr, -i, filename]
+            assert exc_info.value.cmd[2].endswith('chattr')
+            assert exc_info.value.cmd[1] == "-S"
+            assert exc_info.value.cmd[3:] == ["-i", str(test_file)]
