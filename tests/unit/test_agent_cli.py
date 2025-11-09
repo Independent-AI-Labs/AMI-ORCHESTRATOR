@@ -187,24 +187,3 @@ class TestClaudeAgentCLI:
         cli = get_agent_cli()
 
         assert isinstance(cli, ClaudeAgentCLI)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

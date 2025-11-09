@@ -9,8 +9,6 @@ from contextlib import redirect_stdout
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 # Add scripts directory to path
 root_dir = Path(__file__).resolve().parents[2]
 scripts_dir = root_dir / "scripts"
@@ -21,7 +19,7 @@ from ami_repo import GitRepoManager
 # Test constants
 AUTHORIZED_KEYS_MODE = 0o600
 
-from backend.git_server.results import RepositoryError, SSHKeyError, OperationResult, RepoResult
+from backend.git_server.results import OperationResult, RepoResult, SSHKeyResult
 
 
 class TestGitRepoManagerInit:
@@ -56,24 +54,20 @@ class TestURLGeneration:
     def test_file_url_format(self, tmp_path, monkeypatch):
         """get_repo_url generates correct file:// URL."""
         # Mock the repo_ops.get_repo_url to return a specific URL
-        from unittest.mock import patch
-        from backend.git_server.results import OperationResult
-        
+
         manager = GitRepoManager(base_path=tmp_path)
         manager.repos_path.mkdir(parents=True)
         repo_path = manager.repos_path / "test.git"
         repo_path.mkdir()
-        
+
         # Create a mock result object that has a url attribute
-        from backend.git_server.results import RepoResult
         mock_result = RepoResult(success=True, message="Success", data=None, url="file:///fake/path/test.git")
-        
-        with patch.object(manager.repo_ops, 'get_repo_url', return_value=mock_result):
+
+        with patch.object(manager.repo_ops, "get_repo_url", return_value=mock_result):
             # Capture stdout
             f = io.StringIO()
-            with redirect_stdout(f):
-                with patch("sys.exit"):  # Prevent sys.exit in case of error
-                    manager.get_repo_url("test", protocol="file")
+            with redirect_stdout(f), patch("sys.exit"):  # Prevent sys.exit in case of error
+                manager.get_repo_url("test", protocol="file")
 
             output = f.getvalue().strip()
             assert output.startswith("file://")
@@ -81,9 +75,7 @@ class TestURLGeneration:
 
     def test_ssh_url_format(self, tmp_path, monkeypatch):
         """get_repo_url generates correct ssh:// URL."""
-        from unittest.mock import patch
-        from backend.git_server.results import OperationResult
-        
+
         monkeypatch.setenv("USER", "testuser")
         monkeypatch.setenv("HOSTNAME", "testhost")
 
@@ -93,14 +85,12 @@ class TestURLGeneration:
         repo_path.mkdir()
 
         # Create a mock result object that has a url attribute
-        from backend.git_server.results import RepoResult
         mock_result = RepoResult(success=True, message="Success", data=None, url="ssh://testuser@testhost/fake/path/test.git")
-        
-        with patch.object(manager.repo_ops, 'get_repo_url', return_value=mock_result):
+
+        with patch.object(manager.repo_ops, "get_repo_url", return_value=mock_result):
             f = io.StringIO()
-            with redirect_stdout(f):
-                with patch("sys.exit"):  # Prevent sys.exit in case of error
-                    manager.get_repo_url("test", protocol="ssh")
+            with redirect_stdout(f), patch("sys.exit"):  # Prevent sys.exit in case of error
+                manager.get_repo_url("test", protocol="ssh")
 
             output = f.getvalue().strip()
             assert output.startswith("ssh://testuser@testhost")
@@ -163,52 +153,58 @@ class TestRepositoryNameHandling:
 
     def test_adds_git_extension(self, tmp_path):
         """create_repo adds .git extension if missing."""
-        from backend.git_server.results import RepoResult
-        
+
         manager = GitRepoManager(base_path=tmp_path)
         manager.repos_path.mkdir(parents=True)
 
         # Mock the repo_ops.create_repo to return a successful result
-        with patch.object(manager.repo_ops, 'create_repo', return_value=RepoResult(
-            success=True, 
-            message="Repository created", 
-            data=None,
-            repo_name="my-project.git",
-            repo_path=manager.repos_path / "my-project.git",
-            url=f"file://{manager.repos_path / 'my-project.git'}"
-        )):
+        with patch.object(
+            manager.repo_ops,
+            "create_repo",
+            return_value=RepoResult(
+                success=True,
+                message="Repository created",
+                data=None,
+                repo_name="my-project.git",
+                repo_path=manager.repos_path / "my-project.git",
+                url=f"file://{manager.repos_path / 'my-project.git'}",
+            ),
+        ):
             # Capture stdout to prevent printing during test
             f = io.StringIO()
             with redirect_stdout(f):
                 manager.create_repo("my-project")
 
             # Check that .git extension was added
-            expected_path = manager.repos_path / "my-project.git"
+            manager.repos_path / "my-project.git"
             # Since we're mocking, the actual filesystem operation doesn't happen
             # The test focuses on ensuring the method doesn't throw an exception
 
     def test_preserves_git_extension(self, tmp_path):
         """create_repo preserves existing .git extension."""
-        from backend.git_server.results import RepoResult
-        
+
         manager = GitRepoManager(base_path=tmp_path)
         manager.repos_path.mkdir(parents=True)
 
         # Mock the repo_ops.create_repo to return a successful result
-        with patch.object(manager.repo_ops, 'create_repo', return_value=RepoResult(
-            success=True, 
-            message="Repository created", 
-            data=None,
-            repo_name="my-project.git",
-            repo_path=manager.repos_path / "my-project.git",
-            url=f"file://{manager.repos_path / 'my-project.git'}"
-        )):
+        with patch.object(
+            manager.repo_ops,
+            "create_repo",
+            return_value=RepoResult(
+                success=True,
+                message="Repository created",
+                data=None,
+                repo_name="my-project.git",
+                repo_path=manager.repos_path / "my-project.git",
+                url=f"file://{manager.repos_path / 'my-project.git'}",
+            ),
+        ):
             # Capture stdout to prevent printing during test
             f = io.StringIO()
             with redirect_stdout(f):
                 manager.create_repo("my-project.git")
 
-            expected_path = manager.repos_path / "my-project.git"
+            manager.repos_path / "my-project.git"
             # Since we're mocking, the actual filesystem operation doesn't happen
             # The test focuses on ensuring the method doesn't throw an exception
 
@@ -232,7 +228,7 @@ class TestErrorHandling:
         mock_result = MagicMock()
         mock_result.returncode = 0
         mock_run.return_value = mock_result
-        
+
         manager = GitRepoManager(base_path=tmp_path)
         manager.repos_path.mkdir(parents=True)
 
@@ -248,23 +244,19 @@ class TestErrorHandling:
     @patch("subprocess.run")
     def test_list_repos_empty_server(self, tmp_path):
         """list_repos handles empty server gracefully."""
-        from backend.git_server.results import OperationResult
-        
+
         manager = GitRepoManager(base_path=tmp_path)
         manager.repos_path.mkdir(parents=True)
 
         # Mock the repo_ops.list_repos to return empty repos list with appropriate message
         mock_result = OperationResult(
-            success=True, 
+            success=True,
             message="No repositories found",  # This is what the message should be
-            data={"repos": []}  # Empty repos list
+            data={"repos": []},  # Empty repos list
         )
-        with patch.object(manager.repo_ops, 'list_repos', return_value=mock_result):
-            f = io.StringIO()
-            with redirect_stdout(f):
-                # Mock sys.exit to prevent termination if error occurs
-                with patch("sys.exit"):
-                    manager.list_repos()
+        with patch.object(manager.repo_ops, "list_repos", return_value=mock_result), redirect_stdout(f := io.StringIO()), patch("sys.exit"):
+            # Mock sys.exit to prevent termination if error occurs
+            manager.list_repos()
 
             output = f.getvalue()
             assert "No repositories found" in output
@@ -342,22 +334,18 @@ class TestSSHKeyManagement:
 
     def test_list_keys_empty(self, tmp_path):
         """list_ssh_keys handles no keys gracefully."""
-        from backend.git_server.results import SSHKeyResult
-        
+
         manager = GitRepoManager(base_path=tmp_path)
 
         # Mock the ssh_ops.list_ssh_keys to return empty keys list
         mock_result = SSHKeyResult(
-            success=True, 
+            success=True,
             message="No SSH keys configured",  # This is what the message should be
-            data={"keys": []}  # Empty keys list
+            data={"keys": []},  # Empty keys list
         )
-        with patch.object(manager.ssh_ops, 'list_ssh_keys', return_value=mock_result):
-            f = io.StringIO()
-            with redirect_stdout(f):
-                # Mock sys.exit to prevent termination if error occurs
-                with patch("sys.exit"):
-                    manager.list_ssh_keys()
+        with patch.object(manager.ssh_ops, "list_ssh_keys", return_value=mock_result), redirect_stdout(f := io.StringIO()), patch("sys.exit"):
+            # Mock sys.exit to prevent termination if error occurs
+            manager.list_ssh_keys()
 
             output = f.getvalue()
             assert "No SSH keys configured" in output

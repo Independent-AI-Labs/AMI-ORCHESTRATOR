@@ -11,7 +11,6 @@ import pytest
 # Import the implemented hooks functionality
 from scripts.automation.agent_cli import AgentError
 from scripts.automation.hooks import (
-    CoreQualityValidator,
     CommandValidator,
     HookInput,
     HookResult,
@@ -384,7 +383,7 @@ class TestHookValidatorBase:
     """Unit tests for HookValidator base class."""
 
     def test_run_exception_fails_open(self):
-        """HookValidator.run() fails open on error."""
+        """HookValidator.run() fails closed on error."""
 
         # Create a validator that raises an exception
         class FailingValidator(HookValidator):
@@ -408,17 +407,14 @@ class TestHookValidatorBase:
             # Should return 0 (success)
             assert exit_code == 0
 
-            # Should output allow decision
+            # Should output deny decision (fail closed)
             output = sys.stdout.getvalue()
-            # Output should be JSON with allow decision
-            # (or empty JSON which means allow)
-            try:
-                result_data = json.loads(output)
-                # Either empty or has decision=allow
-                assert result_data.get("decision") in (None, "allow")
-            except json.JSONDecodeError:
-                # Empty output is also fine (means allow)
-                pass
+            # Output should be JSON with deny decision
+            result_data = json.loads(output)
+            # For PreToolUse event, should have deny decision in hookSpecificOutput
+            assert "hookSpecificOutput" in result_data
+            assert result_data["hookSpecificOutput"]["permissionDecision"] == "deny"
+            assert "Hook execution failed:" in result_data["hookSpecificOutput"]["permissionDecisionReason"]
         finally:
             sys.stdin = old_stdin
             sys.stdout = old_stdout

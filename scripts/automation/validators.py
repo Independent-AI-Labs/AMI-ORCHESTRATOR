@@ -175,26 +175,26 @@ def _check_file_content_violation(
     # Check if file matches pattern
     # Convert glob pattern to regex properly
     # For **, we want to match zero or more directories followed by /
-    import re
+
     # For **/__init__.py -> (.*?/)?__init\.py (optional directory path)
     # Replace ** patterns first before escaping
-    if '**' in file_match:
+    if "**" in file_match:
         # Handle the case where ** appears at the start (meaning zero or more dirs)
-        if file_match.startswith('**/'):
+        if file_match.startswith("**/"):
             pattern_suffix = file_match[3:]  # Get part after '**/'
             # Create regex that optionally matches any directory path followed by the suffix
-            regex_pattern = f'^(.*?/)?{re.escape(pattern_suffix)}$'
+            regex_pattern = f"^(.*?/)?{re.escape(pattern_suffix)}$"
         else:
             # More complex glob pattern, escape and convert
-            escaped_with_placeholder = file_match.replace('**', '__GLOB_DOUBLE_STAR__')
+            escaped_with_placeholder = file_match.replace("**", "__GLOB_DOUBLE_STAR__")
             regex_pattern = re.escape(escaped_with_placeholder)
-            regex_pattern = regex_pattern.replace('__GLOB_DOUBLE_STAR__', '.*')
-            regex_pattern = regex_pattern.replace(r'\*', '[^/]*')
-            regex_pattern = f'^{regex_pattern}$'
+            regex_pattern = regex_pattern.replace("__GLOB_DOUBLE_STAR__", ".*")
+            regex_pattern = regex_pattern.replace(r"\*", "[^/]*")
+            regex_pattern = f"^{regex_pattern}$"
     else:
         # No ** patterns, just handle * normally
         regex_pattern = f"^{re.escape(file_match).replace(r'*', '[^/]*')}$"
-    
+
     if not re.search(regex_pattern, file_path):
         return False, ""
 

@@ -39,11 +39,17 @@ def get_base_path() -> Path:
 
 def _print_success(message: str) -> None:
     """Print success message."""
+    sys.stdout.write(f"✓ {message}\n")
 
 
 def _print_info(message: str, indent: int = 0) -> None:
     """Print info message with optional indentation."""
     sys.stdout.write("  " * indent + message + "\n")
+
+
+def _print_error(message: str) -> None:
+    """Print error message to stderr."""
+    sys.stderr.write(f"✗ {message}\n")
 
 
 class GitRepoManager:
@@ -133,7 +139,11 @@ class GitRepoManager:
         """
         try:
             result = self.repo_ops.get_repo_url(name, protocol)
-            _print_info(result.url)  # Print the URL to stdout
+            if result.url is not None:
+                _print_info(result.url)  # Print the URL to stdout
+            else:
+                _print_error("No URL returned for repository")
+                sys.exit(1)
         except (RepositoryError, GitServerError):
             sys.exit(1)
 
@@ -193,7 +203,7 @@ class GitRepoManager:
                     for branch in branches:
                         _print_info(branch, 1)
                 else:
-                    pass
+                    _print_info("No commits yet", 1)
 
                 if result.data.get("tags"):
                     for tag in result.data["tags"]:
@@ -231,6 +241,8 @@ class GitRepoManager:
             _print_success(result.message)
             if result.data and result.data.get("keys"):
                 for key in result.data["keys"]:
+                    if "name" in key:
+                        _print_info(f"Name: {key['name']}", 1)
                     if "type" in key:
                         _print_info(f"Type: {key['type']}", 1)
                     if "fingerprint" in key:

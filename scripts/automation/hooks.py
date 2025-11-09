@@ -422,7 +422,7 @@ class HookValidator:
                 error_log_args["session_id"] = hook_input.session_id
             self.logger.error("hook_error", **error_log_args)
             # Fail closed - ZERO TOLERANCE
-            # Default to block for any hook execution failure
+            # Default to block for any hook execution failure to maintain security
             event_type = hook_input.hook_event_name if hook_input else "Stop"
             result = HookResult(
                 decision="block" if event_type in ("Stop", "SubagentStop") else "deny",
