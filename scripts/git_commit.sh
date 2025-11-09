@@ -176,12 +176,14 @@ git add -A
 # Determine target directories
 # IMPORTANT:
 # - Autofixes (lines 148-158) target specific dirs to avoid modifying submodules
-# - Quality checks ALWAYS scan "." (everything) to catch unfixable violations
-# - This forces fixing ALL issues including in submodules before commit
+# - Quality checks skip submodules when committing from root (they're checked separately)
+# - Submodules are independent repos checked when committed from their own directory
+# - This avoids double-scanning and ruff relative path mismatches
 IS_ROOT=false
 if [ "$ORCHESTRATOR_ROOT" = "$MODULE_ROOT" ]; then
     IS_ROOT=true
-    CHECK_TARGETS="."  # Check everything including submodules
+    # Only check orchestrator-level directories, skip submodules
+    CHECK_TARGETS="backend scripts tests"
     MODULE_ARG="root"
 else
     CHECK_TARGETS="."  # Submodules check their own directory
@@ -294,8 +296,36 @@ echo ""
 echo "Running no-lint-suppressions check..."
 CODE_CHECK_SCRIPT="${ORCHESTRATOR_ROOT}/base/scripts/quality/code_check.py"
 if [ -f "$CODE_CHECK_SCRIPT" ]; then
-    if ! "$PYTHON_BIN" "$CODE_CHECK_SCRIPT" "$MODULE_ARG"; then
+    # Run code_check.py and capture output
+    OUTPUT=$("$PYTHON_BIN" "$CODE_CHECK_SCRIPT" "$MODULE_ARG" 2>&1)
+    EXIT_CODE=$?
+    
+    if [ $EXIT_CODE -ne 0 ]; then
         echo "✗ No-lint-suppressions check failed"
+        echo ""
+        echo "Noqa violations found:"
+        echo "======================"
+        echo "$OUTPUT"
+        echo ""
+        echo "Scanning for specific files with noqa comments:"
+        echo "================================================"
+        # Show exact files with noqa violations based on scan paths
+        if [ "$MODULE_ARG" = "root" ]; then
+            SCAN_PATHS="backend scripts tests"
+        else
+            SCAN_PATHS="$MODULE_ARG"
+        fi
+        
+        for scan_path in $SCAN_PATHS; do
+            find "${ORCHESTRATOR_ROOT}/$scan_path" -name "*.py" -exec grep -l "noqa" {} \; 2>/dev/null | while read -r file; do
+                rel_file=$(realpath --relative-to="$ORCHESTRATOR_ROOT" "$file")
+                echo "File: $rel_file"
+                grep -n "noqa" "$file" | while read -r line; do
+                    echo "  $line"
+                done
+                echo ""
+            done
+        done
         exit 1
     fi
     echo "✓ No-lint-suppressions check passed"

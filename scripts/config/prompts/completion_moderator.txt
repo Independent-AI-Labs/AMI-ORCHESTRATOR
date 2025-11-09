@@ -45,6 +45,17 @@ Search FEEDBACK for: "exclude", "skip", "suppress", "exempt", "ignore", "configu
 BLOCK: Invalid FEEDBACK asking permission to skip/suppress violations. Answer is ALWAYS fix properly.
 ```
 
+### Pattern A2: Config File Exemptions
+
+Search conversation for: Creating/modifying ruff.toml, mypy.ini, pytest.ini to add exemptions/exclusions/per-file-ignores
+
+**If found → BLOCK:**
+```
+BLOCK: CRITICAL VIOLATION. Attempted to add exemptions to config files instead of fixing actual code quality issues. FIX THE ERRORS. Do not add exemptions, exclusions, or suppressions. Fix the code.
+```
+
+**Applies to:** ANY Write/Edit creating/modifying config files to add per-file-ignores, increase complexity limits, disable checks, or exclude patterns
+
 ### Pattern B: Incomplete Work FEEDBACK
 
 Search for: "Progress: X%" (X<100), "Continuing/Will continue", "X/Y fixed" (X<Y), "Remaining/Still need", "Systematic fixes"

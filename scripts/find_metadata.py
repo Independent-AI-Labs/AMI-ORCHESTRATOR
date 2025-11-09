@@ -9,7 +9,12 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
+
+if TYPE_CHECKING:
+    from files.backend.mcp.filesys.utils.metadata_config import resolve_artifact_path
+
+MIN_ARG_COUNT = 2  # Minimum number of arguments required for the script
 
 ArtifactType = Literal["progress", "feedback", "meta"]
 
@@ -72,8 +77,10 @@ def init_mappings(artifacts: dict[str, dict[str, list[Path]]], default_root: str
 
             # Init git repo
             if not (meta_path / ".git").exists():
-                with contextlib.suppress(subprocess.CalledProcessError):
-                    subprocess.run(["git", "init"], cwd=meta_path, check=True, capture_output=True)
+                git_executable = shutil.which("git")
+                if git_executable:
+                    with contextlib.suppress(subprocess.CalledProcessError):
+                        subprocess.run([git_executable, "init"], cwd=meta_path, check=True, capture_output=True)  # noqa: S603
 
         mappings.append({"module": module, "metadataPath": str(meta_path), "isActive": True})
 
@@ -97,7 +104,6 @@ def migrate_artifacts(artifacts: dict[str, dict[str, list[Path]]], dry_run: bool
     """
     # Ensure repo is on path
     _ensure_repo_on_path()
-    from files.backend.mcp.filesys.utils.metadata_config import resolve_artifact_path
 
     total_moved = 0
 
@@ -155,6 +161,8 @@ def clean_artifacts(artifacts: dict[str, dict[str, list[Path]]], confirm: bool =
 def list_mappings() -> None:
     """List current metadata mappings."""
     _ensure_repo_on_path()
+
+    # Import after adding repo to path
     from files.backend.mcp.filesys.utils.metadata_config import get_metadata_mappings
 
     mappings = get_metadata_mappings()
@@ -166,42 +174,57 @@ def list_mappings() -> None:
         "Yes" if mapping.get("isActive", True) else "No"
 
 
+def _handle_discover_command() -> None:
+    """Handle the 'discover' command."""
+    artifacts = discover_artifacts()
+    for _module, types in artifacts.items():
+        sum(len(paths) for paths in types.values())
+        for _artifact_type, paths in types.items():
+            if paths:
+                pass
+
+
+def _handle_init_mappings_command(confirm: bool) -> None:
+    """Handle the 'init-mappings' command."""
+    artifacts = discover_artifacts()
+    init_mappings(artifacts, confirm=confirm)
+
+
+def _handle_migrate_command(dry_run: bool) -> None:
+    """Handle the 'migrate' command."""
+    artifacts = discover_artifacts()
+    if dry_run:
+        pass
+    migrate_artifacts(artifacts, dry_run=dry_run)
+
+
+def _handle_clean_command(confirm: bool) -> None:
+    """Handle the 'clean' command."""
+    if not confirm:
+        pass
+    artifacts = discover_artifacts()
+    clean_artifacts(artifacts, confirm=confirm)
+
+
 def main() -> None:
     """Main entry point."""
-    if len(sys.argv) < 2 or (len(sys.argv) >= 2 and sys.argv[1] in ("--help", "-h")):
-        sys.exit(0 if len(sys.argv) >= 2 and sys.argv[1] in ("--help", "-h") else 1)
+    if len(sys.argv) < MIN_ARG_COUNT or (len(sys.argv) >= MIN_ARG_COUNT and sys.argv[1] in ("--help", "-h")):
+        sys.exit(0 if len(sys.argv) >= MIN_ARG_COUNT and sys.argv[1] in ("--help", "-h") else 1)
 
     command = sys.argv[1]
     confirm = "--confirm" in sys.argv
     dry_run = not confirm
 
     if command == "discover":
-        artifacts = discover_artifacts()
-        for _module, types in artifacts.items():
-            sum(len(paths) for paths in types.values())
-            for _artifact_type, paths in types.items():
-                if paths:
-                    pass
-
+        _handle_discover_command()
     elif command == "init-mappings":
-        artifacts = discover_artifacts()
-        init_mappings(artifacts, confirm=confirm)
-
+        _handle_init_mappings_command(confirm)
     elif command == "migrate":
-        artifacts = discover_artifacts()
-        if dry_run:
-            pass
-        migrate_artifacts(artifacts, dry_run=dry_run)
-
+        _handle_migrate_command(dry_run)
     elif command == "clean":
-        if not confirm:
-            pass
-        artifacts = discover_artifacts()
-        clean_artifacts(artifacts, confirm=confirm)
-
+        _handle_clean_command(confirm)
     elif command == "list-mappings":
         list_mappings()
-
     else:
         sys.exit(1)
 

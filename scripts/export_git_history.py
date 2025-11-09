@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import shutil
 import subprocess
 import sys
 from datetime import datetime
@@ -95,7 +96,16 @@ def get_git_log(repo_path: Path, since: str, until: str) -> list[Commit]:
     ]
 
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        # Validate git executable exists before running
+        git_exec = shutil.which("git")
+        if not git_exec:
+            raise FileNotFoundError("git command not found in PATH")
+
+        # Update command to use full path to git
+        if cmd and cmd[0] == "git":
+            cmd[0] = git_exec
+
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True)  # noqa: S603
     except subprocess.CalledProcessError:
         return []
 

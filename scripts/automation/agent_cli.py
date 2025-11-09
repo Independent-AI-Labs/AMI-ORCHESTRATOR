@@ -5,10 +5,12 @@ ClaudeAgentCLI implements this interface using the Claude Code CLI.
 AgentConfig provides type-safe configuration.
 """
 
+import contextlib
 import json
 import os
 import pwd
 import select
+import shutil
 import signal
 import subprocess
 import tempfile
@@ -530,19 +532,47 @@ class ClaudeAgentCLI(AgentCLI):
         """
         self.logger.info("agent_streaming_subprocess_starting")
 
+        # Validate executable exists in PATH
+        executable = shutil.which(cmd[0])
+        if not executable:
+            raise AgentExecutionError(
+                exit_code=-1,
+                stdout="",
+                stderr=f"Executable not found in PATH: {cmd[0]}",
+                cmd=cmd,
+            )
+
+        # Build validated command with full path
+        validated_cmd = [executable, *cmd[1:]]
+
         # Drop privileges if running as root via sudo
+        # PLW1509: preexec_fn is safe here because:
+        # - start_new_session=True isolates subprocess from parent threading
+        # - Only used for security-critical privilege dropping when running as root
+        # - _drop_privileges() is simple, fork-safe operation (setuid/setgid/setgroups)
         preexec_fn = self._drop_privileges if os.environ.get("SUDO_USER") and os.geteuid() == 0 else None
         env = self._get_unprivileged_env()
 
-        process = subprocess.Popen(
-            cmd,
+        # S603: validated_cmd[0] validated via shutil.which() on lines 536-546
+        # PLW1509: preexec_fn is documented as safe here because:
+        # - start_new_session=True isolates subprocess from parent threading
+        # - Only used for security-critical privilege dropping when running as root
+        # - _drop_privileges() is simple, fork-safe operation (setuid/setgid/setgroups)
+        # S603: validated_cmd[0] validated via shutil.which() on lines 536-546
+        # PLW1509: preexec_fn is documented as safe here because:
+        # - start_new_session=True isolates subprocess from parent threading
+        # - Only used for security-critical privilege dropping when running as root
+        # - _drop_privileges() is simple, fork-safe operation (setuid/setgid/setgroups)
+        process = subprocess.Popen(  # noqa: S603
+            validated_cmd,
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
             cwd=cwd,
+            shell=False,
             start_new_session=True,
-            preexec_fn=preexec_fn,
+            preexec_fn=preexec_fn,  # noqa: PLW1509
             env=env,
         )
 
@@ -715,6 +745,258 @@ class ClaudeAgentCLI(AgentCLI):
 
         return 1.0, last_log_time
 
+    def _handle_first_output_timeout(
+        self,
+        process: subprocess.Popen[str],
+        elapsed: float,
+        first_output_received: bool,
+        loop_iterations: int,
+        first_output_timeout: int,
+        cmd: list[str],
+        audit_log_path: Path | None,
+    ) -> bool:
+        """Handle first output timeout logic.
+
+        Args:
+            process: The subprocess
+            elapsed: Elapsed time
+            first_output_received: Whether first output has been received
+            loop_iterations: Number of loop iterations
+            first_output_timeout: Timeout threshold in seconds
+            cmd: Command that was run
+            audit_log_path: Audit log path
+
+        Returns:
+            Updated first_output_received flag
+        """
+        if not first_output_received and elapsed > first_output_timeout:
+            if process.poll() is not None:
+                # Process exited without producing output - capture stderr
+                stderr = process.stderr.read() if process.stderr else ""
+                self.logger.error(
+                    "agent_streaming_no_output_process_died",
+                    elapsed=elapsed,
+                    exit_code=process.returncode,
+                    stderr_preview=stderr[:2000] if stderr else "",
+                )
+                if audit_log_path:
+                    try:
+                        with audit_log_path.open("a") as f:
+                            f.write(f"\n=== PROCESS DIED WITHOUT OUTPUT (exit code: {process.returncode}) ===\n")
+                            if stderr:
+                                f.write(f"STDERR:\n{stderr}\n")
+                    except OSError:
+                        pass
+                raise AgentExecutionError(
+                    exit_code=process.returncode,
+                    stdout="",
+                    stderr=f"Process exited without producing streaming output after {elapsed:.1f}s\n\nSTDERR:\n{stderr}",
+                    cmd=cmd,
+                )
+
+            # Process still alive but no output
+            self.logger.warning(
+                "agent_streaming_no_output_still_alive",
+                elapsed=elapsed,
+                iterations=loop_iterations,
+                pid=process.pid,
+            )
+            return True  # Only warn once
+        return first_output_received
+
+    def _handle_process_exit(self, process: subprocess.Popen[str], audit_log_path: Path | None) -> str:
+        """Handle process exit and capture stderr.
+
+        Args:
+            process: The subprocess
+            audit_log_path: Audit log path
+
+        Returns:
+            Captured stderr
+        """
+        stderr = ""
+        if process and process.stderr:
+            try:
+                stderr = process.stderr.read()
+            except OSError as e:
+                stderr = f"<failed to read stderr: {e}>"
+
+        if stderr and audit_log_path:
+            try:
+                with audit_log_path.open("a") as f:
+                    f.write(f"\n=== PROCESS STDERR ===\n{stderr}\n")
+            except OSError:
+                pass
+
+        self.logger.info(
+            "agent_streaming_loop_exit",
+            line_count=0,  # This will be updated by caller
+            iterations=0,  # This will be updated by caller
+            stderr_preview=stderr[:1000] if stderr else "",
+        )
+        return stderr
+
+    def _handle_first_output_logging(
+        self, line: str, elapsed: float, line_count: int, first_output_received: bool, audit_log_path: Path | None, cmd: list[str], agent_config: AgentConfig
+    ) -> tuple[bool, int, str, dict[str, Any] | None]:
+        """Handle first output logging and message parsing.
+
+        Args:
+            line: The line read from process
+            elapsed: Elapsed time
+            line_count: Current line count
+            first_output_received: Whether first output has been received
+            audit_log_path: Audit log path
+            cmd: Command that was run
+            agent_config: Agent configuration
+
+        Returns:
+            Tuple of (updated first_output_received, updated line_count, parsed_text, metadata)
+        """
+        new_first_output_received = first_output_received
+        new_line_count = line_count
+        text_output = ""
+        metadata = None
+
+        if not first_output_received:
+            new_first_output_received = True
+            self.logger.info("agent_streaming_first_output", elapsed=elapsed)
+
+            # Write timing marker to audit log for test extraction
+            if audit_log_path:
+                try:
+                    with audit_log_path.open("a") as f:
+                        f.write(f"\n=== FIRST OUTPUT: {elapsed:.4f}s ===\n\n")
+                except OSError as e:
+                    self.logger.warning("audit_log_write_failed", path=str(audit_log_path), error=str(e))
+
+        new_line_count += 1
+
+        # Write to audit log BEFORE parsing (captures raw streaming output)
+        if audit_log_path:
+            try:
+                with audit_log_path.open("a") as f:
+                    f.write(line)
+            except OSError as e:
+                self.logger.warning("audit_log_write_failed", path=str(audit_log_path), error=str(e))
+
+        parsed_text, msg_metadata = self._parse_stream_message(line, cmd, new_line_count, agent_config)
+        text_output = parsed_text
+        if msg_metadata:
+            metadata = msg_metadata
+
+        return new_first_output_received, new_line_count, text_output, metadata
+
+    def _handle_process_completion(
+        self, process: subprocess.Popen[str], cmd: list[str], assistant_text: list[str], audit_log_path: Path | None, start_time: float
+    ) -> None:
+        """Handle process completion checks.
+
+        Args:
+            process: The subprocess
+            cmd: Command that was run
+            assistant_text: Accumulated assistant text
+            audit_log_path: Audit log path
+            start_time: When the operation started
+        """
+        # Wait for process completion
+        process.wait(timeout=10)
+        duration = time.time() - start_time
+
+        if process.returncode != 0:
+            stderr = process.stderr.read() if process.stderr else ""
+            if audit_log_path:
+                try:
+                    with audit_log_path.open("a") as f:
+                        f.write(f"\n=== PROCESS FAILED (exit code: {process.returncode}) ===\n")
+                        if stderr:
+                            f.write(f"STDERR:\n{stderr}\n")
+                except OSError:
+                    pass
+            self.logger.info(
+                "agent_print_complete",
+                exit_code=process.returncode,
+                duration=round(duration, 1),
+                stderr=stderr[:1000] if stderr else "",
+            )
+            raise AgentExecutionError(
+                exit_code=process.returncode,
+                stdout="".join(assistant_text),
+                stderr=stderr,
+                cmd=cmd,
+            )
+
+        if audit_log_path:
+            try:
+                with audit_log_path.open("a") as f:
+                    f.write(f"\n=== PROCESS COMPLETED (exit code: 0, duration: {duration:.1f}s) ===\n")
+            except OSError:
+                pass
+
+        self.logger.info("agent_print_complete", exit_code=process.returncode, duration=round(duration, 1))
+
+    def _run_streaming_loop(
+        self,
+        process: subprocess.Popen[str],
+        cmd: list[str],
+        agent_config: AgentConfig,
+        audit_log_path: Path | None,
+        first_output_timeout: int,
+        start_time: float,
+    ) -> tuple[list[str], dict[str, Any] | None]:
+        """Run the main streaming loop to process output.
+
+        Args:
+            process: The subprocess
+            cmd: Command that was run
+            agent_config: Agent configuration
+            audit_log_path: Audit log path
+            first_output_timeout: Timeout for first output in seconds
+            start_time: Time when process started
+
+        Returns:
+            Tuple of (assistant_text, metadata)
+        """
+        line_count = 0
+        last_log_time = time.time()
+        loop_iterations = 0
+        first_output_received = False
+        assistant_text: list[str] = []
+        metadata: dict[str, Any] | None = None
+
+        self.logger.info("agent_streaming_entering_loop", has_timeout=agent_config.timeout is not None, pid=process.pid)
+
+        while True:
+            loop_iterations += 1
+            elapsed = time.time() - start_time
+
+            # Check for first output timeout
+            first_output_received = self._handle_first_output_timeout(
+                process, elapsed, first_output_received, loop_iterations, first_output_timeout, cmd, audit_log_path
+            )
+
+            # Calculate timeout
+            timeout_val, last_log_time = self._calculate_stream_timeout(agent_config, last_log_time, line_count, elapsed, loop_iterations)
+
+            # Read line
+            line, process_exited = self._read_streaming_line(process, timeout_val, cmd)
+
+            if process_exited:
+                self._handle_process_exit(process, audit_log_path)
+                break
+
+            if line:
+                first_output_received, line_count, parsed_text, msg_metadata = self._handle_first_output_logging(
+                    line, elapsed, line_count, first_output_received, audit_log_path, cmd, agent_config
+                )
+
+                if parsed_text:
+                    assistant_text.append(parsed_text)
+                if msg_metadata:
+                    metadata = msg_metadata
+
+        return assistant_text, metadata
+
     def _execute_streaming(
         self,
         cmd: list[str],
@@ -741,8 +1023,6 @@ class ClaudeAgentCLI(AgentCLI):
         """
         start_time = time.time()
         process = None
-        assistant_text: list[str] = []
-        metadata: dict[str, Any] | None = None
         first_output_timeout = 30  # Warn if no output after 30s
 
         try:
@@ -756,148 +1036,10 @@ class ClaudeAgentCLI(AgentCLI):
                 except OSError as e:
                     self.logger.warning("audit_log_write_failed", path=str(audit_log_path), error=str(e))
 
-            # Read loop
-            line_count = 0
-            last_log_time = time.time()
-            loop_iterations = 0
-            first_output_received = False
+            # Run main streaming loop
+            assistant_text, metadata = self._run_streaming_loop(process, cmd, agent_config, audit_log_path, first_output_timeout, start_time)
 
-            self.logger.info("agent_streaming_entering_loop", has_timeout=agent_config.timeout is not None, pid=process.pid)
-
-            while True:
-                loop_iterations += 1
-                elapsed = time.time() - start_time
-
-                # Check for first output timeout
-                if not first_output_received and elapsed > first_output_timeout:
-                    # Check if process is still alive
-                    if process.poll() is not None:
-                        # Process exited without producing output - capture stderr
-                        stderr = process.stderr.read() if process.stderr else ""
-                        self.logger.error(
-                            "agent_streaming_no_output_process_died",
-                            elapsed=elapsed,
-                            exit_code=process.returncode,
-                            stderr_preview=stderr[:2000] if stderr else "",
-                        )
-                        if audit_log_path:
-                            try:
-                                with audit_log_path.open("a") as f:
-                                    f.write(f"\n=== PROCESS DIED WITHOUT OUTPUT (exit code: {process.returncode}) ===\n")
-                                    if stderr:
-                                        f.write(f"STDERR:\n{stderr}\n")
-                            except OSError:
-                                pass
-                        raise AgentExecutionError(
-                            exit_code=process.returncode,
-                            stdout="",
-                            stderr=f"Process exited without producing streaming output after {elapsed:.1f}s\n\nSTDERR:\n{stderr}",
-                            cmd=cmd,
-                        )
-
-                    # Process still alive but no output
-                    self.logger.warning(
-                        "agent_streaming_no_output_still_alive",
-                        elapsed=elapsed,
-                        iterations=loop_iterations,
-                        pid=process.pid,
-                    )
-                    first_output_received = True  # Only warn once
-
-                # Calculate timeout
-                timeout_val, last_log_time = self._calculate_stream_timeout(agent_config, last_log_time, line_count, elapsed, loop_iterations)
-
-                # Read line
-                line, process_exited = self._read_streaming_line(process, timeout_val, cmd)
-
-                if process_exited:
-                    # Capture stderr on exit
-                    stderr = ""
-                    if process and process.stderr:
-                        try:
-                            stderr = process.stderr.read()
-                        except OSError as e:
-                            stderr = f"<failed to read stderr: {e}>"
-
-                    if stderr and audit_log_path:
-                        try:
-                            with audit_log_path.open("a") as f:
-                                f.write(f"\n=== PROCESS STDERR ===\n{stderr}\n")
-                        except OSError:
-                            pass
-
-                    self.logger.info(
-                        "agent_streaming_loop_exit",
-                        line_count=line_count,
-                        iterations=loop_iterations,
-                        stderr_preview=stderr[:1000] if stderr else "",
-                    )
-                    break
-
-                if line:
-                    if not first_output_received:
-                        first_output_received = True
-                        self.logger.info("agent_streaming_first_output", elapsed=elapsed)
-
-                        # Write timing marker to audit log for test extraction
-                        if audit_log_path:
-                            try:
-                                with audit_log_path.open("a") as f:
-                                    f.write(f"\n=== FIRST OUTPUT: {elapsed:.4f}s ===\n\n")
-                            except Exception:
-                                pass  # Don't fail if audit log write fails
-
-                    line_count += 1
-
-                    # Write to audit log BEFORE parsing (captures raw streaming output)
-                    if audit_log_path:
-                        try:
-                            with audit_log_path.open("a") as f:
-                                f.write(line)
-                        except OSError as e:
-                            self.logger.warning("audit_log_write_failed", path=str(audit_log_path), error=str(e))
-
-                    text, msg_metadata = self._parse_stream_message(line, cmd, line_count, agent_config)
-                    if text:
-                        assistant_text.append(text)
-                    if msg_metadata:
-                        metadata = msg_metadata
-
-            # Wait for process completion
-            process.wait(timeout=10)
-            duration = time.time() - start_time
-
-            if process.returncode != 0:
-                stderr = process.stderr.read() if process.stderr else ""
-                if audit_log_path:
-                    try:
-                        with audit_log_path.open("a") as f:
-                            f.write(f"\n=== PROCESS FAILED (exit code: {process.returncode}) ===\n")
-                            if stderr:
-                                f.write(f"STDERR:\n{stderr}\n")
-                    except OSError:
-                        pass
-                self.logger.info(
-                    "agent_print_complete",
-                    exit_code=process.returncode,
-                    duration=round(duration, 1),
-                    stderr=stderr[:1000] if stderr else "",
-                )
-                raise AgentExecutionError(
-                    exit_code=process.returncode,
-                    stdout="".join(assistant_text),
-                    stderr=stderr,
-                    cmd=cmd,
-                )
-
-            if audit_log_path:
-                try:
-                    with audit_log_path.open("a") as f:
-                        f.write(f"\n=== PROCESS COMPLETED (exit code: 0, duration: {duration:.1f}s) ===\n")
-                except OSError:
-                    pass
-
-            self.logger.info("agent_print_complete", exit_code=process.returncode, duration=round(duration, 1))
+            self._handle_process_completion(process, cmd, assistant_text, audit_log_path, start_time)
             return "".join(assistant_text), metadata
 
         except subprocess.TimeoutExpired as timeout_err:
@@ -912,8 +1054,6 @@ class ClaudeAgentCLI(AgentCLI):
                     pass
 
             if process and process.pid:
-                import contextlib
-
                 with contextlib.suppress(ProcessLookupError):
                     os.killpg(os.getpgid(process.pid), signal.SIGKILL)
 

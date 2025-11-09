@@ -47,12 +47,17 @@ BLOCK: reason why research inadequate
 
 ## SKIP CONDITIONS (AUTO-ALLOW)
 
-1. Trivial changes (<5 lines): typos, comments, whitespace
-2. Reverting own changes in same session
-3. Formatting/style (no logic changes)
-4. Previously-read code (Read/Grep in last 10 messages)
-5. Following existing patterns (Grep shows 10+ uses)
-6. Obvious Python errors with clear fixes from traceback (resource scope, variable lifetime, typos, missing imports) - NOT external API changes
+**IMPORTANT:** Users may request side-tasks or inline fixes while other priorities are being handled concurrently. If user explicitly requests a specific change (via message OR todo list), that IS sufficient justification - no additional research required.
+
+1. **Explicit user request or task list item**: User directly asked for this change in recent messages (last 10) OR this change directly addresses a pending/in_progress todo item - user instruction overrides research requirements
+2. Trivial changes (<5 lines): typos, comments, whitespace
+3. Reverting own changes in same session
+4. Formatting/style (no logic changes)
+5. Previously-read code (Read/Grep in last 10 messages)
+6. Following existing patterns (Grep shows 10+ uses)
+7. Obvious Python errors with clear fixes from traceback (resource scope, variable lifetime, typos, missing imports) - NOT external API changes
+8. **Moderator prompt files**: Editing files in `scripts/config/prompts/*.txt` - these contain instructional examples and antipatterns for LLM moderators, not actual code
+9. **Config files with examples**: Editing `ruff.toml`, `mypy.ini`, `pytest.ini` when adding documented examples/comments (not weakening actual checks)
 
 ---
 
@@ -68,6 +73,7 @@ Check **last 30 messages** for research tools.
 ## DECISION RULES
 
 **ALLOW if:**
+- **User explicitly requested this change (in recent messages OR via todo list item)** OR
 - Trivial change OR
 - Proper research tools used OR
 - Claims verified OR
@@ -86,15 +92,28 @@ Check **last 30 messages** for research tools.
 
 ---
 
+## REMEMBER
+
+- Output: `ALLOW: explanation` or `BLOCK: reason`
+- **ALLOW if user explicitly requested this change (in messages OR todo list)** - user instruction is sufficient justification
+- Check last 30 messages for research tools, user requests, and todo list items
+- BLOCK external APIs without docs, architecture without code review
+- ALLOW trivial, obvious fixes, verified implementations
+- Uncertain → BLOCK
+
+---
+
+## CONVERSATION CONTEXT
+
+Below is the conversation showing the assistant's recent work and the code change being made.
+
+<conversation>
+{conversation_context}
+</conversation>
+
 ## CHANGE BEING MADE
 
-After conversation, you'll see:
-
-```
-## CHANGE BEING MADE
-
-[diff or description]
-```
+After the conversation above, you will see the change details.
 
 **Edit operations:**
 - **SUCCESS:** Shows unified diff of actual change
@@ -104,19 +123,3 @@ After conversation, you'll see:
 **Write operations:** "Writing N lines to {file}"
 
 **Use to:** Verify Edit success, see code changes, detect modifications without reading file first
-
----
-
-## REMEMBER
-
-- Output: `ALLOW: explanation` or `BLOCK: reason`
-- Check last 30 messages for research
-- BLOCK external APIs without docs, architecture without code review
-- ALLOW trivial, obvious fixes, verified implementations
-- Uncertain → BLOCK
-
----
-
-## Conversation Context
-
-Conversation via STDIN. Analyze whether adequate research performed before code change.

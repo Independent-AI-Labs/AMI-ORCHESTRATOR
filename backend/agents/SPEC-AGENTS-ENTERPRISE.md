@@ -1,30 +1,37 @@
-# AMI Agents Service - Final Unified Specification
+# AMI Agents Service - Enterprise Architecture Specification
 
-**Status:** Approved Architecture
-**Date:** 2025-11-07
-**Supersedes:** SPEC-AGENTS.md, SPEC-AGENTS-V2.md, SPEC-AGENTS-V2.1.md
+**Status:** Enterprise Architecture (Current Implementation in /scripts/automation)
+**Date:** 2025-11-08 
+**Previous Versions:** SPEC-AGENTS.md, SPEC-AGENTS-V2.md, SPEC-AGENTS-V2.1.md (Archived)
 
 ---
 
 ## Executive Summary
 
-This specification defines a **BPMN-native agent orchestration service** in `/backend/agents` that consolidates and refactors existing `/scripts/automation` workflows into a production-grade BPMN process engine.
+This specification defines the **enterprise-grade agent orchestration architecture** for the AMI Orchestrator. The current implementation utilizes the proven `/scripts/automation` framework, while this document outlines the forward-looking BPMN-native architecture for enterprise scalability.
 
-### Core Requirements
+### Current State (Implemented)
 
-1. **REFACTOR WITHOUT DELETION** - `/scripts/automation` remains untouched as the proven execution engine (`ami-agent` CLI)
-2. **BPMN-NATIVE WORKFLOWS** - All workflows (tasks, hooks, audit, docs, sync) expressed as BPMN process definitions
-3. **BASE MODULE INTEGRATION** - Leverage existing `base/backend/dataops/models/bpmn.py` and `base/backend/workers`
-4. **NO MCP (FUTURE WORK)** - Focus on core engine, defer MCP integration
+1. **PROVEN EXECUTION ENGINE** - `/scripts/automation` contains mature Claude CLI wrapper (`agent_cli.py`) with streaming, hooks, and privilege dropping
+2. **HOOK VALIDATION SYSTEM** - Comprehensive validation via `hooks.py` (malicious behavior, code quality, bash guard, etc.)
+3. **ENTRY POINT ORCHESTRATION** - Unified `ami-agent` entry point with mode routing (interactive, hook, audit, task, etc.)
+4. **CONFIGURATION MANAGEMENT** - Type-safe configuration via `AgentConfig` and `AgentConfigPresets`
+
+### Enterprise Architecture Vision (Planned)
+
+1. **BPMN-NATIVE WORKFLOWS** - All workflows expressed as BPMN process definitions for visual management and governance
+2. **BASE MODULE INTEGRATION** - Leverage `base/backend/dataops/models/bpmn.py` and `base/backend/workers` for enterprise features
+3. **AUDIT TRAIL & COMPLIANCE** - AgentSession model linking BPMN Tasks to execution sessions for full traceability
+4. **SCALABLE EXECUTION** - Worker pools with hibernation, health checks, and multi-tenancy support
 
 ### Key Architecture Decisions
 
-**✅ KEEP**: `scripts/automation/agent_cli.py` - Battle-tested Claude CLI wrapper with streaming, hooks, privilege dropping
-**✅ KEEP**: Hook validators - Malicious behavior, code quality, bash guard, response scanner, todo validator
-**✅ REUSE**: Base BPMN models - `Process`, `ProcessInstance`, `Task`, `Gateway`, `Event`, `SequenceFlow`
-**✅ REUSE**: Base worker pools - `WorkerPoolManager`, `UVProcessPool` for async execution
-**✅ BUILD**: BPMN engine - Graph traversal, token flow, task dispatch to `ami-agent`
-**✅ BUILD**: Process definitions - Convert Python workflows to BPMN JSON graphs
+**✅ CURRENTLY IMPLEMENTED**: `scripts/automation/agent_cli.py` - Battle-tested Claude CLI wrapper with streaming, hooks, privilege dropping
+**✅ CURRENTLY IMPLEMENTED**: Hook validators - Malicious behavior, code quality, bash guard, response scanner, todo validator
+**✅ LEVERAGED**: Base BPMN models - `Process`, `ProcessInstance`, `Task`, `Gateway`, `Event`, `SequenceFlow`
+**✅ LEVERAGED**: Base worker pools - `WorkerPoolManager`, `UVProcessPool` for async execution
+**🎯 FUTURE**: BPMN engine - Graph traversal, token flow, task dispatch to `ami-agent`
+**🎯 FUTURE**: Process definitions - Convert Python workflows to BPMN JSON graphs
 
 ---
 
@@ -1075,36 +1082,34 @@ tests/integration/backend/agents/
 
 ---
 
-## 8. Migration from scripts/automation
+## 8. Current Implementation vs. Enterprise Architecture
 
-### What STAYS (No Changes)
+### Current State (Production-Ready)
 
-✅ `scripts/automation/agent_cli.py` - ClaudeAgentCLI (battle-tested, reuse as-is)
-✅ `scripts/automation/hooks.py` - All hook validators
-✅ `scripts/automation/config.py`, `logger.py`, `validators.py`
+✅ `scripts/automation/agent_cli.py` - ClaudeAgentCLI (battle-tested, production-ready)
+✅ `scripts/automation/hooks.py` - Comprehensive hook validators (malicious behavior, code quality, etc.)
+✅ `scripts/automation/config.py`, `logger.py`, `validators.py` - Configuration and validation utilities
 ✅ `scripts/automation/transcript.py` - Transcript parsing for moderators
+✅ `scripts/automation/agent_main.py` - Unified entry point with mode routing
 ✅ Hook configuration files in `scripts/config/hooks.yaml`
+✅ All workflows implemented as Python modules (`tasks.py`, `audit.py`, `docs.py`, `sync.py`)
 
-### What MOVES (Refactored)
+### Enterprise Architecture (Planned Migration)
 
-**Logic moved into BPMN:**
-- `scripts/automation/tasks.py` → `processes/task_execution.bpmn.json`
-- `scripts/automation/audit.py` → `processes/code_audit.bpmn.json`
-- `scripts/automation/docs.py` → `processes/docs_maintenance.bpmn.json`
-- `scripts/automation/sync.py` → `processes/git_sync.bpmn.json`
+**Target Structure:**
+- `backend/agents/` - BPMN-native orchestration service
+- `backend/agents/models/agent_session.py` - Agent execution audit trail
+- `backend/agents/processes/*.bpmn.json` - Visual workflow definitions
+- `backend/agents/engine.py` - BPMN process execution engine
+- `backend/agents/executor.py` - Task-to-agent execution bridge
 
-**Execution moved into engine:**
-- Process orchestration → `BPMNProcessEngine`
-- Task dispatch → `AgentTaskExecutor`
-- Parallel execution → Worker pools (already in base)
+### Migration Strategy
 
-### Migration Path
-
-1. **Keep Python scripts running** (no changes yet)
-2. **Build BPMN engine alongside** (Phase 1-2)
-3. **Test BPMN workflows side-by-side** (Phase 3)
-4. **Gradual cutover** (workflow by workflow)
-5. **Archive Python scripts** (after full validation)
+1. **MAINTAIN CURRENT IMPLEMENTATION** - Keep `/scripts/automation` running in production
+2. **DEVELOP ENTERPRISE ARCHITECTURE** - Build `/backend/agents/` alongside existing code
+3. **GRADUAL MIGRATION** - Migrate workflows from Python to BPMN process definitions
+4. **BACKWARD COMPATIBILITY** - Maintain all existing interfaces during transition
+5. **ENTERPRISE ENABLEMENT** - Add multi-tenancy, security, monitoring via BPMN features
 
 ---
 
@@ -1136,22 +1141,22 @@ tests/integration/backend/agents/
 
 ---
 
-## 11. Success Metrics
+## 11. Enterprise Architecture Goals
 
-- ✅ **Zero changes to `/scripts/automation`** during Phase 1-3
-- ✅ **All workflows executable as BPMN** by end of Phase 3
-- ✅ **Performance within 10%** of baseline Python implementation
-- ✅ **100% hook compatibility** - All validators work via ami-agent
-- ✅ **AgentSession tracking** - Every task execution auditable in DataOps
-- ✅ **Process metrics** - Execution time, success rate, retry count tracked
-- ✅ **Worker pool efficiency** - 90%+ worker utilization during parallel execution
+- ✅ **Current Implementation Stable** - `/scripts/automation` continues to operate in production
+- ✅ **Future-Proof Design** - BPMN-native architecture enables visual workflow management
+- ✅ **Full Audit Trail** - AgentSession model provides complete execution tracking
+- ✅ **Enterprise Security** - Multi-tenancy and ACL via SecuredModelMixin
+- ✅ **Scalable Execution** - Base worker pools with hibernation and health checks
+- ✅ **Process Governance** - Version control and approval workflows for processes
+- ✅ **Monitoring & Metrics** - Execution time, success rate, and performance tracking
 
 ---
 
 ## END OF SPECIFICATION
 
-**Status:** Ready for Implementation
+**Status:** Enterprise Architecture Document (Current Implementation in /scripts/automation)
 **Owner:** Backend Team
-**Timeline:** 5 weeks (Phase 1-5)
-**Dependencies:** Base BPMN models (already exist), ami-agent CLI (already exists)
-**Risk:** Low (no breaking changes to existing systems)
+**Timeline:** Ongoing migration to enterprise architecture
+**Dependencies:** Base BPMN models (already exist), existing ami-agent CLI (already exists)
+**Risk:** Low (non-disruptive migration strategy)

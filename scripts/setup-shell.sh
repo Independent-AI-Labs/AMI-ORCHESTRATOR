@@ -227,6 +227,22 @@ ami-repo() {
 }
 
 # ============================================================================
+# 4.5. CLI AGENT WRAPPERS
+# ============================================================================
+
+claude() {
+    "$AMI_ROOT/.venv/bin/claude" "$@"
+}
+
+gemini() {
+    "$AMI_ROOT/.venv/bin/gemini" "$@"
+}
+
+qwen() {
+    "$AMI_ROOT/cli-agents/qwen-code/dist/cli.js" "$@"
+}
+
+# ============================================================================
 # 5. SERVICE MANAGEMENT (Root-only execution)
 # ============================================================================
 
@@ -506,6 +522,11 @@ echo -e "  ami-tests, ami-backend, ami-scripts, ami-docs"
 
 echo -e "\n${CYAN}🔵 Utilities:${NC}"
 echo -e "  ami-check-storage, ami-propagate-tests, ami-info"
+
+echo -e "\n${GREEN}🤖 CLI Agents:${NC}"
+echo -e "  claude          → Claude Code AI assistant"
+echo -e "  gemini          → Gemini CLI AI assistant"
+echo -e "  qwen            → Qwen Code AI assistant"
 
 echo -e "\n${BLUE}💡 Available pre-commit hook IDs for ami-codecheck:${NC}"
 echo -e "  ruff, ruff-format, mypy, validate-docs-links, check-yaml,"

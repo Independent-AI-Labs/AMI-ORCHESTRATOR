@@ -8,6 +8,7 @@ import asyncio
 import fnmatch
 import os
 import re
+import shutil
 import subprocess
 import time
 from datetime import datetime
@@ -146,7 +147,7 @@ class TaskExecutor:
             )
 
             # Display metadata
-            self._display_task_metadata(task_file.stem, result.attempts)
+            self._display_task_metadata(result.attempts)
 
         return results
 
@@ -209,7 +210,7 @@ class TaskExecutor:
                     )
 
                     # Display metadata
-                    self._display_task_metadata(result.task_file.stem, result.attempts)
+                    self._display_task_metadata(result.attempts)
                 except Exception as e:
                     self.logger.error(
                         "task_result_retrieval_error",
@@ -682,11 +683,10 @@ Validate if the task was completed correctly."""
         # No marker found
         return {"type": "none", "content": None}
 
-    def _display_task_metadata(self, task_name: str, attempts: list[TaskAttempt]) -> None:
+    def _display_task_metadata(self, attempts: list[TaskAttempt]) -> None:
         """Display aggregated metadata for a task.
 
         Args:
-            task_name: Name of the task
             attempts: List of task attempts with metadata
         """
         total_cost = 0.0
@@ -711,7 +711,13 @@ Validate if the task was completed correctly."""
 
         # Only display if we have any metadata
         if total_cost > 0 or total_turns > 0:
-            pass
+            self.logger.info(
+                "task_metadata",
+                total_cost=round(total_cost, 4),
+                total_duration_seconds=round(total_duration_ms / 1000, 2),
+                total_api_seconds=round(total_api_ms / 1000, 2),
+                total_turns=int(total_turns),
+            )
 
     def _parse_moderator_result(self, output: str) -> dict[str, Any]:
         """Parse moderator validation result.
@@ -782,8 +788,12 @@ Validate if the task was completed correctly."""
 
         if self.is_root:
             # Already running as root, no sudo needed
-            cmd = ["chattr", "+i", str(file_path)]
-            result = subprocess.run(cmd, check=False, capture_output=True, text=True)
+            chattr_exec = shutil.which("chattr")
+            if not chattr_exec:
+                raise RuntimeError("chattr command not found in PATH")
+            cmd = [chattr_exec, "+i", str(file_path)]
+            # S603: chattr_exec validated via shutil.which()
+            result = subprocess.run(cmd, check=False, capture_output=True, text=True)  # noqa: S603
             if result.returncode != 0:
                 # Check if filesystem doesn't support it
                 if "Operation not supported" in result.stderr:
@@ -792,8 +802,15 @@ Validate if the task was completed correctly."""
                 raise subprocess.CalledProcessError(result.returncode, cmd, result.stdout, result.stderr)
         else:
             # Not root, use sudo with password
-            cmd = ["sudo", "-S", "chattr", "+i", str(file_path)]
-            process = subprocess.Popen(
+            sudo_exec = shutil.which("sudo")
+            if not sudo_exec:
+                raise RuntimeError("sudo command not found in PATH")
+            chattr_exec = shutil.which("chattr")
+            if not chattr_exec:
+                raise RuntimeError("chattr command not found in PATH")
+            cmd = [sudo_exec, "-S", chattr_exec, "+i", str(file_path)]
+            # S603: sudo_exec and chattr_exec validated via shutil.which()
+            process = subprocess.Popen(  # noqa: S603
                 cmd,
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
@@ -822,8 +839,12 @@ Validate if the task was completed correctly."""
         """
         if self.is_root:
             # Already running as root, no sudo needed
-            cmd = ["chattr", "-i", str(file_path)]
-            result = subprocess.run(cmd, check=False, capture_output=True, text=True)
+            chattr_exec = shutil.which("chattr")
+            if not chattr_exec:
+                raise RuntimeError("chattr command not found in PATH")
+            cmd = [chattr_exec, "-i", str(file_path)]
+            # S603: chattr_exec validated via shutil.which()
+            result = subprocess.run(cmd, check=False, capture_output=True, text=True)  # noqa: S603
             if result.returncode != 0:
                 self.logger.error(
                     "file_unlock_error",
@@ -834,8 +855,15 @@ Validate if the task was completed correctly."""
                 raise subprocess.CalledProcessError(result.returncode, cmd, result.stdout, result.stderr)
         else:
             # Not root, use sudo with password
-            cmd = ["sudo", "-S", "chattr", "-i", str(file_path)]
-            process = subprocess.Popen(
+            sudo_exec = shutil.which("sudo")
+            if not sudo_exec:
+                raise RuntimeError("sudo command not found in PATH")
+            chattr_exec = shutil.which("chattr")
+            if not chattr_exec:
+                raise RuntimeError("chattr command not found in PATH")
+            cmd = [sudo_exec, "-S", chattr_exec, "-i", str(file_path)]
+            # S603: sudo_exec and chattr_exec validated via shutil.which()
+            process = subprocess.Popen(  # noqa: S603
                 cmd,
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,

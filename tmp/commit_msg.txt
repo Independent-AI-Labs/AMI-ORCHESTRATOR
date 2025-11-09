@@ -1,0 +1,45 @@
+fix: module detection regression breaking non-backend modules
+
+## Critical Bug Fixed
+find_module_root() in base/scripts/env/paths.py used incorrect module detection
+logic (backend/ directory), breaking ux and other non-backend modules. Changed to
+use actual module requirements per module_setup.py: pyproject.toml + tests/.
+
+## Problem
+Non-backend modules (ux, learning) could not be tested or pushed. When running
+git_push.sh ux, tests executed at orchestrator level instead of ux level, discovering
+516 tests from ALL modules and failing with import errors.
+
+Root cause: find_module_root() traversed from ux → orchestrator because ux lacks
+backend/ directory. pytest then used base/pytest.ini with testpaths=tests relative
+to /base/, discovering base/tests/ which includes all submodules.
+
+## Changes
+
+### scripts/git_push.sh
+Line 50: Standard monorepo pattern - parent repo dirty check ignores submodule
+state to allow independent submodule work. Without this, pushing orchestrator
+blocked when any submodule had WIP changes.
+
+Line 97: Fixed test discovery bug - pass explicit tests/ path to pytest for
+submodules (matching line 91 root behavior). Without this, pytest discovers from
+base/tests/ instead of module/tests/.
+
+### CLAUDE.md
+Line 26: Clarified module directory instruction distinguishes code development
+vs git operations. Previous ambiguity caused confusion about submodule commits.
+
+### Cleanup
+Deleted scripts/git_push.sh.backup (leftover from debugging)
+
+### Submodule Pointers
+- ux: Updated to 8155cf0 (now pushable after fix)
+- base: Has unstaged paths.py fix (must be committed separately)
+
+## Verification
+After fix, ux push succeeded: pytest collected 1 test from ux/tests/ (not 516 from
+all modules), tests passed, push completed.
+
+## Impact
+Unblocks all non-backend modules for testing and deployment. Fixes incorrect pytest
+discovery behavior affecting all submodule pushes.

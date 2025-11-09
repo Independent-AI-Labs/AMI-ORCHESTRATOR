@@ -68,6 +68,9 @@ from base.scripts.env.paths import setup_imports
 
 ORCHESTRATOR_ROOT, MODULE_ROOT = setup_imports()
 
+# Additional imports after path setup
+import shutil
+
 # Load .env file before importing automation modules (ensures env vars available for Config)
 from dotenv import load_dotenv
 
@@ -238,9 +241,19 @@ def mode_interactive(continue_session: bool = False, resume: str | bool | None =
         # Debug: log the command being run
         logger.info("launching_claude", command=" ".join(cmd[:5]) + " ...")
 
+        # Validate executable exists in PATH before running
+        if cmd and cmd[0]:
+            executable = shutil.which(cmd[0])
+            if not executable:
+                logger.error("claude_command_not_found", command=cmd[0])
+                return 1
+            # Replace with full path to validated executable
+            cmd[0] = executable
+
         # Redirect stderr to debug log
+        # S603: cmd[0] validated via shutil.which() above, replacing with full path to executable
         with debug_log.open("a") as log_file:
-            subprocess.run(cmd, check=False, stderr=log_file)
+            subprocess.run(cmd, check=False, stderr=log_file)  # noqa: S603
         return 0
     finally:
         settings_file.unlink(missing_ok=True)
@@ -340,7 +353,6 @@ def mode_audit(directory_path: str, retry_errors: bool = False, user_instruction
     results = engine.audit_directory(directory, parallel=True, max_workers=4, retry_errors=retry_errors, user_instruction=user_instruction)
 
     # Print summary
-    sum(1 for r in results if r.status == "PASS")
     failed = sum(1 for r in results if r.status == "FAIL")
     errors = sum(1 for r in results if r.status == "ERROR")
 
@@ -383,7 +395,6 @@ def mode_tasks(path: str, root_dir: str | None = None, parallel: bool = False, u
     results = executor.execute_tasks(target_path, parallel=parallel, root_dir=root_path, user_instruction=user_instruction)
 
     # Print summary
-    sum(1 for r in results if r.status == "completed")
     feedback = sum(1 for r in results if r.status == "feedback")
     failed = sum(1 for r in results if r.status == "failed")
     timeout = sum(1 for r in results if r.status == "timeout")

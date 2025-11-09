@@ -47,7 +47,7 @@ cd "$MODULE_ROOT"
 
 # Check for uncommitted or unstaged changes (unless --only-ready)
 if [ "$ONLY_READY" = false ]; then
-    if ! git diff-index --quiet HEAD --; then
+    if ! git diff-index --quiet --ignore-submodules HEAD --; then
         echo "✗ BLOCKED: Uncommitted or unstaged changes detected"
         echo ""
         echo "Working tree must be clean before push."
@@ -85,7 +85,7 @@ fi
 
 # Run centralized test runner
 # For root: explicitly test only tests/ directory to avoid submodule tests
-# For submodules: discover all tests in module
+# For submodules: explicitly test only tests/ directory in module
 if [ "$MODULE_NAME" = "root" ]; then
     # Pass "tests/" as explicit pytest argument to only test root's tests/
     if ! "$ORCHESTRATOR_ROOT/scripts/ami-run.sh" "$ORCHESTRATOR_ROOT/base/scripts/run_tests.py" "$MODULE_ROOT" -- tests/; then
@@ -93,8 +93,8 @@ if [ "$MODULE_NAME" = "root" ]; then
         exit 1
     fi
 else
-    # Submodules: discover all tests
-    if ! "$ORCHESTRATOR_ROOT/scripts/ami-run.sh" "$ORCHESTRATOR_ROOT/base/scripts/run_tests.py" "$MODULE_ROOT"; then
+    # Submodules: pass "tests/" to discover only from module's tests/ directory
+    if ! "$ORCHESTRATOR_ROOT/scripts/ami-run.sh" "$ORCHESTRATOR_ROOT/base/scripts/run_tests.py" "$MODULE_ROOT" -- tests/; then
         echo "✗ Tests failed - push aborted"
         exit 1
     fi

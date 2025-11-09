@@ -19,6 +19,7 @@ Usage:
 """
 
 import argparse
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -248,9 +249,14 @@ def get_staged_python_files(scan_dir: Path) -> list[Path]:
     Returns:
         List of staged Python file paths
     """
+    git_cmd = shutil.which("git")
+    if not git_cmd:
+        logger.error("git command not found in PATH")
+        return []
+
     try:
-        result = subprocess.run(
-            ["git", "diff", "--cached", "--name-only", "--diff-filter=ACM"],
+        result = subprocess.run(  # noqa: S603
+            [git_cmd, "diff", "--cached", "--name-only", "--diff-filter=ACM"],
             cwd=scan_dir,
             capture_output=True,
             text=True,
@@ -261,6 +267,86 @@ def get_staged_python_files(scan_dir: Path) -> list[Path]:
     except subprocess.CalledProcessError:
         logger.warning("Failed to get staged files (not a git repo?)")
         return []
+
+
+def _check_files_for_issues(
+    python_files: list[Path],
+    target_dir: Path,
+    verbose: bool,
+) -> tuple[list[tuple[Path, str]], int, int]:
+    """Check Python files for shebang issues.
+
+    Args:
+        python_files: List of Python files to check
+        target_dir: Base directory for relative paths
+        verbose: Show verbose output
+
+    Returns:
+        Tuple of (issues list, checked count, skipped count)
+    """
+    issues: list[tuple[Path, str]] = []
+    checked = 0
+    skipped = 0
+
+    for py_file in python_files:
+        if should_skip_file(py_file):
+            skipped += 1
+            continue
+
+        checked += 1
+        is_correct, issue = check_shebang(py_file, verbose=verbose)
+
+        if not is_correct:
+            issues.append((py_file, issue))
+        elif verbose and issue:
+            logger.debug(f"✓ {py_file.relative_to(target_dir)}: {issue}")
+
+    return issues, checked, skipped
+
+
+def _display_issues(issues: list[tuple[Path, str]], target_dir: Path) -> None:
+    """Display shebang issues found during audit.
+
+    Args:
+        issues: List of (file_path, issue_description) tuples
+        target_dir: Base directory for relative paths
+    """
+    logger.warning("Files with incorrect shebangs:")
+    logger.warning("")
+    for file_path, issue in issues:
+        try:
+            rel_path = file_path.relative_to(target_dir)
+        except ValueError:
+            rel_path = file_path
+        logger.warning(f"  {rel_path}")
+        logger.warning(f"    Issue: {issue}")
+        logger.warning("")
+
+
+def _fix_issues(issues: list[tuple[Path, str]]) -> int:
+    """Attempt to fix shebang issues.
+
+    Args:
+        issues: List of (file_path, issue_description) tuples
+
+    Returns:
+        Number of files successfully fixed
+    """
+    logger.info("=" * 60)
+    logger.info("Fixing shebangs...")
+    logger.info("=" * 60)
+    fixed = 0
+    for file_path, _ in issues:
+        if fix_shebang(file_path):
+            fixed += 1
+
+    logger.info("")
+    logger.info(f"✓ Fixed {fixed}/{len(issues)} files")
+
+    if fixed < len(issues):
+        logger.warning(f"⚠ {len(issues) - fixed} files could not be fixed")
+
+    return fixed
 
 
 def audit_repository(
@@ -290,10 +376,6 @@ def audit_repository(
         logger.info("Mode: Git staged files only")
     logger.info("")
 
-    issues: list[tuple[Path, str]] = []
-    checked = 0
-    skipped = 0
-
     # Get files to check
     if staged_only:
         python_files = get_staged_python_files(target_dir)
@@ -303,19 +385,8 @@ def audit_repository(
     else:
         python_files = list(target_dir.rglob("*.py"))
 
-    # Check each file
-    for py_file in python_files:
-        if should_skip_file(py_file):
-            skipped += 1
-            continue
-
-        checked += 1
-        is_correct, issue = check_shebang(py_file, verbose=verbose)
-
-        if not is_correct:
-            issues.append((py_file, issue))
-        elif verbose and issue:
-            logger.debug(f"✓ {py_file.relative_to(target_dir)}: {issue}")
+    # Check files for issues
+    issues, checked, skipped = _check_files_for_issues(python_files, target_dir, verbose)
 
     # Report findings
     logger.info("")
@@ -332,32 +403,11 @@ def audit_repository(
         return 0
 
     # Display issues
-    logger.warning("Files with incorrect shebangs:")
-    logger.warning("")
-    for file_path, issue in issues:
-        try:
-            rel_path = file_path.relative_to(target_dir)
-        except ValueError:
-            rel_path = file_path
-        logger.warning(f"  {rel_path}")
-        logger.warning(f"    Issue: {issue}")
-        logger.warning("")
+    _display_issues(issues, target_dir)
 
     # Fix if requested
     if fix:
-        logger.info("=" * 60)
-        logger.info("Fixing shebangs...")
-        logger.info("=" * 60)
-        fixed = 0
-        for file_path, _ in issues:
-            if fix_shebang(file_path):
-                fixed += 1
-
-        logger.info("")
-        logger.info(f"✓ Fixed {fixed}/{len(issues)} files")
-
-        if fixed < len(issues):
-            logger.warning(f"⚠ {len(issues) - fixed} files could not be fixed")
+        _fix_issues(issues)
 
     return len(issues)
 

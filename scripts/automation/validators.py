@@ -154,6 +154,175 @@ def check_pattern_exemption(file_path: str, pattern_config: dict[str, Any]) -> b
     return False
 
 
+def _check_file_content_violation(
+    file_path: str,
+    new_content: str,
+    pattern_config: dict[str, Any],
+) -> tuple[bool, str]:
+    """Check file content pattern violations (e.g., non-empty __init__.py).
+
+    Args:
+        file_path: Path to file being checked
+        new_content: New content
+        pattern_config: Pattern configuration dictionary
+
+    Returns:
+        Tuple of (is_violation, error_message). If no violation, error_message is empty.
+    """
+    file_match = pattern_config.get("file_match", "")
+    condition = pattern_config.get("condition")
+
+    # Check if file matches pattern
+    regex_pattern = file_match.replace("**", ".*").replace("*", "[^/]*")
+    if not re.search(regex_pattern, file_path):
+        return False, ""
+
+    # Check condition
+    if condition == "not_empty" and new_content.strip():
+        error_msg = pattern_config.get("error_template", "Pattern violation detected")
+        return True, error_msg
+
+    return False, ""
+
+
+def _check_additions_violation(
+    pattern_str: str,
+    old_content: str,
+    new_content: str,
+    is_regex: bool,
+    file_path: str,
+    pattern_config: dict[str, Any],
+) -> tuple[bool, str]:
+    """Check for addition violations when allow_removal is True.
+
+    Args:
+        pattern_str: Pattern to check
+        old_content: Previous content
+        new_content: New content
+        is_regex: Whether pattern is a regex
+        file_path: Path to file being checked
+        pattern_config: Pattern configuration dictionary
+
+    Returns:
+        Tuple of (is_violation, error_message)
+    """
+    # Only block ADDITIONS - compare old vs new count
+    old_count = count_pattern_occurrences(old_content, pattern_str, is_regex)
+    new_count = count_pattern_occurrences(new_content, pattern_str, is_regex)
+
+    if new_count <= old_count:
+        return False, ""  # No addition detected
+
+    # Addition detected - check exemptions
+    if check_pattern_exemption(file_path, pattern_config):
+        # File is in exemption path, check if pattern is allowed
+        return _check_exemptions_for_pattern(pattern_str, new_content, pattern_config)
+
+    # Not in exemption path, it's a violation
+    error_msg = pattern_config.get("error_template", "Pattern violation detected")
+    return True, error_msg
+
+
+def _check_exemptions_for_pattern(
+    pattern_str: str,
+    new_content: str,
+    pattern_config: dict[str, Any],
+) -> tuple[bool, str]:
+    """Check if a pattern is exempted based on the pattern config.
+
+    Args:
+        pattern_str: Pattern to check
+        new_content: New content
+        pattern_config: Pattern configuration dictionary
+
+    Returns:
+        Tuple of (is_violation, error_message)
+    """
+    exemptions = pattern_config.get("exemptions", [])
+    for exemption in exemptions:
+        allowed_patterns = exemption.get("allowed_patterns", [])
+        allowed_regex = exemption.get("allowed_pattern_regex")
+
+        # Check if the specific pattern is allowed
+        if pattern_str in allowed_patterns:
+            return False, ""  # This pattern is allowed
+
+        # Check regex exemption
+        if allowed_regex and re.search(allowed_regex, new_content):
+            return False, ""  # Matches allowed regex
+
+    # No exemption matched, it's a violation
+    error_msg = pattern_config.get("error_template", "Pattern violation detected")
+    return True, error_msg
+
+
+def _check_presence_violation(
+    pattern_str: str,
+    new_content: str,
+    is_regex: bool,
+    pattern_config: dict[str, Any],
+) -> tuple[bool, str]:
+    """Check for presence violations when allow_removal is False.
+
+    Args:
+        pattern_str: Pattern to check
+        new_content: New content
+        is_regex: Whether pattern is a regex
+        pattern_config: Pattern configuration dictionary
+
+    Returns:
+        Tuple of (is_violation, error_message)
+    """
+    if is_regex:
+        if re.search(pattern_str, new_content):
+            error_msg = pattern_config.get("error_template", "Pattern violation detected")
+            return True, error_msg
+    elif pattern_str in new_content:
+        error_msg = pattern_config.get("error_template", "Pattern violation detected")
+        return True, error_msg
+
+    return False, ""  # No violation
+
+
+def _check_content_pattern_violation(
+    file_path: str,
+    old_content: str,
+    new_content: str,
+    pattern_config: dict[str, Any],
+) -> tuple[bool, str]:
+    """Check content pattern violations (e.g., .parent.parent, suppressions).
+
+    Args:
+        file_path: Path to file being checked
+        old_content: Previous content
+        new_content: New content
+        pattern_config: Pattern configuration dictionary
+
+    Returns:
+        Tuple of (is_violation, error_message). If no violation, error_message is empty.
+    """
+    patterns = pattern_config.get("patterns", [pattern_config.get("pattern")])
+    allow_removal = pattern_config.get("allow_removal", False)
+    is_regex = pattern_config.get("is_regex", False)
+
+    # Check for violations
+    for pattern_str in patterns:
+        if pattern_str is None:
+            continue
+
+        if allow_removal:
+            violation_detected, error_msg = _check_additions_violation(pattern_str, old_content, new_content, is_regex, file_path, pattern_config)
+            if violation_detected:
+                return True, error_msg
+        else:
+            # Block if present in new content (regardless of old content)
+            violation_detected, error_msg = _check_presence_violation(pattern_str, new_content, is_regex, pattern_config)
+            if violation_detected:
+                return True, error_msg
+
+    return False, ""
+
+
 def check_pattern_violation(
     file_path: str,
     old_content: str,
@@ -173,73 +342,10 @@ def check_pattern_violation(
     """
     check_type = pattern_config.get("check_type")
 
-    # File content check (e.g., non-empty __init__.py)
     if check_type == "file_content":
-        file_match = pattern_config.get("file_match", "")
-        condition = pattern_config.get("condition")
-
-        # Check if file matches pattern
-        regex_pattern = file_match.replace("**", ".*").replace("*", "[^/]*")
-        if not re.search(regex_pattern, file_path):
-            return False, ""
-
-        # Check condition
-        if condition == "not_empty" and new_content.strip():
-            error_msg = pattern_config.get("error_template", "Pattern violation detected")
-            return True, error_msg
-
-        return False, ""
-
-    # Content pattern check (e.g., .parent.parent, suppressions)
+        return _check_file_content_violation(file_path, new_content, pattern_config)
     if check_type == "content_pattern":
-        patterns = pattern_config.get("patterns", [pattern_config.get("pattern")])
-        allow_removal = pattern_config.get("allow_removal", False)
-        is_regex = pattern_config.get("is_regex", False)
-
-        # Check for violations
-        for pattern_str in patterns:
-            if pattern_str is None:
-                continue
-
-            if allow_removal:
-                # Only block ADDITIONS - compare old vs new count
-                old_count = count_pattern_occurrences(old_content, pattern_str, is_regex)
-                new_count = count_pattern_occurrences(new_content, pattern_str, is_regex)
-
-                if new_count > old_count:
-                    # Addition detected - check exemptions
-                    if check_pattern_exemption(file_path, pattern_config):
-                        # File is in exemption path, check if pattern is allowed
-                        exemptions = pattern_config.get("exemptions", [])
-                        for exemption in exemptions:
-                            allowed_patterns = exemption.get("allowed_patterns", [])
-                            allowed_regex = exemption.get("allowed_pattern_regex")
-
-                            # Check if the specific pattern is allowed
-                            if pattern_str in allowed_patterns:
-                                continue  # This pattern is allowed
-
-                            # Check regex exemption
-                            if allowed_regex and re.search(allowed_regex, new_content):
-                                continue  # Matches allowed regex
-
-                        # No exemption matched, it's a violation
-                        error_msg = pattern_config.get("error_template", "Pattern violation detected")
-                        return True, error_msg
-                    # Not in exemption path, it's a violation
-                    error_msg = pattern_config.get("error_template", "Pattern violation detected")
-                    return True, error_msg
-            # Block if present in new content (regardless of old content)
-            elif is_regex:
-                if re.search(pattern_str, new_content):
-                    error_msg = pattern_config.get("error_template", "Pattern violation detected")
-                    return True, error_msg
-            elif pattern_str in new_content:
-                error_msg = pattern_config.get("error_template", "Pattern violation detected")
-                return True, error_msg
-
-        return False, ""
-
+        return _check_content_pattern_violation(file_path, old_content, new_content, pattern_config)
     # Unknown check type
     return False, ""
 
@@ -393,26 +499,8 @@ def validate_diff_llm(
         # Check result - parse output for ALLOW/BLOCK
         cleaned_output = parse_code_fence_output(output)
 
-        # Strip preamble before decision marker
-        # Find first occurrence of ALLOW or BLOCK: and take text from there
-        allow_match = re.search(r"\bALLOW\b", cleaned_output, re.IGNORECASE)
-        block_match = re.search(r"\bBLOCK:\s*", cleaned_output, re.IGNORECASE)
-
-        if allow_match and (not block_match or allow_match.start() < block_match.start()):
-            # ALLOW appears before BLOCK (or no BLOCK)
-            return True, "Quality check passed"
-
-        if block_match:
-            # Extract reason after BLOCK:
-            reason_start = block_match.end()
-            reason = cleaned_output[reason_start:].strip()
-            if not reason:
-                reason = "Code quality regression detected"
-            return False, f"CODE QUALITY CHECK FAILED\n\n{reason}\n\nZero-tolerance policy: NO regression allowed."
-
-        # No decision marker found
-        reason = output if output else "Code quality regression detected"
-        return False, f"CODE QUALITY CHECK FAILED\n\n{reason}\n\nZero-tolerance policy: NO regression allowed."
+        # Parse the decision from the output
+        return _parse_audit_decision(cleaned_output, output)
 
     except (AgentTimeoutError, AgentExecutionError) as e:
         # FAIL-CLOSED: On timeout or execution errors, BLOCK the edit
@@ -439,6 +527,38 @@ def validate_diff_llm(
         # Clean up temporary prompt file
         with contextlib.suppress(Exception):
             tmp_prompt_path.unlink()
+
+
+def _parse_audit_decision(cleaned_output: str, original_output: str) -> tuple[bool, str]:
+    """Parse the decision from audit output.
+
+    Args:
+        cleaned_output: Cleaned output from LLM
+        original_output: Original output in case no decision marker is found
+
+    Returns:
+        Tuple of (is_valid, feedback_message)
+    """
+    # Strip preamble before decision marker
+    # Find first occurrence of ALLOW or BLOCK: and take text from there
+    allow_match = re.search(r"\bALLOW\b", cleaned_output, re.IGNORECASE)
+    block_match = re.search(r"\bBLOCK:\s*", cleaned_output, re.IGNORECASE)
+
+    if allow_match and (not block_match or allow_match.start() < block_match.start()):
+        # ALLOW appears before BLOCK (or no BLOCK)
+        return True, "Quality check passed"
+
+    if block_match:
+        # Extract reason after BLOCK:
+        reason_start = block_match.end()
+        reason = cleaned_output[reason_start:].strip()
+        if not reason:
+            reason = "Code quality regression detected"
+        return False, f"CODE QUALITY CHECK FAILED\n\n{reason}\n\nZero-tolerance policy: NO regression allowed."
+
+    # No decision marker found
+    reason = original_output if original_output else "Code quality regression detected"
+    return False, f"CODE QUALITY CHECK FAILED\n\n{reason}\n\nZero-tolerance policy: NO regression allowed."
 
 
 def validate_python_diff_llm(

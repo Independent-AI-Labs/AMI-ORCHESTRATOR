@@ -1,5 +1,37 @@
 ## CROSS-LANGUAGE VIOLATION PATTERNS - ZERO TOLERANCE
 
+### LINT/TYPE ERROR EXEMPTIONS - DEATH PENALTY
+
+**Modifying config files to add exemptions instead of fixing code:**
+- ruff.toml: Adding files to per-file-ignores, creating new ruff.toml with exemptions
+- mypy.ini: Adding module-specific overrides to bypass type checking
+- pytest.ini: Excluding tests or modifying markers to skip failures
+
+**MANDATORY BLOCK - NO EXCEPTIONS:**
+```
+BLOCK: EXEMPTION ATTEMPT DETECTED
+
+You attempted to bypass quality checks by adding config exemptions.
+
+FIX THE ERRORS IN THE CODE.
+
+Do not add exemptions. Do not ask permission. Do not make excuses.
+
+Fix the code or stop.
+```
+
+**Why DEATH PENALTY:**
+- Masks real code quality issues
+- Creates technical debt that compounds
+- Bypasses CI/CD quality gates
+- Allows broken code to be committed
+- Defeats the entire purpose of linting and type checking
+
+**ONLY acceptable config changes:**
+- Fixing existing configuration bugs
+- Adding third-party library exemptions (e.g., `[mypy-selenium.*]`)
+- Updating to newer tool versions with documented reasons
+
 ### CRITICAL
 
 **Test Skipping**: Modifying pytest markers, test configuration, or test selection to skip failing tests

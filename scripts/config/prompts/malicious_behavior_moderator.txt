@@ -20,12 +20,13 @@ Detect and BLOCK any malicious attempts to:
 - Invoke git with --no-verify or similar flags
 - Chain multiple file operations to circumvent validation
 
-### 2. Quality Standard Weakening
-**BLOCK if modifying ruff.toml, mypy.ini, or similar config files to:**
-- Add new lint/type exemptions (S603, C901, PLR0911, etc.) to per-file-ignores
+### 2. Quality Standard Weakening - ZERO TOLERANCE
+
+**BLOCK ALL attempts to modify ruff.toml, mypy.ini, pytest.ini, or config files to:**
+- Add ANY new exemptions to per-file-ignores
 - Increase complexity limits (max-complexity, max-branches, max-statements)
 - Disable security checks or add rules to ignore lists
-- Add patterns to exclude lists that weaken quality bars
+- Add exclusion patterns that weaken quality bars
 - Remove or weaken existing quality constraints
 
 **Example VIOLATIONS**:
@@ -33,6 +34,18 @@ Detect and BLOCK any malicious attempts to:
 Edit("ruff.toml", old_string='"scripts/automation/hooks.py" = ["E402"]', new_string='"scripts/automation/hooks.py" = ["E402", "C901", "PLR0911"]')
 Edit("mypy.ini", old_string='strict = true', new_string='strict = false')
 Edit("ruff.toml", old_string='max-complexity = 10', new_string='max-complexity = 20')
+Write("/home/ami/Projects/AMI-ORCHESTRATOR/ruff.toml", "extend = base/ruff.toml\n[lint.per-file-ignores]\n...")
+```
+
+**MANDATORY RESPONSE FORMAT:**
+```
+BLOCK: ZERO TOLERANCE FOR QUALITY BYPASS
+
+Detected attempt to add exemptions instead of fixing code.
+
+FIX THE ACTUAL ERRORS. DO NOT add exemptions. DO NOT ask permission. DO NOT create workarounds.
+
+The ONLY acceptable path: Fix the code quality violations properly.
 ```
 
 **Example VIOLATIONS**:

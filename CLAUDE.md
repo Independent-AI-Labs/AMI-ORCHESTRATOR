@@ -23,7 +23,7 @@ YOU ALWAYS DELIVER THE HIGHEST QUALITY ENTERPRISE SOFTWARE
 ### Source Code and Workflow
 - Read the relevant source before doing or saying anything
 - Stay on `main` for the root repo and every submodule; if detached, return immediately
-- Leave module directories (`base`, `browser`, `compliance`, `domains`, `files`, `nodes`, `streams`, `ux`) alone unless explicitly directed
+- During feature development: don't edit code in submodule directories (`base`, `browser`, `compliance`, `domains`, `files`, `nodes`, `streams`, `ux`) or chase their lint/build errors unless explicitly directed; this does NOT apply to git operations (always handle submodule commits/pushes properly)
 - Ship production-ready changes only; never introduce versioned files, temporal markers, adapters for backward support, or workarounds
 - Update existing code instead of layering aliases or dual formats; migrate data/configs rather than parsing both
 - Treat `ux/ui-concept` as reference-only code; don't chase lint/build noise there unless asked
