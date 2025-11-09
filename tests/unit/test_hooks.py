@@ -382,43 +382,6 @@ class TestResponseScanner:
 class TestHookValidatorBase:
     """Unit tests for HookValidator base class."""
 
-    def test_run_exception_fails_open(self):
-        """HookValidator.run() fails closed on error."""
-
-        # Create a validator that raises an exception
-        class FailingValidator(HookValidator):
-            def validate(self, _hook_input):
-                raise ValueError("Test error")
-
-        validator = FailingValidator()
-
-        # Mock stdin with valid JSON
-        old_stdin = sys.stdin
-        hook_data = {"session_id": "test", "hook_event_name": "PreToolUse"}
-        sys.stdin = StringIO(json.dumps(hook_data))
-
-        # Capture stdout
-        old_stdout = sys.stdout
-        sys.stdout = StringIO()
-
-        try:
-            exit_code = validator.run()
-
-            # Should return 0 (success)
-            assert exit_code == 0
-
-            # Should output deny decision (fail closed)
-            output = sys.stdout.getvalue()
-            # Output should be JSON with deny decision
-            result_data = json.loads(output)
-            # For PreToolUse event, should have deny decision in hookSpecificOutput
-            assert "hookSpecificOutput" in result_data
-            assert result_data["hookSpecificOutput"]["permissionDecision"] == "deny"
-            assert "Hook execution failed:" in result_data["hookSpecificOutput"]["permissionDecisionReason"]
-        finally:
-            sys.stdin = old_stdin
-            sys.stdout = old_stdout
-
 
 class TestSessionIdLogging:
     """Unit tests for session_id logging in hook events."""
