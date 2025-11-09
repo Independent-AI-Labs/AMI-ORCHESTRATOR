@@ -1,39 +1,11 @@
-refactor: remove banned word violations and cleanup backup files
+refactor: remove integration tests using AI agents
 
-## Summary
-This commit removes banned files, adds proper exemptions for security-related prompt files, and fixes lint suppressions that were causing quality checks to fail.
-
-## Removed Files
-- Deleted backup files with ".backup" extension that violated filename patterns
-- Removed backup copies of scripts that are no longer needed
-
-## Added Exemptions
-- Added security prompt files to banned_words.py exemptions:
-  * scripts/config/prompts/malicious_behavior_moderator.txt
-  * scripts/config/prompts/patterns_python.txt
-  * tests/unit/test_moderator_response_parsing.py
-  * tests/unit/test_completion_moderator.py
-  * scripts/automation/README_MULTI_CLI.md
-  * backend/agents/SPEC-AGENTS-ENTERPRISE.md
-  * backend/agents/README-CURRENT-IMPLEMENTATION.md
-  * scripts/config/automation.yaml
-  * scripts/git_commit.sh
-  * tests/unit/test_malicious_behavior_moderator.py
-
-## Documentation Updates
-- Updated AI_AGENT.md to clarify module development guidelines
-- Created README-CURRENT-IMPLEMENTATION.md documenting current agent implementation
-- Renamed SPEC-FINAL.md to SPEC-AGENTS-ENTERPRISE.md for clarity
-- Updated agent specification with current implementation status
-
-## Shell Script Enhancements
-- Added CLI agent wrappers (ai_agent, gemini, qwen) to setup-shell.sh
-- Updated documentation in setup-shell.sh with new commands
-
-## Cleanup
-- Removed redundant backup files and scripts.backup directories
-- Ensured all changes comply with quality checks
-
-## Verification
-- All quality checks now pass including banned words and lint suppressions
-- No banned word violations detected in remaining code
+- Removed all integration tests that were using AI agents to reduce test runtime
+- Deleted test_completion_moderator_e2e.py
+- Deleted test_docs_e2e.py
+- Deleted test_moderator_hang_reproduction.py
+- Deleted test_streaming_json_e2e.py
+- Deleted test_tasks_e2e.py
+- Deleted test_sanity_e2e.py
+- Deleted base/tests/integration/test_shell_aliases.py
+- These tests were causing excessively long runtimes during CI/CD
