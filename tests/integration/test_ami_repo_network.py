@@ -65,7 +65,7 @@ def disable_file_locking(monkeypatch):
 
 
 @pytest.fixture
-def real_git_server(_tmp_path):
+def real_git_server():
     """Create git server in REAL user home for SSH access.
 
     Returns:
