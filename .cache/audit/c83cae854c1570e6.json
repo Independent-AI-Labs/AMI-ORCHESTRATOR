@@ -1,1 +1,0 @@
-{"file_path": "base/scripts/lib/cli.py", "status": "ERROR", "violations": [{"line": 0, "pattern_id": "audit_format_violation", "severity": "ERROR", "message": "Audit agent violated output format. Expected 'PASS' or 'FAIL: <reasons>', got: I need to analyze this code against the 72 violation patterns systematically."}], "execution_time": 31.108888149261475}

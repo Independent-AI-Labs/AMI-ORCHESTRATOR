@@ -1,1 +1,0 @@
-{"file_path": "base/backend/dataops/models/ip_config.py", "status": "FAIL", "violations": [{"line": 0, "pattern_id": "llm_audit", "severity": "CRITICAL", "message": "FAIL: Line 10: Plain Sensitive Data - password field uses str instead of SecretStr"}], "execution_time": 13.181144714355469}

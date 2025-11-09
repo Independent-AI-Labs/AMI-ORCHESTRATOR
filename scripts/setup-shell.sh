@@ -365,6 +365,28 @@ ami-propagate-tests() {
     ami-run base/scripts/propagate_test_runner.py
 }
 
+ami-gcloud() {
+    # ami-gcloud [gcloud-args]
+    # Uses local .gcloud installation if available, otherwise system gcloud
+    local gcloud_path
+    
+    # Check for local installation first
+    if [[ -f "$AMI_ROOT/.gcloud/google-cloud-sdk/bin/gcloud" ]]; then
+        gcloud_path="$AMI_ROOT/.gcloud/google-cloud-sdk/bin/gcloud"
+    else
+        # Fall back to system gcloud
+        gcloud_path=$(which gcloud 2>/dev/null || echo "")
+        if [[ -z "$gcloud_path" ]]; then
+            echo -e "${RED}Error: gcloud not found${NC}"
+            echo -e "Install with: ami-run scripts/install_gcloud.sh"
+            return 1
+        fi
+    fi
+    
+    echo -e "${BLUE}Running gcloud via:${NC} $gcloud_path"
+    "$gcloud_path" "$@"
+}
+
 # ============================================================================
 # 9. NAVIGATION ALIASES
 # ============================================================================
@@ -521,7 +543,7 @@ echo -e "  ami-files, ami-nodes, ami-streams, ami-ux"
 echo -e "  ami-tests, ami-backend, ami-scripts, ami-docs"
 
 echo -e "\n${CYAN}🔵 Utilities:${NC}"
-echo -e "  ami-check-storage, ami-propagate-tests, ami-info"
+echo -e "  ami-check-storage, ami-propagate-tests, ami-gcloud, ami-info"
 
 echo -e "\n${GREEN}🤖 CLI Agents:${NC}"
 echo -e "  claude          → Claude Code AI assistant"

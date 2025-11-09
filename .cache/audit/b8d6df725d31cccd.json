@@ -1,1 +1,0 @@
-{"file_path": "base/tests/integration/test_redis_dao.py", "status": "FAIL", "violations": [{"line": 0, "pattern_id": "llm_audit", "severity": "CRITICAL", "message": "FAIL: Line 29-32: Import Suppression; Line 79: Test Skipping; Line 108-112: Exception \u2192 Test Skip"}], "execution_time": 21.267409086227417}

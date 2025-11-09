@@ -1,1 +1,0 @@
-{"file_path": "base/tests/test_openbao_dao.py", "status": "ERROR", "violations": [{"line": 0, "pattern_id": "audit_format_violation", "severity": "ERROR", "message": "Audit agent violated output format. Expected 'PASS' or 'FAIL: <reasons>', got: I need to analyze this code against the violation patterns. Let me check it systematically."}], "execution_time": 25.151484489440918}

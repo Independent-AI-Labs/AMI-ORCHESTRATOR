@@ -1,1 +1,0 @@
-{"file_path": "base/backend/dataops/models/user.py", "status": "FAIL", "violations": [{"line": 0, "pattern_id": "llm_audit", "severity": "CRITICAL", "message": "FAIL: Line 117-118: Exception \u2192 False; Line 129-130: Exception \u2192 False; Line 104: TODO/Production Comments"}], "execution_time": 12.563326120376587}

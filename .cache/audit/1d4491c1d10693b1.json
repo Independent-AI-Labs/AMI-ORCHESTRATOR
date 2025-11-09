@@ -1,1 +1,0 @@
-{"file_path": "base/backend/dataops/implementations/mem/redis_create.py", "status": "FAIL", "violations": [{"line": 0, "pattern_id": "llm_audit", "severity": "CRITICAL", "message": "FAIL: Missing Type Hints: Functions `_store_data_and_metadata`, `_create_indexes`, and `create` use `dao: Any` parameter without inline comment justification"}], "execution_time": 22.44210147857666}

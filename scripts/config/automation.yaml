@@ -107,7 +107,7 @@ audit:
   workers: 4
   cache:
     enabled: true
-    storage: ".cache/audit"
+    storage: "logs/audit-cache"
     ttl: 3600
 
   scanning:

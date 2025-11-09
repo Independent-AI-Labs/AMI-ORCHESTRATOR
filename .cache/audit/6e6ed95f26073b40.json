@@ -1,1 +1,0 @@
-{"file_path": "base/backend/dataops/implementations/sql/postgresql_create.py", "status": "FAIL", "violations": [{"line": 0, "pattern_id": "llm_audit", "severity": "CRITICAL", "message": "FAIL: Line 114, 155, 168, 199, 224, 254: Missing Type Hints - dao: Any parameter without inline justification comment"}], "execution_time": 18.521170616149902}

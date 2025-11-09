@@ -152,10 +152,10 @@ if [ "$RUN_AUTOFIXES" = true ]; then
     fi
 
     echo "Running ruff format on $AUTOFIX_TARGETS..."
-    "$RUFF_BIN" format --no-cache --config "$RUFF_CONFIG" $AUTOFIX_TARGETS || true
+    "$RUFF_BIN" format --no-cache --config "$RUFF_CONFIG" --exclude ".gcloud" $AUTOFIX_TARGETS || true
 
     echo "Running ruff check --fix --unsafe-fixes on $AUTOFIX_TARGETS..."
-    "$RUFF_BIN" check --no-cache --config "$RUFF_CONFIG" --fix --unsafe-fixes $AUTOFIX_TARGETS || true
+    "$RUFF_BIN" check --no-cache --config "$RUFF_CONFIG" --fix --unsafe-fixes --exclude ".gcloud" $AUTOFIX_TARGETS || true
 
     echo "✓ Auto-fixes complete"
 
@@ -222,7 +222,7 @@ echo "========================================"
 # 1. Format check
 echo ""
 echo "Running format check..."
-if ! "$RUFF_BIN" format --no-cache --check --config "$RUFF_CONFIG" $CHECK_TARGETS; then
+if ! "$RUFF_BIN" format --no-cache --check --config "$RUFF_CONFIG" --exclude ".gcloud" $CHECK_TARGETS; then
     echo "✗ Format check failed - files need formatting"
     echo "Run with --fix flag to auto-format"
     exit 1
@@ -232,7 +232,7 @@ echo "✓ Format check passed"
 # 2. Lint check
 echo ""
 echo "Running lint check..."
-if ! "$RUFF_BIN" check --no-cache --config "$RUFF_CONFIG" $CHECK_TARGETS; then
+if ! "$RUFF_BIN" check --no-cache --config "$RUFF_CONFIG" --exclude ".gcloud" $CHECK_TARGETS; then
     echo "✗ Lint check failed - violations detected"
     echo "Run with --fix flag to auto-fix"
     exit 1

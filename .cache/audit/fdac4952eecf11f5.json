@@ -1,1 +1,0 @@
-{"file_path": "base/tests/integration/test_prometheus_dao.py", "status": "FAIL", "violations": [{"line": 0, "pattern_id": "llm_audit", "severity": "CRITICAL", "message": "FAIL: Line 44: Import Suppression (ImportError \u2192 pass); Line 89: Warning + Continue (unhealthy service \u2192 continue tests)"}], "execution_time": 11.83216667175293}

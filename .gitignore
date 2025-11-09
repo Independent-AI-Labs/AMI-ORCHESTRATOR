@@ -77,6 +77,7 @@ config.test.yaml
 htmlcov/
 .pytest_cache/
 package-lock.json
+.cache/
 
 # Metadata artifacts (managed via metadata system)
 progress-*.md

@@ -1,1 +1,0 @@
-{"file_path": "base/tests/integration/gdpr/test_gdpr_utils.py", "status": "ERROR", "violations": [{"line": 0, "pattern_id": "audit_format_violation", "severity": "ERROR", "message": "Audit agent violated output format. Expected 'PASS' or 'FAIL: <reasons>', got: I'll analyze this test file systematically against all violation patterns.PASS"}], "execution_time": 23.88497304916382}

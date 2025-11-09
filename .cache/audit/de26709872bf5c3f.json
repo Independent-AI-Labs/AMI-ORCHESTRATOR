@@ -1,1 +1,0 @@
-{"file_path": "base/backend/opsec/oauth/browser/callback_server.py", "status": "FAIL", "violations": [{"line": 0, "pattern_id": "llm_audit", "severity": "CRITICAL", "message": "FAIL: Line 179-182: Missing Exception Handling - socket operations without try/except"}], "execution_time": 15.507066011428833}

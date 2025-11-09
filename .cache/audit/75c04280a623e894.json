@@ -1,1 +1,0 @@
-{"file_path": "base/backend/dataops/core/factory.py", "status": "FAIL", "violations": [{"line": 0, "pattern_id": "llm_audit", "severity": "CRITICAL", "message": "FAIL: Line 16: Missing Type Hints - Any used without inline comment justification"}], "execution_time": 21.92751979827881}

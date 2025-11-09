@@ -1,1 +1,0 @@
-{"file_path": "base/backend/dataops/models/bpmn.py", "status": "FAIL", "violations": [{"line": 0, "pattern_id": "llm_audit", "severity": "CRITICAL", "message": "FAIL: Line 589: Placeholder Before NotImplementedError; Line 596: Placeholder Before NotImplementedError"}], "execution_time": 6.031994581222534}

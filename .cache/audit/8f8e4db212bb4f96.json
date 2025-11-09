@@ -1,1 +1,0 @@
-{"file_path": "base/scripts/meta/cleanup.py", "status": "FAIL", "violations": [{"line": 0, "pattern_id": "llm_audit", "severity": "CRITICAL", "message": "FAIL: Line 59, 98, 141: Missing Exception Handling - file_path.unlink() operations without try/except (can raise OSError, PermissionError)"}], "execution_time": 21.366076231002808}
