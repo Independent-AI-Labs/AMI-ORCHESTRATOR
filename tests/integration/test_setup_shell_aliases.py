@@ -31,7 +31,7 @@ def test_aliases_exist_and_respond_to_help():
         "ami-uv",
         "ami-agent",
         "ami-repo",
-        "ami-service",  # Contains start, stop, restart, profile as subcommands
+        "ami-services",  # Contains start, stop, restart, profile as subcommands
         "ami-test",
         "ami-install",
         "ami-setup",

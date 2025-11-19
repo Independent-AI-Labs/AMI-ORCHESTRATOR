@@ -485,21 +485,9 @@ ami-test() {
     # Takes optional module path as parameter: ami-test [module] [pytest-args]
     # If no module specified, auto-detects from current working directory
     # Uses the smart run_tests.py which can run tests across the modular system
-    if [[ $# -gt 0 && "$1" != -* ]]; then
-        # Module specified as first arg
-        local module="$1"
-        shift
-        echo -e "${BLUE}Running tests for module:${NC} $module"
-        ami-run "$module/scripts/run_tests.py" "$@"
-    else
-        # Auto-detect current module
-        local module_root="$(_find_module_root)"
-        local module_name="${module_root#$AMI_ROOT/}"
-        [[ "$module_name" == "$module_root" ]] && module_name="base"
-
-        echo -e "${BLUE}Running tests for detected module:${NC} $module_name"
-        ami-run "$AMI_ROOT/$module_name/scripts/run_tests.py" "$@"
-    fi
+    echo -e "${BLUE}Running tests via base module runner${NC}"
+    # Always use the run_tests.py script from base module which handles all module discovery
+    ami-run "$AMI_ROOT/base/scripts/run_tests.py" "$@"
 }
 
 ami-setup() {

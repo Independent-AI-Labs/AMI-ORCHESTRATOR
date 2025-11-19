@@ -132,11 +132,30 @@ class TestCompletionModeratorIntegration:
         }.get(key, default)
 
         # Mock load_session_todos to return empty list to avoid todo check blocking
-        # Also mock the completion moderator function since there might be an issue with config mocking
         with (
-            patch("scripts.agents.workflows.core.load_session_todos", return_value=[]),
-            patch("scripts.agents.validation.moderator_runner.run_moderator_with_retry", return_value=("ALLOW: Moderator disabled, allowing completion", None)),
+            patch("scripts.agents.workflows.completion_validator.load_session_todos", return_value=[]),
+            patch("scripts.agents.workflows.completion_validator.get_config") as mock_get_config,
         ):
+            # Also mock the CompletionValidator's get_config to ensure moderator is disabled there too
+            config_instance = Mock()
+
+            # Configure the mock to return False specifically for the completion moderator key
+            def config_get(key, default=None):
+                if key == "response_scanner.completion_moderator_enabled":
+                    return False
+                # Return appropriate defaults for other keys
+                defaults_map = {
+                    "prompts.dir": "scripts/config/prompts",
+                    "prompts.completion_moderator": "completion_moderator.txt",
+                    "hooks.file": "scripts/config/hooks.yaml",
+                }
+                return defaults_map.get(key, default if default is not None else True)
+
+            config_instance.get.side_effect = config_get
+            # Set the root properly
+            config_instance.root = Path("/home/ami/Projects/AMI-ORCHESTRATOR")
+            mock_get_config.return_value = config_instance
+
             result = scanner._validate_completion("test-session", test_transcript, "WORK DONE")
 
             # Should allow when moderator is disabled and no incomplete todos (current behavior)
@@ -152,10 +171,8 @@ class TestCompletionModeratorIntegration:
         }.get(key, default)
         cast(Any, scanner.config).root = Path("/home/ami/Projects/AMI-ORCHESTRATOR")
 
-        with patch("scripts.agents.cli.factory.get_agent_cli") as mock_get_cli:
-            mock_cli = Mock()
-            mock_cli.run_print.return_value = ("ALLOW: Implementation complete with tests", None)
-            mock_get_cli.return_value = mock_cli
+        with patch("scripts.agents.workflows.completion_validator.run_moderator_with_retry") as mock_run_moderator:
+            mock_run_moderator.return_value = ("ALLOW: Implementation complete with tests", None)
 
             result = scanner._validate_completion("test-session", test_transcript, "WORK DONE")
 
@@ -172,10 +189,8 @@ class TestCompletionModeratorIntegration:
         }.get(key, default)
         cast(Any, scanner.config).root = Path("/home/ami/Projects/AMI-ORCHESTRATOR")
 
-        with patch("scripts.agents.cli.factory.get_agent_cli") as mock_get_cli, patch("loguru.logger") as mock_get_logger:
-            mock_cli = Mock()
-            mock_cli.run_print.return_value = ("BLOCK: Tests are failing, bug still present", None)
-            mock_get_cli.return_value = mock_cli
+        with patch("scripts.agents.workflows.completion_validator.run_moderator_with_retry") as mock_run_moderator, patch("loguru.logger") as mock_get_logger:
+            mock_run_moderator.return_value = ("BLOCK: Tests are failing, bug still present", None)
 
             # Make get_logger return the same mock logger as the scanner
             mock_get_logger.return_value = scanner.logger
@@ -197,10 +212,8 @@ class TestCompletionModeratorIntegration:
         }.get(key, default)
         cast(Any, scanner.config).root = Path("/home/ami/Projects/AMI-ORCHESTRATOR")
 
-        with patch("scripts.agents.cli.factory.get_agent_cli") as mock_get_cli:
-            mock_cli = Mock()
-            mock_cli.run_print.return_value = ("Some unclear output with no decision", None)
-            mock_get_cli.return_value = mock_cli
+        with patch("scripts.agents.workflows.completion_validator.run_moderator_with_retry") as mock_run_moderator:
+            mock_run_moderator.return_value = ("Some unclear output with no decision", None)
 
             result = scanner._validate_completion("test-session", test_transcript, "WORK DONE")
 
@@ -259,10 +272,8 @@ class TestCompletionModeratorIntegration:
         }.get(key, default)
         cast(Any, scanner.config).root = Path("/home/ami/Projects/AMI-ORCHESTRATOR")
 
-        with patch("scripts.agents.cli.factory.get_agent_cli") as mock_get_cli:
-            mock_cli = Mock()
-            mock_cli.run_print.side_effect = AgentTimeoutError(120, ["claude"], 120.0)
-            mock_get_cli.return_value = mock_cli
+        with patch("scripts.agents.workflows.completion_validator.run_moderator_with_retry") as mock_run_moderator:
+            mock_run_moderator.side_effect = AgentTimeoutError(120, ["claude"], 120.0)
 
             result = scanner._validate_completion("test-session", test_transcript, "WORK DONE")
 
@@ -327,7 +338,7 @@ class TestCompletionModeratorIntegration:
             cast(Any, scanner.config).root = Path("/home/ami/Projects/AMI-ORCHESTRATOR")
 
             # Mock load_session_todos to return incomplete todos
-            with patch("scripts.agents.workflows.core.load_session_todos") as mock_load_todos:
+            with patch("scripts.agents.workflows.completion_validator.load_session_todos") as mock_load_todos:
                 mock_load_todos.return_value = [
                     {"status": "pending", "content": "Fix bug"},
                     {"status": "in_progress", "content": "Run tests"},
@@ -335,12 +346,10 @@ class TestCompletionModeratorIntegration:
 
                 # Mock agent CLI to return ALLOW with explanation
                 with (
-                    patch("scripts.agents.cli.factory.get_agent_cli") as mock_get_cli,
+                    patch("scripts.agents.workflows.completion_validator.run_moderator_with_retry") as mock_run_moderator,
                     patch("loguru.logger") as mock_get_logger,
                 ):
-                    mock_cli = Mock()
-                    mock_cli.run_print.return_value = ("ALLOW: Feedback provided, continuing work", None)
-                    mock_get_cli.return_value = mock_cli
+                    mock_run_moderator.return_value = ("ALLOW: Feedback provided, continuing work", None)
 
                     # Make get_logger return the same mock logger as the scanner
                     mock_get_logger.return_value = scanner.logger
@@ -364,24 +373,28 @@ class TestCompletionModeratorIntegration:
         cast(Any, scanner.config).root = Path("/home/ami/Projects/AMI-ORCHESTRATOR")
 
         # Mock the load_session_todos function to return incomplete tasks
-        # Since load_session_todos is imported directly into the response_validators module,
+        # Since load_session_todos is imported directly into the completion_validator module,
         # we need to patch it in that module's namespace
-        with patch("scripts.agents.workflows.core.load_session_todos") as mock_load_todos:
+        with patch("scripts.agents.workflows.completion_validator.load_session_todos") as mock_load_todos:
             # Return incomplete todos to trigger the blocking condition
             mock_load_todos.return_value = [
                 {"status": "pending", "content": "Fix bug"},
                 {"status": "in_progress", "content": "Run tests"},
             ]
 
-            # Call _validate_completion with WORK DONE message
-            result = scanner._validate_completion("test-session", test_transcript, "WORK DONE")
+            # We still need to mock the moderator in case there are issues in the control flow
+            # But the todo check should happen first and block before the moderator call
+            with patch("scripts.agents.workflows.completion_validator.run_moderator_with_retry"):
+                # Call _validate_completion with WORK DONE message
+                result = scanner._validate_completion("test-session", test_transcript, "WORK DONE")
 
-            # Should BLOCK on incomplete todos when WORK DONE is present
-            assert result.decision == "block"
-            assert result.reason is not None
-            assert "INCOMPLETE TASKS" in result.reason
-            assert "Fix bug" in result.reason
-            assert "Run tests" in result.reason
+                # Should BLOCK on incomplete todos when WORK DONE is present
+                # The incomplete todo check should prevent the moderator from running
+                assert result.decision == "block"
+                assert result.reason is not None
+                assert "INCOMPLETE TASKS" in result.reason
+                assert "Fix bug" in result.reason
+                assert "Run tests" in result.reason
 
     def test_validate_completion_markdown_code_block(self, scanner: ResponseScanner, test_transcript: Path) -> None:
         """Test parsing decision from markdown code blocks - updated for security improvements."""
@@ -393,11 +406,9 @@ class TestCompletionModeratorIntegration:
         }.get(key, default)
         cast(Any, scanner.config).root = Path("/home/ami/Projects/AMI-ORCHESTRATOR")
 
-        with patch("scripts.agents.cli.factory.get_agent_cli") as mock_get_cli:
-            mock_cli = Mock()
+        with patch("scripts.agents.workflows.completion_validator.run_moderator_with_retry") as mock_run_moderator:
             # Moderator output wrapped in code blocks with explanation
-            mock_cli.run_print.return_value = ("```\nALLOW: Task completed successfully\n```", None)
-            mock_get_cli.return_value = mock_cli
+            mock_run_moderator.return_value = ("```\nALLOW: Task completed successfully\n```", None)
 
             result = scanner._validate_completion("test-session", test_transcript, "WORK DONE")
 

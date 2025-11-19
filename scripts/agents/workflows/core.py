@@ -303,7 +303,7 @@ class HookResult:
         Returns:
             Allow result
         """
-        return cls()
+        return cls(decision="allow")
 
     @classmethod
     def deny(cls, reason: str, system_message: str | None = None) -> "HookResult":

@@ -15,9 +15,9 @@ class TestHookResult:
 
         assert result.decision is None or result.decision == "allow"
         json_output = result.to_json()
-        # Empty JSON or minimal JSON for allow
+        # Empty JSON or minimal JSON for allow (mapped to "approve" for Stop hooks)
         data = json.loads(json_output)
-        assert data.get("decision") in (None, "allow")
+        assert data.get("decision") in (None, "approve")
 
     def test_deny_result(self):
         """HookResult.deny() creates deny result."""

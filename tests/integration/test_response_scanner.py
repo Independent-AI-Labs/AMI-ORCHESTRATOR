@@ -35,6 +35,13 @@ class TestResponseScanner:
 
     def test_scan_completion_marker_allows(self, mocker):
         """ResponseScanner behavior with 'WORK DONE' marker - updated for security improvements."""
+        # Mock the config before creating ResponseScanner to avoid _load_completion_markers error
+        mock_config = mocker.patch("scripts.agents.workflows.response_validators.get_config")
+        config_instance = mocker.Mock()
+        config_instance.get.return_value = True
+        config_instance.root = Path("/home/ami/Projects/AMI-ORCHESTRATOR")  # Set root to avoid Mock / str error
+        mock_config.return_value = config_instance
+
         with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as f:
             # Create user and assistant messages for context
             user_msg = {
@@ -51,8 +58,11 @@ class TestResponseScanner:
             temp_path = Path(f.name)
 
         try:
-            # Mock the run_moderator_with_retry function at the right location
-            mocker.patch("scripts.agents.validation.moderator_runner.run_moderator_with_retry", return_value=("ALLOW: Task completed successfully", None))
+            # Mock run_moderator_with_retry function at the correct location where it's imported and used
+            mocker.patch("scripts.agents.workflows.completion_validator.run_moderator_with_retry", return_value=("ALLOW: Task completed successfully", None))
+
+            # Mock load_session_todos to return empty list to avoid todo check blocking
+            mocker.patch("scripts.agents.workflows.completion_validator.load_session_todos", return_value=[])
 
             validator = ResponseScanner()
             hook_input = type("obj", (object,), {"session_id": "test-session", "transcript_path": temp_path})()
@@ -66,6 +76,13 @@ class TestResponseScanner:
 
     def test_scan_feedback_marker_allows(self, mocker):
         """ResponseScanner behavior with 'FEEDBACK:' marker - updated for security improvements."""
+        # Mock the config before creating ResponseScanner to avoid _load_completion_markers error
+        mock_config = mocker.patch("scripts.agents.workflows.response_validators.get_config")
+        config_instance = mocker.Mock()
+        config_instance.get.return_value = True
+        config_instance.root = Path("/home/ami/Projects/AMI-ORCHESTRATOR")  # Set root to avoid Mock / str error
+        mock_config.return_value = config_instance
+
         with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as f:
             # Create user and assistant messages for context
             user_msg = {
@@ -82,10 +99,13 @@ class TestResponseScanner:
             temp_path = Path(f.name)
 
         try:
-            # Mock the run_moderator_with_retry function at the right location
+            # Mock run_moderator_with_retry function at the correct location where it's imported and used
             mocker.patch(
-                "scripts.agents.validation.moderator_runner.run_moderator_with_retry", return_value=("ALLOW: Feedback provided, continuing work", None)
+                "scripts.agents.workflows.completion_validator.run_moderator_with_retry", return_value=("ALLOW: Feedback provided, continuing work", None)
             )
+
+            # Mock load_session_todos to return empty list to avoid todo check blocking
+            mocker.patch("scripts.agents.workflows.completion_validator.load_session_todos", return_value=[])
 
             validator = ResponseScanner()
             hook_input = type("obj", (object,), {"session_id": "test-session", "transcript_path": temp_path})()
