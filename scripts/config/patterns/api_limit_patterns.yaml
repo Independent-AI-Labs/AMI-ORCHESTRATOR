@@ -1,0 +1,19 @@
+# API Limit Message Patterns
+# Used by response validation utilities for API rate limit detection
+#
+# These patterns identify API limit messages that should be allowed.
+
+version: "1.0.0"
+
+api_limit_patterns:
+  - pattern: "weekly\\s+limit\\s+reached"
+    description: "weekly limit reached"
+    
+  - pattern: "rate\\s+limit\\s+exceeded"
+    description: "rate limit exceeded"
+    
+  - pattern: "quota\\s+exceeded"
+    description: "quota exceeded"
+    
+  - pattern: "usage\\s+limit\\s+reached"
+    description: "usage limit reached"

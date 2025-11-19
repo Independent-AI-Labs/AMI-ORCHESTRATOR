@@ -29,9 +29,9 @@ ALWAYS USE: ami-run FOR PYTHON/PYTEST, ami-uv FOR UV COMMANDS
 EXAMPLE: ami-run script.py, ami-run -m module, ami-uv sync, ami-uv add package
 
 CRITICAL: NEVER USE git commit OR git push DIRECTLY
-ALWAYS USE: /home/ami/Projects/AMI-ORCHESTRATOR/scripts/git_commit.sh <message>
-ALWAYS USE: /home/ami/Projects/AMI-ORCHESTRATOR/scripts/git_push.sh
+ALWAYS USE: scripts/git_commit.sh <message>
+ALWAYS USE: scripts/git_push.sh
 THESE SCRIPTS AUTO-STAGE CHANGES AND RUN TESTS BEFORE PUSHING
-USE THE FULL ABSOLUTE PATH FROM ANY DIRECTORY IN THE REPO
+USE THE RELATIVE PATH FROM THE REPOSITORY ROOT
 
 ALL CODE QUALITY ISSUES ARE ALWAYS YOUR FAULT AND YOUR RESPONSIBILITY

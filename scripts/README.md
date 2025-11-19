@@ -90,26 +90,26 @@ Check the latest available versions of all dependencies in a pyproject.toml file
 **Usage:**
 ```bash
 # Check dependencies in current directory's pyproject.toml
-scripts/ami-run.sh scripts/check_pypi_versions.py
+scripts/ami-run scripts/check_pypi_versions.py
 
 # Check specific pyproject.toml file
-scripts/ami-run.sh scripts/check_pypi_versions.py path/to/pyproject.toml
+scripts/ami-run scripts/check_pypi_versions.py path/to/pyproject.toml
 
 # Show only outdated packages
-scripts/ami-run.sh scripts/check_pypi_versions.py pyproject.toml --outdated-only
+scripts/ami-run scripts/check_pypi_versions.py pyproject.toml --outdated-only
 
 # Output as JSON for automation
-scripts/ami-run.sh scripts/check_pypi_versions.py pyproject.toml --json
+scripts/ami-run scripts/check_pypi_versions.py pyproject.toml --json
 ```
 
 **Examples:**
 ```bash
 # Check all modules
-scripts/ami-run.sh scripts/check_pypi_versions.py base/pyproject.toml
-scripts/ami-run.sh scripts/check_pypi_versions.py nodes/pyproject.toml --outdated-only
+scripts/ami-run scripts/check_pypi_versions.py base/pyproject.toml
+scripts/ami-run scripts/check_pypi_versions.py nodes/pyproject.toml --outdated-only
 
 # Get outdated packages as JSON for processing
-scripts/ami-run.sh scripts/check_pypi_versions.py pyproject.toml --outdated-only --json | jq '.[] | .name'
+scripts/ami-run scripts/check_pypi_versions.py pyproject.toml --outdated-only --json | jq '.[] | .name'
 ```
 
 **Output:**
@@ -267,7 +267,7 @@ scripts/ami-repo service status
 # Development mode - temporary services via setup_service.py
 scripts/ami-repo service start --mode dev     # Start SSH + git-daemon
 scripts/ami-repo service stop --mode dev      # Stop services
-scripts/ami-run.sh nodes/scripts/setup_service.py profile start git-server  # Alternative
+scripts/ami-run nodes/scripts/setup_service.py profile start git-server  # Alternative
 
 # Production mode - persistent services via systemd
 scripts/ami-repo service install-systemd      # One-time setup
@@ -298,7 +298,7 @@ systemctl --user enable git-sshd git-daemon   # Enable auto-start
 - ✅ SSH server: `.venv/openssh/sbin/sshd` (venv binary)
 - ✅ Git daemon: `.venv/bin/git` (venv binary)
 - ✅ No system dependencies required
-- ✅ Fully portable via `.venv-linux/` backup
+- ✅ Fully portable via `.boot-linux/` bootstrap environment
 - ✅ Both binaries auto-bootstrapped during `module_setup.py`
 
 **Security Features:**
@@ -367,7 +367,7 @@ Bootstraps Podman and podman-compose in the virtual environment for rootless con
 
 See main project documentation for Podman usage.
 
-### ami-run.sh
+### ami-run
 Universal launcher for Python scripts using the correct virtual environment.
 
 ### ami-uv
@@ -462,7 +462,7 @@ source scripts/setup-shell.sh
    ```bash
    ami-info                # Display environment info
    ami-check-storage       # Check storage backends
-   ami-propagate-tests     # Propagate test runner
+
    ```
 
 **Example Workflows:**

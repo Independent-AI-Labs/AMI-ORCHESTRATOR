@@ -269,7 +269,7 @@
   ```bash
   #!/usr/bin/env bash
   ''':'
-  exec "$(dirname "$0")/scripts/ami-run.sh" "$0" "$@"
+  exec "$(dirname "$0")/scripts/ami-run" "$0" "$@"
   '''
   ```
 - **Rationale**: `exec` replaces current process (no subprocess created, no exit code to check); standard wrapper pattern; used by pipx, poetry, and other Python tools
@@ -279,7 +279,7 @@
 - **Example CORRECT**:
   ```python
   #!/usr/bin/env bash
-  'exec "$(dirname "$0")/../../scripts/ami-run.sh" "$0" "$@" #'
+  'exec "$(dirname "$0")/../../scripts/ami-run" "$0" "$@" #'
   from __future__ import annotations
 
   """Module docstring explaining what this module does."""

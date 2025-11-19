@@ -1,0 +1,34 @@
+# Greeting Detection Patterns
+# Used by response validation utilities to identify greeting exchanges
+#
+# These patterns define common greeting patterns for detection purposes.
+
+version: "1.0.0"
+
+greeting_patterns:
+  - pattern: "\\b(hello|hi|hey|greetings|howdy)\\b(?!\\.|\\w)"
+    description: "Basic greetings not followed by period or word chars"
+    
+  - pattern: "hi\\s+there\\b"
+    description: "hi there"
+    
+  - pattern: "good\\s+(morning|afternoon|evening)\\b"
+    description: "time-specific greetings"
+    
+  - pattern: "\\bwhat'?s\\s+up\\b"
+    description: "what's up"
+    
+  - pattern: "\\bhow\\s+are\\s+you\\b"
+    description: "how are you"
+    
+  - pattern: "\\bnice\\s+to\\s+meet\\s+you\\b"
+    description: "nice to meet you"
+    
+  - pattern: "\\bpleased\\s+to\\s+meet\\s+you\\b"
+    description: "pleased to meet you"
+    
+  - pattern: "\\bgood\\s+to\\s+see\\s+you\\b"
+    description: "good to see you"
+    
+  - pattern: "\\bglad\\s+to\\s+meet\\s+you\\b"
+    description: "glad to meet you"

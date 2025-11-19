@@ -132,15 +132,37 @@ if [ "$RUN_AUTOFIXES" = true ]; then
         RUFF_CONFIG="${ORCHESTRATOR_ROOT}/base/ruff.toml"
     fi
 
-    # Run ruff with autofix
-    RUFF_BIN="${ORCHESTRATOR_ROOT}/.venv/bin/ruff"
-    if [ ! -f "$RUFF_BIN" ]; then
-        # Try module .venv
-        RUFF_BIN="${MODULE_ROOT}/.venv/bin/ruff"
+    # Find nearest .venv by walking up from target directory - NO FALLBACKS
+    find_venv_for_target() {
+        local target_dir="${1:-$ORCHESTRATOR_ROOT}"
+        local search_dir="$target_dir"
+
+        # If target is a file, get its directory
+        if [ -f "$target_dir" ]; then
+            search_dir="$(dirname "$target_dir")"
+        fi
+
+        while [ "$search_dir" != "/" ]; do
+            if [ -d "$search_dir/.venv" ]; then
+                echo "$search_dir/.venv"
+                return 0
+            fi
+            search_dir="$(dirname "$search_dir")"
+        done
+
+        return 1
+    }
+
+    # Find nearest .venv for the current context - NO FALLBACKS
+    if ! NEAREST_VENV_DIR="$(find_venv_for_target "$MODULE_ROOT" 2>/dev/null)"; then
+        echo "Error: No .venv found in hierarchy from $MODULE_ROOT to root" >&2
+        exit 1
     fi
 
+    RUFF_BIN="${NEAREST_VENV_DIR}/bin/ruff"
+
     if [ ! -f "$RUFF_BIN" ]; then
-        echo "Error: ruff not found in ${ORCHESTRATOR_ROOT}/.venv/bin or ${MODULE_ROOT}/.venv/bin"
+        echo "Error: ruff not found in nearest .venv at $RUFF_BIN"
         exit 1
     fi
 
@@ -169,11 +191,7 @@ echo "Staging all changes in ${MODULE_ROOT}..."
 cd "$MODULE_ROOT"
 git add -A
 
-# ============================================================================
-# QUALITY CHECKS (run before commit)
-# ============================================================================
-
-# Determine target directories
+# Determine target directories early, before relative imports section
 # IMPORTANT:
 # - Autofixes (lines 148-158) target specific dirs to avoid modifying submodules
 # - Quality checks skip submodules when committing from root (they're checked separately)
@@ -190,6 +208,54 @@ else
     MODULE_ARG="$(realpath --relative-to="$ORCHESTRATOR_ROOT" "$MODULE_ROOT")"
 fi
 
+# Convert relative imports to absolute imports before quality checks
+# Only run during actual commits (not during dry-run), and only with --fix flag
+if [ "$DRY_RUN" = false ]; then
+    if [ "$RUN_AUTOFIXES" = true ]; then
+        echo ""
+        echo "Converting relative imports to absolute imports..."
+
+        # Define PYTHON_BIN for use in this section
+        PYTHON_BIN="${ORCHESTRATOR_ROOT}/.venv/bin/python"
+        if [ ! -f "$PYTHON_BIN" ]; then
+            PYTHON_BIN="${MODULE_ROOT}/.venv/bin/python"
+        fi
+        if [ ! -f "$PYTHON_BIN" ]; then
+            PYTHON_BIN="python3"
+        fi
+
+        FIX_RELATIVE_IMPORTS_SCRIPT="${ORCHESTRATOR_ROOT}/base/scripts/quality/fix_relative_imports.py"
+        if [ -f "$FIX_RELATIVE_IMPORTS_SCRIPT" ]; then
+            if ! "$PYTHON_BIN" "$FIX_RELATIVE_IMPORTS_SCRIPT" "$MODULE_ARG"; then
+                echo "⚠ Relative imports fixer failed (non-critical)"
+            else
+                # Re-stage any changes made by the script
+                git add -A
+                echo "✓ Relative imports converted to absolute imports"
+            fi
+        else
+            echo "ℹ Relative imports fixer not found, skipping"
+        fi
+    else
+        # When --fix is not specified, inform user about relative imports but don't fix them
+        echo ""
+        echo "ℹ Relative imports check skipped (use --fix to convert relative imports to absolute)"
+    fi
+else
+    echo ""
+    echo "ℹ Skipping relative imports check during dry-run"
+fi
+
+# ============================================================================
+# QUALITY CHECKS (run before commit)
+# ============================================================================
+
+# Determine target directories
+# IMPORTANT:
+# - Autofixes (lines 148-158) target specific dirs to avoid modifying submodules
+# - Quality checks skip submodules when committing from root (they're checked separately)
+# - Submodules are independent repos checked when committed from their own directory
+# - This avoids double-scanning and ruff relative path mismatches
 # Determine config paths
 if [ "$IS_ROOT" = true ]; then
     if [ -f "${ORCHESTRATOR_ROOT}/ruff.toml" ]; then
@@ -219,7 +285,45 @@ echo "========================================"
 echo "Running quality checks..."
 echo "========================================"
 
-# 1. Format check
+# Merge conflict markers
+echo ""
+echo "Checking for merge conflict markers..."
+CONFLICT_FILES=$(git diff --cached --name-only --diff-filter=ACM | while read file; do
+    if [ -f "$file" ] && grep -qE '^(<<<<<<<|=======|>>>>>>>) ' "$file"; then
+        echo "$file"
+    fi
+done)
+if [ -n "$CONFLICT_FILES" ]; then
+    echo "✗ Merge conflict markers found:"
+    echo "$CONFLICT_FILES"
+    exit 1
+fi
+echo "✓ No merge conflicts"
+
+# Max line check
+echo ""
+echo "Checking for files with too many lines..."
+MAX_LINE_FILES=$(git diff --cached --name-only --diff-filter=ACM | grep '\.py$' | while read file; do
+    if [ -f "$file" ]; then
+        # Check if it's a text file and count lines
+        if file --mime-type "$file" 2>/dev/null | grep -q 'text/'; then
+            LINE_COUNT=$(wc -l < "$file")
+            if [ "$LINE_COUNT" -gt 512 ]; then
+                echo "$file: $LINE_COUNT lines"
+            fi
+        fi
+    fi
+done)
+if [ -n "$MAX_LINE_FILES" ]; then
+    echo "✗ Files with more than 512 lines detected:"
+    echo "$MAX_LINE_FILES"
+    echo ""
+    echo "Consider splitting large files into smaller modules."
+    exit 1
+fi
+echo "✓ All files have reasonable line counts"
+
+# Format check
 echo ""
 echo "Running format check..."
 if ! "$RUFF_BIN" format --no-cache --check --config "$RUFF_CONFIG" --exclude ".gcloud" $CHECK_TARGETS; then
@@ -229,7 +333,7 @@ if ! "$RUFF_BIN" format --no-cache --check --config "$RUFF_CONFIG" --exclude ".g
 fi
 echo "✓ Format check passed"
 
-# 2. Lint check
+# Lint check
 echo ""
 echo "Running lint check..."
 if ! "$RUFF_BIN" check --no-cache --config "$RUFF_CONFIG" --exclude ".gcloud" $CHECK_TARGETS; then
@@ -239,7 +343,7 @@ if ! "$RUFF_BIN" check --no-cache --config "$RUFF_CONFIG" --exclude ".gcloud" $C
 fi
 echo "✓ Lint check passed"
 
-# 3. Fix polyglot shebang formatting
+# Fix polyglot shebang formatting
 FIX_SCRIPT="${ORCHESTRATOR_ROOT}/base/scripts/fix_polyglot_formatting.py"
 if [ -f "$FIX_SCRIPT" ]; then
     echo ""
@@ -252,10 +356,10 @@ if [ -f "$FIX_SCRIPT" ]; then
     echo "✓ Polyglot formatting complete"
 fi
 
-# 4. Shebang security check
+# Shebang security check
 echo ""
 echo "Running shebang security check..."
-AUDIT_SCRIPT="${ORCHESTRATOR_ROOT}/scripts/audit_shebangs.py"
+AUDIT_SCRIPT="${ORCHESTRATOR_ROOT}/scripts/agents/validation/audit_shebangs.py"
 if [ -f "$AUDIT_SCRIPT" ]; then
     if ! "$PYTHON_BIN" "$AUDIT_SCRIPT" --staged-only --directory "$MODULE_ROOT"; then
         echo "✗ Shebang security check failed"
@@ -267,7 +371,7 @@ else
     exit 1
 fi
 
-# 5. Banned words
+# Banned words
 echo ""
 echo "Running banned-words check..."
 BANNED_WORDS_SCRIPT="${ORCHESTRATOR_ROOT}/base/scripts/quality/banned_words.py"
@@ -279,7 +383,7 @@ if [ -f "$BANNED_WORDS_SCRIPT" ]; then
     echo "✓ Banned words check passed"
 fi
 
-# 6. Config-based lint suppressions
+# Config-based lint suppressions
 echo ""
 echo "Running config ignores check..."
 CONFIG_IGNORES_SCRIPT="${ORCHESTRATOR_ROOT}/base/scripts/quality/check_config_ignores.py"
@@ -291,47 +395,19 @@ if [ -f "$CONFIG_IGNORES_SCRIPT" ]; then
     echo "✓ Config ignores check passed"
 fi
 
-# 7. No lint suppressions
+# No lint suppressions
 echo ""
 echo "Running no-lint-suppressions check..."
 CODE_CHECK_SCRIPT="${ORCHESTRATOR_ROOT}/base/scripts/quality/code_check.py"
 if [ -f "$CODE_CHECK_SCRIPT" ]; then
-    # Run code_check.py and capture output
-    OUTPUT=$("$PYTHON_BIN" "$CODE_CHECK_SCRIPT" "$MODULE_ARG" 2>&1)
-    EXIT_CODE=$?
-    
-    if [ $EXIT_CODE -ne 0 ]; then
+    if ! "$PYTHON_BIN" "$CODE_CHECK_SCRIPT" "$MODULE_ARG"; then
         echo "✗ No-lint-suppressions check failed"
-        echo ""
-        echo "Noqa violations found:"
-        echo "======================"
-        echo "$OUTPUT"
-        echo ""
-        echo "Scanning for specific files with noqa comments:"
-        echo "================================================"
-        # Show exact files with noqa violations based on scan paths
-        if [ "$MODULE_ARG" = "root" ]; then
-            SCAN_PATHS="backend scripts tests"
-        else
-            SCAN_PATHS="$MODULE_ARG"
-        fi
-        
-        for scan_path in $SCAN_PATHS; do
-            find "${ORCHESTRATOR_ROOT}/$scan_path" -name "*.py" -exec grep -l "noqa" {} \; 2>/dev/null | while read -r file; do
-                rel_file=$(realpath --relative-to="$ORCHESTRATOR_ROOT" "$file")
-                echo "File: $rel_file"
-                grep -n "noqa" "$file" | while read -r line; do
-                    echo "  $line"
-                done
-                echo ""
-            done
-        done
         exit 1
     fi
     echo "✓ No-lint-suppressions check passed"
 fi
 
-# 8. Mypy
+# Mypy
 echo ""
 echo "Running mypy..."
 MYPY_CONFIG="${ORCHESTRATOR_ROOT}/base/scripts/mypy.ini"
@@ -349,7 +425,7 @@ else
 fi
 echo "✓ Mypy check passed"
 
-# 9. YAML validation
+# YAML validation
 echo ""
 echo "Checking YAML files..."
 YAML_FILES=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(ya?ml)$' || true)
@@ -365,7 +441,7 @@ else
     echo "✓ No YAML files to check"
 fi
 
-# 10. Large files check
+# Large files check
 echo ""
 echo "Checking for large files..."
 LARGE_FILES=$(git diff --cached --name-only --diff-filter=ACM | while read file; do
@@ -378,34 +454,19 @@ LARGE_FILES=$(git diff --cached --name-only --diff-filter=ACM | while read file;
             echo "✗ ERROR: Cannot stat file: $file" >&2
             exit 1
         fi
-        if [ "$SIZE" -gt 104857600 ]; then
+        if [ "$SIZE" -gt 52428800 ]; then
             echo "$file"
         fi
     fi
 done)
 if [ -n "$LARGE_FILES" ]; then
-    echo "✗ Large files detected (>100MB):"
+    echo "✗ Large files detected (>50MB):"
     echo "$LARGE_FILES"
     exit 1
 fi
 echo "✓ No large files"
 
-# 11. Merge conflict markers
-echo ""
-echo "Checking for merge conflict markers..."
-CONFLICT_FILES=$(git diff --cached --name-only --diff-filter=ACM | while read file; do
-    if [ -f "$file" ] && grep -qE '^(<<<<<<<|=======|>>>>>>>) ' "$file"; then
-        echo "$file"
-    fi
-done)
-if [ -n "$CONFLICT_FILES" ]; then
-    echo "✗ Merge conflict markers found:"
-    echo "$CONFLICT_FILES"
-    exit 1
-fi
-echo "✓ No merge conflicts"
-
-# 12. Debug statements
+# Debug statements
 echo ""
 echo "Checking for debug statements..."
 PY_FILES=$(git diff --cached --name-only --diff-filter=ACM | grep '\.py$' || true)
@@ -423,6 +484,58 @@ if [ -n "$PY_FILES" ]; then
     echo "✓ No debug statements"
 else
     echo "✓ No Python files to check"
+fi
+
+# Commit message validation
+echo ""
+echo "Running commit message validation..."
+if [ "$USE_FILE" = true ]; then
+    # If using a file for the commit message, read from the file
+    COMMIT_MSG_FOR_VALIDATION=$(cat "$COMMIT_FILE")
+elif [ "$USE_AMEND" = true ]; then
+    # If amending without a new message, we need to get the current commit message
+    if [ -z "$AMEND_MESSAGE" ]; then
+        COMMIT_MSG_FOR_VALIDATION=$(git log -1 --pretty=%B)
+    else
+        COMMIT_MSG_FOR_VALIDATION="$AMEND_MESSAGE"
+    fi
+else
+    # Direct commit message
+    COMMIT_MSG_FOR_VALIDATION="$COMMIT_MSG"
+fi
+
+# Load patterns from config file and check each one individually to show violations
+PATTERNS_FILE="${ORCHESTRATOR_ROOT}/base/scripts/quality/commit_message_patterns.txt"
+if [ -f "$PATTERNS_FILE" ]; then
+    VIOLATIONS=()
+    while IFS= read -r pattern; do
+        # Skip empty lines and comments
+        if [[ -n "$pattern" && ! "$pattern" =~ ^# ]]; then
+            if echo "$COMMIT_MSG_FOR_VALIDATION" | grep -qiE "$pattern"; then
+                VIOLATIONS+=("$pattern")
+            fi
+        fi
+    done < "$PATTERNS_FILE"
+
+    if [ ${#VIOLATIONS[@]} -gt 0 ]; then
+        echo "✗ BLOCKED: Commit message contains banned patterns"
+        echo ""
+        echo "Violations detected:"
+        for violation in "${VIOLATIONS[@]}"; do
+            echo "  - Pattern: $violation"
+            # Show the matching line in the commit message
+            MATCHING_LINE=$(echo "$COMMIT_MSG_FOR_VALIDATION" | grep -iE "$violation" | head -1 | sed 's/^/    Line: /')
+            echo "$MATCHING_LINE"
+        done
+        echo ""
+        echo "Check $PATTERNS_FILE for list of banned patterns"
+        echo ""
+        echo "Please remove these patterns from your commit message."
+        exit 1
+    fi
+    echo "✓ Commit message validation passed"
+else
+    echo "ℹ Commit message patterns file not found, skipping commit message validation"
 fi
 
 echo ""

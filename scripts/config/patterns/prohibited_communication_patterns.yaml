@@ -1,0 +1,51 @@
+# Prohibited Communication Patterns
+# Used by response validation utilities for communication quality checks
+#
+# These patterns define forbidden communication patterns that indicate quality issues.
+
+version: "1.0.0"
+
+prohibited_patterns:
+  - pattern: "\\byou'?re\\s+(absolutely|completely|totally|entirely|definitely)?\\s*(correct|right|spot-on)\\b"
+    description: "you're right variations"
+    category: "communication_quality"
+    
+  - pattern: "\\byou\\s+are\\s+(absolutely|completely|totally|entirely|definitely)?\\s*(correct|right|spot-on)\\b"
+    description: "you are right variations"
+    category: "communication_quality"
+    
+  - pattern: "\\b(absolutely|completely|totally|entirely|definitely)\\s+(correct|right|spot-on)\\b"
+    description: "absolutely correct/right"
+    category: "communication_quality"
+    
+  - pattern: "\\bthe\\s+issue\\s+is\\s+clear\\b"
+    description: "the issue is clear"
+    category: "communication_quality"
+    
+  - pattern: "\\bi\\s+see\\s+the\\s+(problem|issue)\\b"
+    description: "I see the problem"
+    category: "communication_quality"
+    
+  - pattern: "\\bthat'?s\\s+(absolutely|completely|totally|exactly)\\s+(correct|right|spot-on)\\b"
+    description: "that's absolutely correct/right"
+    category: "communication_quality"
+    
+  - pattern: "\\bspot-on\\b"
+    description: "spot-on"
+    category: "communication_quality"
+    
+  - pattern: "\\bpre-existing\\b"
+    description: "pre-existing (avoidance)"
+    category: "communication_quality"
+    
+  - pattern: "\\bpre\\s+existing\\b"
+    description: "pre existing (avoidance)"
+    category: "communication_quality"
+    
+  - pattern: "\\balready\\s+exists?\\b"
+    description: "already exists (avoidance)"
+    category: "communication_quality"
+    
+  - pattern: "\\bexisting\\s+(issue|problem|violation|bug|error)s?\\b"
+    description: "existing issues (avoidance)"
+    category: "communication_quality"

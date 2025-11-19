@@ -44,7 +44,7 @@
 - Validates required fields per storage type before attempting connections.
 - Uses `dao.connect()` and `dao.test_connection()` to verify backend connectivity.
 - **CLI tool**: `base/scripts/check_storage.py`
-  - Usage: `./scripts/ami-run.sh base/scripts/check_storage.py [--storage NAME] [--model NAME] [--json]`
+  - Usage: `./scripts/ami-run base/scripts/check_storage.py [--storage NAME] [--model NAME] [--json]`
   - Returns exit code 0 (all OK) or 1 (failures detected)
   - Integrated into CI/testing workflows
 
@@ -71,22 +71,22 @@ Access via MCP client or through `base/scripts/run_dataops_fastmcp.py`.
 **CLI Commands:**
 ```bash
 # Validate all storages
-./scripts/ami-run.sh base/scripts/check_storage.py
+./scripts/ami-run base/scripts/check_storage.py
 
 # Validate specific storage(s)
-./scripts/ami-run.sh base/scripts/check_storage.py --storage postgres --storage redis
+./scripts/ami-run base/scripts/check_storage.py --storage postgres --storage redis
 
 # Validate storages for a specific model
-./scripts/ami-run.sh base/scripts/check_storage.py --model User
+./scripts/ami-run base/scripts/check_storage.py --model User
 
 # JSON output
-./scripts/ami-run.sh base/scripts/check_storage.py --json
+./scripts/ami-run base/scripts/check_storage.py --json
 ```
 
 **Via MCP:**
 MCP clients can call `dataops_storage_validate` tool directly. The MCP server runs via:
 ```bash
-./scripts/ami-run.sh base/scripts/run_dataops_fastmcp.py --transport stdio
+./scripts/ami-run base/scripts/run_dataops_fastmcp.py --transport stdio
 ```
 
 **Adding a New Storage Backend:**

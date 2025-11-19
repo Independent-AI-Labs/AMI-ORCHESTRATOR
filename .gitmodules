@@ -49,3 +49,8 @@
 	url = git@github.com:Independent-AI-Labs/AMI-LEARNING.git
 	branch = main
 	update = checkout
+[submodule "cli-agents/qwen-code"]
+	path = cli-agents/qwen-code
+	url = git@github.com:Independent-AI-Labs/qwen-code.git
+	branch = main
+	update = checkout

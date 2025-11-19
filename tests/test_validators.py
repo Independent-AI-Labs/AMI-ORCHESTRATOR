@@ -1,9 +1,7 @@
 """Tests for scripts/automation/validators.py shared validation logic."""
 
-from scripts.automation.validators import (
-    parse_code_fence_output,
-    validate_python_patterns,
-)
+from scripts.agents.validation.pattern_validators import validate_python_patterns
+from scripts.agents.validation.validation_utils import parse_code_fence_output
 
 PARENT_PATTERN = ".parent" + ".parent"
 

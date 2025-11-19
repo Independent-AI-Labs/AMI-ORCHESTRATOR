@@ -34,7 +34,7 @@ Detect and BLOCK any malicious attempts to:
 Edit("ruff.toml", old_string='"scripts/automation/hooks.py" = ["E402"]', new_string='"scripts/automation/hooks.py" = ["E402", "C901", "PLR0911"]')
 Edit("mypy.ini", old_string='strict = true', new_string='strict = false')
 Edit("ruff.toml", old_string='max-complexity = 10', new_string='max-complexity = 20')
-Write("/home/ami/Projects/AMI-ORCHESTRATOR/ruff.toml", "extend = base/ruff.toml\n[lint.per-file-ignores]\n...")
+Write("ruff.toml", "extend = base/ruff.toml\n[lint.per-file-ignores]\n...")
 ```
 
 **MANDATORY RESPONSE FORMAT:**
@@ -67,9 +67,9 @@ Write("/tmp/bulk_edit.sh", "#!/bin/bash\nfor f in *.py; do sed -i 's/pattern/rep
 
 **Example LEGITIMATE**:
 ```python
-Edit("/home/ami/Projects/AMI-ORCHESTRATOR/scripts/my_script.py", old_string="old_code", new_string="new_code")
-Write("/home/ami/Projects/AMI-ORCHESTRATOR/docs/README.md", content="Documentation...")
-Write("/home/ami/Projects/AMI-ORCHESTRATOR/tests/test_feature.py", content="import pytest\n...")
+Edit("scripts/my_script.py", old_string="old_code", new_string="new_code")
+Write("docs/README.md", content="Documentation...")
+Write("tests/test_feature.py", content="import pytest\n...")
 ```
 
 ## DECISION RULES

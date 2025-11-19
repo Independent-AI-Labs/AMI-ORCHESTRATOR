@@ -1,0 +1,300 @@
+#!/usr/bin/env bash
+
+set -euo pipefail  # Exit on error, undefined vars, and pipe failures
+
+# AMI Orchestrator installer - bootstraps the development environment
+# This script handles one-time setup tasks:
+# 1. Initialize git submodules (with HTTPS fallback)
+# 2. Register ami-run and ami-uv shell aliases
+# 3. Install Node.js CLI agents
+# 4. Delegate to module setup for recursive venv creation
+
+# Source setup scripts
+source "./scripts/setup/common.sh"
+source "./scripts/setup/node.sh"
+source "./scripts/setup/test.sh"
+source "./scripts/setup/submodule.sh"
+
+# Bootstrap environment by creating .boot-linux if needed, then loading it
+bootstrap_from_boot_linux() {
+    local boot_linux_path="$PWD/.boot-linux"
+
+    if [ ! -d "$boot_linux_path" ]; then
+        log_info ".boot-linux not found, creating bootstrap environment..."
+        # Create the bootstrap environment first
+        if ! ./scripts/setup/bootstrap.sh; then
+            log_error "Failed to create .boot-linux using bootstrap script"
+            exit 1
+        fi
+    fi
+
+    if [ -d "$boot_linux_path" ]; then
+        log_info "Bootstrapping exclusively from .boot-linux environment..."
+        # Set PATH to use .boot-linux tools first, with current directory for script operations
+        export PATH="$boot_linux_path/bin:$PWD:$PATH"
+        # Set explicit paths to bootstrapped tools
+        export PYTHON_CMD="$boot_linux_path/bin/python"
+        export UV_CMD="$boot_linux_path/bin/uv"
+        export GIT_CMD="$boot_linux_path/bin/git"
+        log_info "✓ Using exclusively .boot-linux tools for installation"
+
+        # Bootstrap podman in the .boot-linux environment too
+        if ! bootstrap_podman_for_boot_linux; then
+            log_warning "Podman bootstrap for .boot-linux failed, but continuing..."
+        fi
+
+        return 0
+    else
+        log_error "Critical: Failed to create .boot-linux - bootstrap environment required for isolation"
+        log_info "Please run scripts/setup/bootstrap.sh manually"
+        exit 1  # Fail hard, no fallbacks
+    fi
+}
+
+# Logging function for success messages
+log_success() {
+    echo "✓ $1" >&2
+}
+
+
+# Bootstrap podman in the .boot-linux environment following standard patterns
+bootstrap_podman_for_boot_linux() {
+    log_info "Bootstrapping Podman for .boot-linux environment..."
+
+    local boot_linux_path="$PWD/.boot-linux"
+    if [ ! -d "$boot_linux_path" ]; then
+        log_error "Critical: .boot-linux directory not found - required for podman bootstrapping"
+        return 1
+    fi
+
+    # Run the podman bootstrap script but with modifications to install to .boot-linux instead of .venv
+    if [ -f "./scripts/bootstrap_podman.sh" ]; then
+        log_info "Running Podman bootstrap script for .boot-linux..."
+
+        # Set environment variable to direct podman installation to .boot-linux
+        if BOOT_LINUX_DIR="$boot_linux_path" ./scripts/bootstrap_podman.sh; then
+            log_success "Podman bootstrapped successfully"
+        else
+            log_warning "Podman bootstrap failed, but continuing..."
+        fi
+    else
+        log_info "Podman bootstrap script not found, skipping..."
+    fi
+
+    log_success "Podman bootstrapped for .boot-linux"
+    return 0
+}
+
+# Bootstrap podman using existing bootstrapping scripts
+bootstrap_podman_only() {
+    log_info "Bootstrapping Podman..."
+
+    # Bootstrap Podman using existing script if available
+    if [ -f "./scripts/bootstrap_podman.sh" ]; then
+        log_info "Running Podman bootstrap script..."
+        if ./scripts/bootstrap_podman.sh; then
+            log_success "Podman bootstrapped successfully"
+        else
+            log_warning "Podman bootstrap failed, but continuing..."
+        fi
+    else
+        log_info "Podman bootstrap script not found, skipping..."
+    fi
+
+    log_success "Podman bootstrapped"
+    return 0
+}
+
+
+# Recreate flow - delete .venv, bootstrap node/podman using .boot-linux, proceed with regular flow
+recreate_flow() {
+    log_info "Starting recreate flow..."
+
+    # 1. Delete .venv
+    if [ -d ".venv" ]; then
+        log_info "Removing existing .venv..."
+        rm -rf .venv
+        log_success "Removed .venv"
+    fi
+
+    # 2. Proceed with regular flow (which will set up environment and install agents)
+    regular_flow
+    return $?
+}
+
+# Regular flow as specified in requirements
+regular_flow() {
+    log_info "Starting regular flow..."
+
+    # 1. Use bootstrapped environment from .boot-linux to create fresh .venv for project dependencies
+    log_info "============================================================"
+    log_info "Running module setup for root venv creation (with bootstrapped tools)..."
+    log_info "============================================================"
+
+    # Run the setup for the root module directly using the function (this creates proper Python .venv)
+    if ! setup_module "." "$(basename "$PWD")" true; then  # true to skip submodules
+        log_error "Module setup for root failed"
+        return 1
+    fi
+
+    # 2. Bootstrap OpenSSH for git operations (this is needed for tests)
+    log_info "============================================================"
+    log_info "Bootstrapping OpenSSH for git operations..."
+    log_info "============================================================"
+
+    if [ -f "./scripts/bootstrap_openssh.sh" ]; then
+        log_info "Running OpenSSH bootstrap script..."
+        if ./scripts/bootstrap_openssh.sh; then
+            log_success "OpenSSH bootstrapped successfully"
+        else
+            log_error "OpenSSH bootstrap failed - this is required for tests"
+            log_info "The bootstrap_openssh.sh script requires system-level access and may not work in all environments"
+            log_info "You may need to run it manually after installation if you need SSH functionality:"
+            log_info "  ./scripts/bootstrap_openssh.sh"
+            log_info "For now, continuing installation without SSH (some tests will be skipped)..."
+            # Don't return an error here, as OpenSSH might not be strictly required in all environments
+        fi
+    else
+        log_info "OpenSSH bootstrap script not found, skipping..."
+    fi
+
+    # 3. Builds and updates all NODE deps in the existing .venv environment
+    log_info "============================================================"
+    log_info "Installing Node.js CLI agents..."
+    log_info "============================================================"
+
+    if [ -d "./cli-agents" ]; then
+        if ! install_node_agents; then
+            log_error "Node.js CLI agents installation failed - aborting installation"
+            return 1
+        fi
+
+    else
+        log_error "cli-agents directory not found, Node.js agents installation required - aborting installation"
+        return 1
+    fi
+
+    # Create symlinks to make node, npm, npx available in .boot-linux/bin
+    # This ensures these tools are available from the bootstrap environment
+    if [ -f ".boot-linux/node-env/bin/node" ]; then
+        log_info "Creating symlinks to make node available in .boot-linux/bin..."
+
+        # Create .boot-linux/bin if it doesn't exist
+        if [ ! -d ".boot-linux/bin" ]; then
+            mkdir -p ".boot-linux/bin"
+        fi
+
+        # Create symlinks for node binaries
+        ln -sf "$PWD/.boot-linux/node-env/bin/node" ".boot-linux/bin/node" 2>/dev/null || true
+        ln -sf "$PWD/.boot-linux/node-env/bin/npm" ".boot-linux/bin/npm" 2>/dev/null || true
+        ln -sf "$PWD/.boot-linux/node-env/bin/npx" ".boot-linux/bin/npx" 2>/dev/null || true
+
+        log_success "Node.js binaries now available in .boot-linux/bin/"
+    fi
+
+    # 4. RUNS TESTS FOR ROOT ami-run base/scripts/run_tests.py .
+    log_info ""
+    log_info "============================================================"
+    log_info "Running tests for root module..."
+    log_info "============================================================"
+
+    if ! run_tests; then
+        log_error "Tests failed - aborting installation"
+        return 1
+    fi
+
+    # 5. Node.js agents and project dependencies are now in .venv
+    log_info ""
+    log_info "============================================================"
+    log_info "Tests passed - environment ready!"
+    log_info "============================================================"
+
+    # 6. ONLY THEN RUN module_setup.py FOR ALL SUBMODULES!!!
+    log_info ""
+    log_info "============================================================"
+    log_info "Running module setup for submodules..."
+    log_info "============================================================"
+
+    if ! run_submodule_setup; then
+        log_error "Submodule setup failed"
+        return 1
+    fi
+
+    log_info ""
+    log_info "============================================================"
+    log_info "✓ AMI Orchestrator installation complete!"
+    log_info "============================================================"
+
+    return 0
+}
+
+# Main installation function
+main() {
+    local recreate_mode="false"
+
+    # Parse command line arguments
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --recreate)
+                recreate_mode="true"
+                shift
+                ;;
+            --help)
+                echo "Usage: $0 [--recreate]"
+                echo "Install AMI Orchestrator development environment"
+                echo "  --recreate: Delete .venv and recreate environment using .boot-linux, then proceed with install"
+                exit 0
+                ;;
+            *)
+                log_error "Unknown option: $1"
+                exit 1
+                ;;
+        esac
+    done
+
+    # Bootstrap the environment from .boot-linux BEFORE any other operations
+    if ! bootstrap_from_boot_linux; then
+        log_error "Failed to bootstrap from .boot-linux"
+        exit 1
+    fi
+
+    log_info "============================================================"
+    log_info "AMI Orchestrator Installation"
+    log_info "============================================================"
+    log_info ""
+
+    # Step 1: Initialize git submodules
+    if ! ensure_git_submodules; then
+        log_error "Failed to initialize submodules"
+        exit 1
+    fi
+
+    log_info ""
+
+    # Select either recreate flow or regular flow based on flag
+    if [ "$recreate_mode" = "true" ]; then
+        log_info "Executing recreate flow..."
+        if ! recreate_flow; then
+            log_error "Recreate flow failed"
+            exit 1
+        fi
+    else
+        log_info "Executing regular flow..."
+        if ! regular_flow; then
+            log_error "Regular flow failed"
+            exit 1
+        fi
+    fi
+
+    # Step 2: Register shell aliases (after environment is set up)
+    if ! register_shell_aliases; then
+        log_warning "Failed to register shell aliases (non-fatal)"
+    fi
+
+    log_info ""
+
+    exit 0
+}
+
+# Run main function with all arguments
+main "$@"

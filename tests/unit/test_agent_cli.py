@@ -5,12 +5,9 @@ from pathlib import Path
 
 import pytest
 
-from scripts.automation.agent_cli import (
-    AgentConfig,
-    AgentConfigPresets,
-    ClaudeAgentCLI,
-    get_agent_cli,
-)
+from scripts.agents.cli.claude_cli import ClaudeAgentCLI
+from scripts.agents.cli.config import AgentConfig, AgentConfigPresets
+from scripts.agents.cli.factory import get_agent_cli
 
 # Test constants
 DEFAULT_TIMEOUT = 180
@@ -150,14 +147,16 @@ class TestClaudeAgentCLI:
         assert result == sorted(result)
 
     def test_load_instruction_from_file(self):
-        """_load_instruction() reads file."""
+        """load_instruction_with_replacements() reads file."""
         with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
             f.write("Test instruction")
             temp_path = Path(f.name)
 
         try:
-            cli = ClaudeAgentCLI()
-            result = cli._load_instruction(temp_path)
+            # Use the utility function directly since ClaudeAgentCLI doesn't have _load_instruction
+            from scripts.agents.cli.streaming_utils import load_instruction_with_replacements
+
+            result = load_instruction_with_replacements(temp_path)
 
             assert "Test instruction" in result
         finally:
@@ -165,14 +164,16 @@ class TestClaudeAgentCLI:
                 temp_path.unlink()
 
     def test_load_instruction_template_substitution(self):
-        """_load_instruction() substitutes {date}."""
+        """load_instruction_with_replacements() substitutes {date}."""
         with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
             f.write("Date: {date}")
             temp_path = Path(f.name)
 
         try:
-            cli = ClaudeAgentCLI()
-            result = cli._load_instruction(temp_path)
+            # Use the utility function directly since ClaudeAgentCLI doesn't have _load_instruction
+            from scripts.agents.cli.streaming_utils import load_instruction_with_replacements
+
+            result = load_instruction_with_replacements(temp_path)
 
             # {date} should be replaced
             assert "{date}" not in result

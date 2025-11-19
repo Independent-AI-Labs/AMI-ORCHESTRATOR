@@ -194,10 +194,10 @@ ami-agent --sync base --user-instruction "Add SSO authentication"
 ami-agent (--interactive set by default)
 
 # Run comprehensive test suite across all modules
-./scripts/ami-run.sh scripts/run_tests.py
+./scripts/ami-run scripts/run_tests.py
 
 # Launch infrastructure services via nodes launcher
-./scripts/ami-run.sh nodes/scripts/setup_service.py start <service>
+./scripts/ami-run nodes/scripts/setup_service.py start <service>
 
 # Secure remote command execution across server fleet
 ami-run base/scripts/run_ssh_fastmcp.py
@@ -226,22 +226,22 @@ This one command sets up:
 
 **2. Verify Everything Works**
 ```bash
-./scripts/ami-run.sh base/scripts/run_tests.py  # Run base module tests
+./scripts/ami-run base/scripts/run_tests.py  # Run base module tests
 ami-agent --help                                 # Check CLI is installed
 ```
 
 **3. Launch Your Infrastructure Stack**
 ```bash
 # Start development profile (data-stack + secrets-broker)
-./scripts/ami-run.sh nodes/scripts/setup_service.py profile start dev
+./scripts/ami-run nodes/scripts/setup_service.py profile start dev
 
 # Or start individual services
-./scripts/ami-run.sh nodes/scripts/setup_service.py process start data-stack
-./scripts/ami-run.sh nodes/scripts/setup_service.py process start secrets-broker
-./scripts/ami-run.sh nodes/scripts/setup_service.py process start searxng
+./scripts/ami-run nodes/scripts/setup_service.py process start data-stack
+./scripts/ami-run nodes/scripts/setup_service.py process start secrets-broker
+./scripts/ami-run nodes/scripts/setup_service.py process start searxng
 
 # Start the CMS (Next.js web platform)
-./scripts/ami-run.sh nodes/scripts/setup_service.py profile start cms
+./scripts/ami-run nodes/scripts/setup_service.py profile start cms
 ```
 
 **Basic infrastructure stack is now running.**
@@ -342,8 +342,8 @@ MIT License - Copyright © 2025 Independent AI Labs
 ### 🚀 Getting Started
 1. **Clone**: `git clone https://github.com/independent-ai-labs/ami-orchestrator`
 2. **Setup**: `python install.py` (automated bootstrap)
-3. **Verify**: `./scripts/ami-run.sh base/scripts/run_tests.py`
-4. **Deploy**: `./scripts/ami-run.sh nodes/scripts/setup_service.py start <service>`
+3. **Verify**: `./scripts/ami-run base/scripts/run_tests.py`
+4. **Deploy**: `./scripts/ami-run nodes/scripts/setup_service.py start <service>`
 5. **Explore**: `ami-agent --help`
 
 ### 💬 Community & Support

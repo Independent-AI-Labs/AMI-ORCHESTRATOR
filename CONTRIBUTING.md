@@ -32,7 +32,7 @@ cd ami-orchestrator
 python install.py
 
 # Verify installation
-./scripts/ami-run.sh base/scripts/run_tests.py
+./scripts/ami-run base/scripts/run_tests.py
 ```
 
 ## Development Workflow
@@ -147,11 +147,11 @@ from base.backend.config.loader import load_config
 
 ```bash
 # Run module-specific tests
-./scripts/ami-run.sh base/scripts/run_tests.py
-./scripts/ami-run.sh browser/scripts/run_tests.py
+./scripts/ami-run base/scripts/run_tests.py
+./scripts/ami-run browser/scripts/run_tests.py
 
 # Run root-level tests
-./scripts/ami-run.sh scripts/run_tests.py
+./scripts/ami-run scripts/run_tests.py
 
 # Run integration tests with services
 ./scripts/run_tests_with_services.sh

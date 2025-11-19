@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from scripts.automation.tasks import TaskExecutor
+from scripts.agents.tasks import TaskExecutor
 
 # Test constants
 TWO_FILES = 2
@@ -23,7 +23,7 @@ def mock_sudo_password(monkeypatch):
 
 
 class TestTaskExecutorFindTaskFiles:
-    """Tests for _find_task_files method."""
+    """Tests for _find_item_files method (originally _find_task_files)."""
 
     def test_find_all_md_files(self):
         """Find all .md files in directory."""
@@ -36,7 +36,7 @@ class TestTaskExecutorFindTaskFiles:
             (tmpdir_path / "README.md").write_text("readme")
 
             executor = TaskExecutor()
-            task_files = executor._find_task_files(tmpdir_path)
+            task_files = executor._find_item_files(tmpdir_path)
 
             # Should find task1.md and task2.md (README.md excluded by default)
             assert len(task_files) == TWO_FILES
@@ -53,7 +53,7 @@ class TestTaskExecutorFindTaskFiles:
             (tmpdir_path / "feedback-20250119-task1.md").write_text("feedback")
 
             executor = TaskExecutor()
-            task_files = executor._find_task_files(tmpdir_path)
+            task_files = executor._find_item_files(tmpdir_path)
 
             # Should only find task1.md
             assert len(task_files) == 1
@@ -69,7 +69,7 @@ class TestTaskExecutorFindTaskFiles:
             (tmpdir_path / "progress-20250119-task1.md").write_text("progress")
 
             executor = TaskExecutor()
-            task_files = executor._find_task_files(tmpdir_path)
+            task_files = executor._find_item_files(tmpdir_path)
 
             # Should only find task1.md
             assert len(task_files) == 1
@@ -87,7 +87,7 @@ class TestTaskExecutorFindTaskFiles:
             (tmpdir_path / "AGENTS.md").write_text("agents")
 
             executor = TaskExecutor()
-            task_files = executor._find_task_files(tmpdir_path)
+            task_files = executor._find_item_files(tmpdir_path)
 
             # Should only find task1.md
             assert len(task_files) == 1
@@ -104,7 +104,7 @@ class TestTaskExecutorFindTaskFiles:
             (tmpdir_path / "task2.md").write_text("task 2")
 
             executor = TaskExecutor()
-            task_files = executor._find_task_files(tmpdir_path)
+            task_files = executor._find_item_files(tmpdir_path)
 
             # Should be sorted
             assert len(task_files) == THREE_FILES
@@ -123,7 +123,7 @@ class TestTaskExecutorFindTaskFiles:
             (tmpdir_path / "subdir" / "task2.md").write_text("task 2")
 
             executor = TaskExecutor()
-            task_files = executor._find_task_files(tmpdir_path)
+            task_files = executor._find_item_files(tmpdir_path)
 
             # Should find both files
             assert len(task_files) == TWO_FILES
@@ -140,7 +140,7 @@ class TestTaskExecutorFindTaskFiles:
             task_file.write_text("This is a single task")
 
             executor = TaskExecutor()
-            task_files = executor._find_task_files(task_file)
+            task_files = executor._find_item_files(task_file)
 
             # Should return the single file
             assert len(task_files) == 1
@@ -157,7 +157,7 @@ class TestTaskExecutorFindTaskFiles:
             txt_file.write_text("This is not markdown")
 
             executor = TaskExecutor()
-            task_files = executor._find_task_files(txt_file)
+            task_files = executor._find_item_files(txt_file)
 
             # Should return empty list
             assert len(task_files) == 0
@@ -180,9 +180,9 @@ class TestTaskExecutorFindTaskFiles:
             executor = TaskExecutor()
 
             # All should be excluded
-            assert len(executor._find_task_files(readme)) == 0
-            assert len(executor._find_task_files(feedback)) == 0
-            assert len(executor._find_task_files(progress)) == 0
+            assert len(executor._find_item_files(readme)) == 0
+            assert len(executor._find_item_files(feedback)) == 0
+            assert len(executor._find_item_files(progress)) == 0
 
     def test_single_file_not_excluded(self):
         """Include single file if it does not match exclusion patterns."""
@@ -194,7 +194,7 @@ class TestTaskExecutorFindTaskFiles:
             task_file.write_text("valid task")
 
             executor = TaskExecutor()
-            task_files = executor._find_task_files(task_file)
+            task_files = executor._find_item_files(task_file)
 
             # Should return the file
             assert len(task_files) == 1
@@ -209,7 +209,7 @@ class TestTaskExecutorFindTaskFiles:
             nonexistent = tmpdir_path / "does-not-exist.md"
 
             executor = TaskExecutor()
-            task_files = executor._find_task_files(nonexistent)
+            task_files = executor._find_item_files(nonexistent)
 
             # Should return empty list
             assert len(task_files) == 0
@@ -340,7 +340,7 @@ FAIL: Multiple issues:
 
 
 class TestTaskExecutorFileLocking:
-    """Tests for _lock_file and _unlock_file methods."""
+    """Tests for file_lock_manager.lock_file and file_lock_manager.unlock_file methods."""
 
     def test_lock_unlock_success_with_mocked_subprocess(self, monkeypatch):
         """Lock and unlock succeed when chattr returns exit code 0."""
@@ -362,8 +362,8 @@ class TestTaskExecutorFileLocking:
                 executor = TaskExecutor()
 
                 # Lock and unlock should not raise exceptions when returncode is 0
-                executor._lock_file(test_file)
-                executor._unlock_file(test_file)
+                executor.file_lock_manager.lock_file(test_file)
+                executor.file_lock_manager.unlock_file(test_file)
 
                 # Verify subprocess was called with correct commands
                 assert mock_popen.call_count == TWO_COMMANDS
@@ -403,7 +403,7 @@ class TestTaskExecutorFileLocking:
 
             # Should raise CalledProcessError with correct returncode
             with pytest.raises(subprocess.CalledProcessError) as exc_info:
-                executor._lock_file(test_file)
+                executor.file_lock_manager.lock_file(test_file)
 
             assert exc_info.value.returncode == 1
             # Check that the command is for sudo with the expected arguments (full path may be used)
@@ -432,7 +432,7 @@ class TestTaskExecutorFileLocking:
 
             # Should raise CalledProcessError with correct returncode
             with pytest.raises(subprocess.CalledProcessError) as exc_info:
-                executor._unlock_file(test_file)
+                executor.file_lock_manager.unlock_file(test_file)
 
             assert exc_info.value.returncode == 1
             # Check that the command is for sudo with the expected arguments (full path may be used)

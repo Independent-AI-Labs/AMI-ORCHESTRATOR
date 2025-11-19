@@ -1,0 +1,209 @@
+#!/usr/bin/env bash
+# ami-run: Universal execution wrapper for AMI Orchestrator
+# Use this instead of python3/python/uv/podman/node/java commands
+#
+# Supports subcommands: python, uv, podman, node, npm, npx, java
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(dirname "$SCRIPT_DIR")"
+
+# Check for help flag first
+if [[ "$#" -gt 0 && ("$1" == "-h" || "$1" == "--help") ]]; then
+    echo "ami-run: Universal execution wrapper for AMI Orchestrator"
+    echo ""
+    echo "Usage: ami-run [subcommand] [options] [args...]"
+    echo ""
+    echo "Available subcommands:"
+    echo "  python [args...]     Execute Python with nearest .venv (default if no subcommand)"
+    echo "  uv [args...]         Execute UV with root .venv"
+    echo "  podman [args...]     Execute Podman from bootstrapped environment"
+    echo "  node [args...]       Execute Node.js from bootstrapped environment"
+    echo "  npm [args...]        Execute NPM from bootstrapped environment"
+    echo "  npx [args...]        Execute NPX from bootstrapped environment"
+    echo "  java [args...]       Execute Java from system installation (if available)"
+    echo ""
+    echo "Examples:"
+    echo "  ami-run script.py                    # Run Python script (nearest .venv)"
+    echo "  ami-run python script.py             # Same as above"
+    echo "  ami-run uv pip install package       # Run uv command with root .venv"
+    echo "  ami-run podman ps                    # Run podman command"
+    echo "  ami-run node --version               # Run node command"
+    echo "  ami-run npm install                  # Run npm command"
+    exit 0
+fi
+
+# Load root .env if it exists (contains main environment variables)
+if [[ -f "$ROOT_DIR/.env" ]]; then
+    set -a
+    source "$ROOT_DIR/.env"
+    set +a
+fi
+
+# Load scripts/.env if it exists (contains script-specific environment variables)
+if [[ -f "$SCRIPT_DIR/.env" ]]; then
+    set -a
+    source "$SCRIPT_DIR/.env"
+    set +a
+fi
+
+# Find nearest .venv by walking up from PWD - NO FALLBACKS
+find_venv() {
+    local search_dir="$PWD"
+    while [[ "$search_dir" != "/" ]]; do
+        if [[ -d "$search_dir/.venv" ]]; then
+            echo "$search_dir/.venv"
+            return 0
+        fi
+        search_dir="$(dirname "$search_dir")"
+    done
+
+    return 1
+}
+
+# Set up base PATH with bootstrapped tools
+export PATH="$ROOT_DIR/.boot-linux/bin:$PATH"
+
+# Determine the subcommand - default to python if no subcommand provided
+if [[ $# -eq 0 || ("$1" != "python" && "$1" != "uv" && "$1" != "podman" && "$1" != "node" && "$1" != "npm" && "$1" != "npx" && "$1" != "java") ]]; then
+    SUBCOMMAND="python"
+    ORIGINAL_ARGS=("$@")
+else
+    SUBCOMMAND="$1"
+    shift
+    ORIGINAL_ARGS=("$@")
+fi
+
+# Execute based on subcommand
+case "$SUBCOMMAND" in
+    python)
+        # Find nearest .venv, same as original ami-run
+        VENV_DIR="$(find_venv)"
+        if [[ -z "$VENV_DIR" ]]; then
+            echo "Error: No .venv found in hierarchy from $PWD to root" >&2
+            exit 1
+        fi
+
+        VENV_PYTHON="$VENV_DIR/bin/python"
+        ROOT_VENV_PYTHON="$ROOT_DIR/.venv/bin/python"
+        VENV_SOURCE="$ROOT_DIR/.boot-linux"
+
+        if [[ ! -x "$VENV_PYTHON" ]]; then
+            echo "Error: Python executable not found in $VENV_DIR" >&2
+            echo "Run ./install first to properly set up the environment" >&2
+            exit 1
+        fi
+
+        # Add venv/bin to PATH so podman and other venv tools are available
+        export PATH="$VENV_DIR/bin:$PATH"
+
+        # Special command: install (alias for setup)
+        # Special command: setup
+        if [[ "${ORIGINAL_ARGS[0]:-}" == "install" ]] || [[ "${ORIGINAL_ARGS[0]:-}" == "setup" ]]; then
+            shift 2>/dev/null || true  # shift ORIGINAL_ARGS[0]
+            if [[ ${#ORIGINAL_ARGS[@]} -eq 0 ]]; then
+                # Run root module_setup using root venv python
+                exec "$ROOT_VENV_PYTHON" "$ROOT_DIR/module_setup.py"
+            else
+                # Run specific module setup using root venv python
+                MODULE="${ORIGINAL_ARGS[0]}"
+                ORIGINAL_ARGS=("${ORIGINAL_ARGS[@]:1}")  # remove first element
+                if [[ -f "$ROOT_DIR/$MODULE/module_setup.py" ]]; then
+                    exec "$ROOT_VENV_PYTHON" "$ROOT_DIR/$MODULE/module_setup.py" "${ORIGINAL_ARGS[@]}"
+                else
+                    echo "Error: module_setup.py not found in $MODULE" >&2
+                    exit 1
+                fi
+            fi
+        fi
+
+        # Regular execution: run python with all args using nearest .venv python
+        exec "$VENV_PYTHON" "${ORIGINAL_ARGS[@]}"
+        ;;
+    uv)
+        # Always use bootstrapped uv from .boot-linux ONLY - NO FALLBACKS
+        # This ensures consistent uv version across environments
+        BOOTSTRAPPED_UV="$ROOT_DIR/.boot-linux/bin/uv"
+        ROOT_VENV_PYTHON="$ROOT_DIR/.venv/bin/python"
+
+        if [[ ! -x "$BOOTSTRAPPED_UV" ]]; then
+            echo "Error: uv not found in bootstrapped environment at $BOOTSTRAPPED_UV" >&2
+            exit 1
+        fi
+
+        if [[ ! -x "$ROOT_VENV_PYTHON" ]]; then
+            echo "Error: python not found in root venv at $ROOT_VENV_PYTHON" >&2
+            exit 1
+        fi
+
+        # Inject --python flag for commands that need it for target directory operations
+        case "${ORIGINAL_ARGS[0]:-}" in
+            pip|add|remove|sync|lock)
+                exec "$BOOTSTRAPPED_UV" "${ORIGINAL_ARGS[0]}" --python "$ROOT_VENV_PYTHON" "${ORIGINAL_ARGS[@]:1}"
+                ;;
+            *)
+                exec "$BOOTSTRAPPED_UV" "${ORIGINAL_ARGS[@]}"
+                ;;
+        esac
+        ;;
+    podman)
+        # Direct access to podman from the bootstrapped environment (same as ami-podman function)
+        PODMAN_BIN="$ROOT_DIR/.boot-linux/bin/podman"
+
+        if [[ ! -x "$PODMAN_BIN" ]]; then
+            echo "Error: podman not found in bootstrapped environment at $PODMAN_BIN" >&2
+            exit 1
+        fi
+
+        exec "$PODMAN_BIN" "${ORIGINAL_ARGS[@]}"
+        ;;
+    node)
+        # Access to node from the bootstrapped environment
+        NODE_BIN="$ROOT_DIR/.boot-linux/bin/node"
+
+        if [[ ! -x "$NODE_BIN" ]]; then
+            echo "Error: node not found in bootstrapped environment at $NODE_BIN" >&2
+            exit 1
+        fi
+
+        exec "$NODE_BIN" "${ORIGINAL_ARGS[@]}"
+        ;;
+    npm)
+        # Access to npm from the bootstrapped environment
+        NPM_BIN="$ROOT_DIR/.boot-linux/bin/npm"
+
+        if [[ ! -x "$NPM_BIN" ]]; then
+            echo "Error: npm not found in bootstrapped environment at $NPM_BIN" >&2
+            exit 1
+        fi
+
+        exec "$NPM_BIN" "${ORIGINAL_ARGS[@]}"
+        ;;
+    npx)
+        # Access to npx from the bootstrapped environment
+        NPX_BIN="$ROOT_DIR/.boot-linux/bin/npx"
+
+        if [[ ! -x "$NPX_BIN" ]]; then
+            echo "Error: npx not found in bootstrapped environment at $NPX_BIN" >&2
+            exit 1
+        fi
+
+        exec "$NPX_BIN" "${ORIGINAL_ARGS[@]}"
+        ;;
+    java)
+        # Access to system java only - no bootstrapping for Java
+        if ! command -v java >/dev/null 2>&1; then
+            echo "Error: java not found in system PATH" >&2
+            echo "Please install Java on your system to use this command." >&2
+            exit 1
+        fi
+
+        exec java "${ORIGINAL_ARGS[@]}"
+        ;;
+    *)
+        echo "Error: Unknown subcommand '$SUBCOMMAND'" >&2
+        echo "Usage: ami-run [subcommand] [args...]" >&2
+        echo "Available subcommands: python, uv, podman, node, npm, npx, java" >&2
+        exit 1
+        ;;
+esac

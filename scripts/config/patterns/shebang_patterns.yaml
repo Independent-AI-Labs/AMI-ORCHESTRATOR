@@ -1,0 +1,34 @@
+# Shebang Security and Incorrect Patterns
+# Used by audit_shebangs.py for security and correctness validation
+#
+# These patterns define security risks and incorrect shebang patterns to detect.
+
+version: "1.0.0"
+
+# Security risk patterns to detect
+security_patterns:
+  - pattern: "sudo"
+    description: "Contains sudo (security risk)"
+    
+  - pattern: "/usr/bin/python"
+    description: "System python path (out-of-sandbox)"
+    
+  - pattern: "/usr/local/bin/python"
+    description: "System python path (out-of-sandbox)"
+
+# Incorrect patterns to detect
+incorrect_patterns:
+  - pattern: "#!/usr/bin/env python"
+    description: "Direct python shebang"
+    
+  - pattern: "#!/usr/bin/python"
+    description: "Direct python shebang"
+    
+  - pattern: "#!/usr/bin/env python3"
+    description: "Direct python3 shebang"
+    
+  - pattern: "#!/usr/bin/python3"
+    description: "Direct python3 shebang"
+    
+  - pattern: '.venv/bin/python"'
+    description: "Direct .venv python"

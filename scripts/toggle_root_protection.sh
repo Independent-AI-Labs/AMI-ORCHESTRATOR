@@ -1,7 +1,9 @@
 #!/bin/bash
 set -euo pipefail
 
-ROOT_DIR="/home/ami/Projects/AMI-ORCHESTRATOR"
+# Dynamically determine the script's directory and set ROOT_DIR relative to it
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(dirname "$SCRIPT_DIR")"
 DRY_RUN=false
 
 show_usage() {

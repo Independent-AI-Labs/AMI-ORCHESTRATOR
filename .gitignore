@@ -4,6 +4,9 @@ __pycache__/
 *$py.class
 *.so
 .Python
+
+# Backup directories
+*backup*/
 build/
 develop-eggs/
 dist/
@@ -113,3 +116,10 @@ docs/tech-logos/
 
 # Git repos working directory
 git-repos/repos/
+commit*
+COMMIT*
+tmp*
+tmp/
+.tmp/
+
+*.backup*

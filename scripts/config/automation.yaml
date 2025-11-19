@@ -90,6 +90,8 @@ prompts:
   docs_worker: "docs_worker.txt"
   docs_moderator: "docs_moderator.txt"
   completion_moderator: "completion_moderator.txt"
+  code_completion: "code_completion.txt"
+  code_review: "code_review.txt"
 
 # Response Scanner
 response_scanner:

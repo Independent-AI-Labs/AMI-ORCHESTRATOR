@@ -1,0 +1,12 @@
+Review the following {language} code, focusing on {areas}:
+
+```{language}
+{code}
+```
+
+Provide specific feedback on:
+1. Potential bugs or issues
+2. Performance improvements
+3. Code style and best practices
+4. Security considerations
+5. Suggested refactoring

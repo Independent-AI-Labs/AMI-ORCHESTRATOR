@@ -1,19 +1,19 @@
 #!/usr/bin/env bash
-"""'exec "$(dirname "$0")/ami-run.sh" "$0" "$@" #"""
+""":'
+exec "$(dirname "$0")/ami-run" "$0" "$@"
+"""
 
 """Git repository server management CLI.
 
 Creates and manages bare git repositories for local/remote development.
 """
 
-import argparse
-import os
-import sys
-from collections.abc import Callable
-from pathlib import Path
-from typing import NoReturn
+import sys  # noqa: E402
+from collections.abc import Callable  # noqa: E402
+from pathlib import Path  # noqa: E402
+from typing import Any, NoReturn  # noqa: E402
 
-from base.scripts.env.paths import setup_imports
+from base.scripts.env.paths import setup_imports  # noqa: E402
 
 # Bootstrap imports
 setup_imports(Path(__file__))
@@ -23,33 +23,10 @@ from backend.git_server.repo_ops import GitRepoOps
 from backend.git_server.results import BootstrapInfo, GitServerError, RepositoryError, ServiceError, SSHConfigInfo, SSHKeyError, SSHServerStatus
 from backend.git_server.service_ops import GitServiceOps
 from backend.git_server.ssh_ops import GitSSHOps
-
-
-def get_base_path() -> Path:
-    """Get git server base path from environment or default.
-
-    Returns:
-        Base path for git repositories (default: ~/git-repos)
-    """
-    env_path = os.getenv("GIT_SERVER_BASE_PATH")
-    if env_path:
-        return Path(env_path).expanduser()
-    return Path.home() / "git-repos"
-
-
-def _print_success(message: str) -> None:
-    """Print success message."""
-    sys.stdout.write(f"✓ {message}\n")
-
-
-def _print_info(message: str, indent: int = 0) -> None:
-    """Print info message with optional indentation."""
-    sys.stdout.write("  " * indent + message + "\n")
-
-
-def _print_error(message: str) -> None:
-    """Print error message to stderr."""
-    sys.stderr.write(f"✗ {message}\n")
+from scripts.cli_components.cli_helpers import print_error, print_info, print_success
+from scripts.cli_components.command_executor import execute_service_command
+from scripts.cli_components.path_utils import get_base_path
+from scripts.cli_components.repo_cli_parser import setup_argument_parser
 
 
 class GitRepoManager:
@@ -77,15 +54,15 @@ class GitRepoManager:
         """Initialize git server directory structure."""
         try:
             result = self.repo_ops.init_server()
-            _print_success(result.message)
+            print_success(result.message)
             if result.data:
                 if result.data.get("already_exists"):
-                    _print_info(f"Base path: {result.data['base_path']}", 1)
-                    _print_info(f"Repositories: {result.data['repos_path']}", 1)
+                    print_info(f"Base path: {result.data['base_path']}", 1)
+                    print_info(f"Repositories: {result.data['repos_path']}", 1)
                 else:
-                    _print_info(f"Base path: {result.data['base_path']}", 1)
-                    _print_info(f"Repositories: {result.data['repos_path']}", 1)
-                    _print_info(f"README: {result.data['readme_path']}", 1)
+                    print_info(f"Base path: {result.data['base_path']}", 1)
+                    print_info(f"Repositories: {result.data['repos_path']}", 1)
+                    print_info(f"README: {result.data['readme_path']}", 1)
         except (RepositoryError, GitServerError):
             sys.exit(1)
 
@@ -98,12 +75,12 @@ class GitRepoManager:
         """
         try:
             result = self.repo_ops.create_repo(name, description)
-            _print_success(result.message)
-            _print_info(f"Repository: {result.repo_name}", 1)
-            _print_info(f"Path: {result.repo_path}", 1)
-            _print_info(f"URL: {result.url}", 1)
+            print_success(result.message)
+            print_info(f"Repository: {result.repo_name}", 1)
+            print_info(f"Path: {result.repo_path}", 1)
+            print_info(f"URL: {result.url}", 1)
             if result.data and result.data.get("description"):
-                _print_info(f"Description: {result.data['description']}", 1)
+                print_info(f"Description: {result.data['description']}", 1)
         except (RepositoryError, GitServerError):
             sys.exit(1)
 
@@ -115,18 +92,18 @@ class GitRepoManager:
         """
         try:
             result = self.repo_ops.list_repos(verbose)
-            _print_success(result.message)
+            print_success(result.message)
             if result.data and result.data.get("repos"):
                 for repo in result.data["repos"]:
-                    _print_info(f"Path: {repo['path']}", 1)
-                    _print_info(f"URL: {repo['url']}", 1)
+                    print_info(f"Path: {repo['path']}", 1)
+                    print_info(f"URL: {repo['url']}", 1)
                     if verbose and "description" in repo:
-                        _print_info(f"Description: {repo['description']}", 1)
+                        print_info(f"Description: {repo['description']}", 1)
                     if verbose and "branches" in repo:
-                        _print_info(f"Branches: {repo['branches']}", 1)
+                        print_info(f"Branches: {repo['branches']}", 1)
             else:
                 # Print message when no repositories exist
-                _print_info("No repositories found")
+                print_info("No repositories found")
         except (RepositoryError, GitServerError):
             sys.exit(1)
 
@@ -140,9 +117,9 @@ class GitRepoManager:
         try:
             result = self.repo_ops.get_repo_url(name, protocol)
             if result.url is not None:
-                _print_info(result.url)  # Print the URL to stdout
+                print_info(result.url)  # Print the URL to stdout
             else:
-                _print_error("No URL returned for repository")
+                print_error("No URL returned for repository")
                 sys.exit(1)
         except (RepositoryError, GitServerError):
             sys.exit(1)
@@ -156,10 +133,10 @@ class GitRepoManager:
         """
         try:
             result = self.repo_ops.clone_repo(name, destination)
-            _print_success(result.message)
+            print_success(result.message)
             if result.data:
-                _print_info(f"Source: {result.data['source']}", 1)
-                _print_info(f"Destination: {result.data['destination']}", 1)
+                print_info(f"Source: {result.data['source']}", 1)
+                print_info(f"Destination: {result.data['destination']}", 1)
         except (RepositoryError, GitServerError):
             sys.exit(1)
 
@@ -176,11 +153,11 @@ class GitRepoManager:
                 response = input("Type 'yes' to confirm: ")
                 if response.lower() == "yes":
                     result = self.repo_ops.delete_repo(name, confirmed=True)
-                    _print_success(result.message)
+                    print_success(result.message)
                 else:
                     return
             else:
-                _print_success(result.message)
+                print_success(result.message)
         except (RepositoryError, GitServerError):
             sys.exit(1)
 
@@ -193,27 +170,27 @@ class GitRepoManager:
         try:
             result = self.repo_ops.repo_info(name)
             if result.data:
-                _print_info(f"Path: {result.data['path']}", 1)
-                _print_info(f"URL: {result.data['url']}", 1)
+                print_info(f"Path: {result.data['path']}", 1)
+                print_info(f"URL: {result.data['url']}", 1)
                 if result.data.get("description"):
-                    _print_info(f"Description: {result.data['description']}", 1)
+                    print_info(f"Description: {result.data['description']}", 1)
 
                 branches = result.data.get("branches")
                 if branches:
                     for branch in branches:
-                        _print_info(branch, 1)
+                        print_info(branch, 1)
                 else:
-                    _print_info("No commits yet", 1)
+                    print_info("No commits yet", 1)
 
                 if result.data.get("tags"):
                     for tag in result.data["tags"]:
-                        _print_info(tag, 1)
+                        print_info(tag, 1)
                 if result.data.get("last_commit"):
                     commit = result.data["last_commit"]
-                    _print_info(f"Hash: {commit['hash']}", 1)
-                    _print_info(f"Author: {commit['author']}", 1)
-                    _print_info(f"Date: {commit['date']}", 1)
-                    _print_info(f"Message: {commit['message']}", 1)
+                    print_info(f"Hash: {commit['hash']}", 1)
+                    print_info(f"Author: {commit['author']}", 1)
+                    print_info(f"Date: {commit['date']}", 1)
+                    print_info(f"Message: {commit['message']}", 1)
         except (RepositoryError, GitServerError):
             sys.exit(1)
 
@@ -226,11 +203,11 @@ class GitRepoManager:
         """
         try:
             result = self.ssh_ops.add_ssh_key(key_file, name)
-            _print_success(result.message)
+            print_success(result.message)
             if result.data:
-                _print_info(f"Key name: {result.data['name']}", 1)
-                _print_info(f"Restrictions: {result.data['restrictions']}", 1)
-                _print_info(f"Link command: {result.data['link_command']}", 1)
+                print_info(f"Key name: {result.data['name']}", 1)
+                print_info(f"Restrictions: {result.data['restrictions']}", 1)
+                print_info(f"Link command: {result.data['link_command']}", 1)
         except (SSHKeyError, GitServerError):
             sys.exit(1)
 
@@ -238,18 +215,18 @@ class GitRepoManager:
         """List all authorized SSH keys."""
         try:
             result = self.ssh_ops.list_ssh_keys()
-            _print_success(result.message)
+            print_success(result.message)
             if result.data and result.data.get("keys"):
                 for key in result.data["keys"]:
                     if "name" in key:
-                        _print_info(f"Name: {key['name']}", 1)
+                        print_info(f"Name: {key['name']}", 1)
                     if "type" in key:
-                        _print_info(f"Type: {key['type']}", 1)
+                        print_info(f"Type: {key['type']}", 1)
                     if "fingerprint" in key:
-                        _print_info(f"Fingerprint: {key['fingerprint']}", 1)
+                        print_info(f"Fingerprint: {key['fingerprint']}", 1)
             else:
                 # Print message when no SSH keys exist
-                _print_info("No SSH keys configured")
+                print_info("No SSH keys configured")
         except (SSHKeyError, GitServerError):
             sys.exit(1)
 
@@ -261,7 +238,7 @@ class GitRepoManager:
         """
         try:
             result = self.ssh_ops.remove_ssh_key(name)
-            _print_success(result.message)
+            print_success(result.message)
         except (SSHKeyError, GitServerError):
             sys.exit(1)
 
@@ -269,9 +246,9 @@ class GitRepoManager:
         """Link git authorized_keys to ~/.ssh/authorized_keys."""
         try:
             result = self.ssh_ops.setup_ssh_link()
-            _print_success(result.message)
+            print_success(result.message)
             if result.data:
-                _print_info(f"{result.data['link_target']} -> {result.data['link_source']}", 1)
+                print_info(f"{result.data['link_target']} -> {result.data['link_source']}", 1)
         except (SSHKeyError, GitServerError):
             sys.exit(1)
 
@@ -285,13 +262,13 @@ class GitRepoManager:
         """
         try:
             result = self.ssh_ops.generate_ssh_key(name, key_type, comment)
-            _print_success(result.message)
+            print_success(result.message)
             if result.data:
-                _print_info(f"Name: {result.data['name']}", 1)
-                _print_info(f"Type: {result.data['type']}", 1)
-                _print_info(f"Private key: {result.data['private_key']} (permissions: 0600)", 1)
-                _print_info(f"Public key: {result.data['public_key']} (permissions: 0644)", 1)
-                _print_info(result.data["fingerprint"], 1)
+                print_info(f"Name: {result.data['name']}", 1)
+                print_info(f"Type: {result.data['type']}", 1)
+                print_info(f"Private key: {result.data['private_key']} (permissions: 0600)", 1)
+                print_info(f"Public key: {result.data['public_key']} (permissions: 0644)", 1)
+                print_info(result.data["fingerprint"], 1)
         except (SSHKeyError, GitServerError):
             sys.exit(1)
 
@@ -311,10 +288,10 @@ class GitRepoManager:
                     self._print_ssh_status(bootstrap_info.ssh_status)
                 if bootstrap_info.ssh_config:
                     self._print_ssh_config(bootstrap_info.ssh_config)
-            _print_success(result.message)
+            print_success(result.message)
             if result.data and result.data.get("next_steps"):
                 for i, step in enumerate(result.data["next_steps"], 1):
-                    _print_info(f"{i}. {step}", 1)
+                    print_info(f"{i}. {step}", 1)
         except (ServiceError, GitServerError):
             sys.exit(1)
 
@@ -329,180 +306,41 @@ class GitRepoManager:
 
     def _print_running_ssh_status(self, ssh_status: SSHServerStatus) -> None:
         """Print running SSH server status."""
-        _print_success("SSH server is running")
+        print_success("SSH server is running")
         if ssh_status.openssh_dir:
-            _print_info(f"OpenSSH: {ssh_status.openssh_dir}", 1)
+            print_info(f"OpenSSH: {ssh_status.openssh_dir}", 1)
         if ssh_status.sshd_venv:
-            _print_info(f"Control script: {ssh_status.sshd_venv}", 1)
+            print_info(f"Control script: {ssh_status.sshd_venv}", 1)
         if ssh_status.sshd_path:
-            _print_info(f"sshd: {ssh_status.sshd_path}", 1)
+            print_info(f"sshd: {ssh_status.sshd_path}", 1)
 
     def _print_not_running_ssh_status(self, ssh_status: SSHServerStatus) -> None:
         """Print not running SSH server status."""
         if ssh_status.start_command:
-            _print_info(ssh_status.start_command, 1)
+            print_info(ssh_status.start_command, 1)
         if ssh_status.start_commands:
             for cmd in ssh_status.start_commands:
-                _print_info(cmd, 1)
+                print_info(cmd, 1)
 
     def _print_unknown_ssh_status(self, ssh_status: SSHServerStatus) -> None:
         """Print unknown SSH server status."""
         if ssh_status.message:
-            _print_info(ssh_status.message, 1)
+            print_info(ssh_status.message, 1)
 
     def _print_ssh_config(self, ssh_config: SSHConfigInfo) -> None:
         """Print SSH configuration information."""
         if ssh_config.status == "found":
-            _print_success(f"SSH configuration: {ssh_config.config_path}")
+            print_success(f"SSH configuration: {ssh_config.config_path}")
             if ssh_config.recommended_settings:
                 for setting in ssh_config.recommended_settings:
-                    _print_info(setting, 1)
+                    print_info(setting, 1)
         else:
             pass
 
 
-def service_status() -> None:
-    """Check status of git server services."""
-    base_path = get_base_path()
-    repos_path = base_path / "repos"
-    service_ops = GitServiceOps(base_path, repos_path)
-    result = service_ops.service_status()
-    if result.services:
-        # Group by mode
-        dev_services = [s for s in result.services if s.get("mode") == "dev"]
-        systemd_services = [s for s in result.services if s.get("mode") == "systemd"]
-
-        if dev_services:
-            for svc in dev_services:
-                if "message" in svc:
-                    _print_info(svc["message"], 2)
-
-        if systemd_services:
-            for svc in systemd_services:
-                if "message" in svc:
-                    _print_info(svc["message"], 2)
-
-
-def service_start(mode: str = "dev") -> None:
-    """Start git server services."""
-    base_path = get_base_path()
-    repos_path = base_path / "repos"
-    service_ops = GitServiceOps(base_path, repos_path)
-    result = service_ops.service_start(mode)
-    _print_success(result.message)
-
-
-def service_stop(mode: str = "dev") -> None:
-    """Stop git server services."""
-    base_path = get_base_path()
-    repos_path = base_path / "repos"
-    service_ops = GitServiceOps(base_path, repos_path)
-    result = service_ops.service_stop(mode)
-    _print_success(result.message)
-
-
-def service_install_systemd() -> None:
-    """Install systemd user services for git server."""
-    base_path = get_base_path()
-    repos_path = base_path / "repos"
-    service_ops = GitServiceOps(base_path, repos_path)
-    result = service_ops.service_install_systemd()
-    if result.data:
-        _print_success(f"Created {result.data['sshd_service']}")
-        _print_success(f"Created {result.data['daemon_service']}")
-        _print_success("Reloaded systemd user daemon")
-        _print_success("Enabled services (auto-start)")
-        _print_success("Enabled lingering (services persist after logout)")
-        _print_info(result.data["start_command"], 1)
-        _print_info(result.data["status_command"], 1)
-
-
-def _setup_argument_parser() -> argparse.ArgumentParser:
-    """Set up and return configured argument parser."""
-    parser = argparse.ArgumentParser(
-        description="Git repository server management CLI",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-    )
-    parser.add_argument(
-        "--base-path",
-        type=Path,
-        help="Base directory for git repositories (default: $GIT_SERVER_BASE_PATH or ~/git-repos)",
-    )
-
-    subparsers = parser.add_subparsers(dest="command", help="Command to execute")
-
-    # Repository commands
-    _ = subparsers.add_parser("init", help="Initialize git server directory structure")
-
-    create_parser = subparsers.add_parser("create", help="Create a new bare repository")
-    create_parser.add_argument("name", help="Repository name")
-    create_parser.add_argument("-d", "--description", help="Repository description")
-
-    list_parser = subparsers.add_parser("list", help="List all repositories")
-    list_parser.add_argument("-v", "--verbose", action="store_true", help="Show detailed information")
-
-    url_parser = subparsers.add_parser("url", help="Get repository URL")
-    url_parser.add_argument("name", help="Repository name")
-    url_parser.add_argument("-p", "--protocol", choices=["file", "ssh"], default="file", help="URL protocol")
-
-    clone_parser = subparsers.add_parser("clone", help="Clone a repository")
-    clone_parser.add_argument("name", help="Repository name")
-    clone_parser.add_argument("destination", nargs="?", type=Path, help="Destination directory")
-
-    delete_parser = subparsers.add_parser("delete", help="Delete a repository")
-    delete_parser.add_argument("name", help="Repository name")
-    delete_parser.add_argument("-f", "--force", action="store_true", help="Skip confirmation")
-
-    info_parser = subparsers.add_parser("info", help="Show repository information")
-    info_parser.add_argument("name", help="Repository name")
-
-    # SSH commands
-    add_key_parser = subparsers.add_parser("add-key", help="Add SSH public key with git-only access")
-    add_key_parser.add_argument("key_file", type=Path, help="Path to SSH public key file")
-    add_key_parser.add_argument("name", help="Identifier for this key")
-
-    _ = subparsers.add_parser("list-keys", help="List authorized SSH keys")
-
-    remove_key_parser = subparsers.add_parser("remove-key", help="Remove an SSH key")
-    remove_key_parser.add_argument("name", help="Key identifier to remove")
-
-    _ = subparsers.add_parser("setup-ssh", help="Link git keys to ~/.ssh/authorized_keys")
-
-    generate_key_parser = subparsers.add_parser("generate-key", help="Generate new SSH key pair")
-    generate_key_parser.add_argument("name", help="Key name (used for filename)")
-    generate_key_parser.add_argument(
-        "-t", "--type", dest="key_type", choices=["ed25519", "rsa", "ecdsa"], default="ed25519", help="Key type (default: ed25519)"
-    )
-    generate_key_parser.add_argument("-c", "--comment", help="Comment for the key")
-
-    bootstrap_ssh_parser = subparsers.add_parser("bootstrap-ssh", help="Bootstrap SSH server installation")
-    bootstrap_ssh_parser.add_argument(
-        "--install-type", choices=["system", "venv"], default="system", help="Installation type: system-wide or virtualenv (default: system)"
-    )
-
-    # Service commands
-    service_parser = subparsers.add_parser("service", help="Manage git server services")
-    service_subparsers = service_parser.add_subparsers(dest="service_action", help="Service action")
-
-    _ = service_subparsers.add_parser("status", help="Check service status")
-
-    service_start_parser = service_subparsers.add_parser("start", help="Start services")
-    service_start_parser.add_argument(
-        "--mode", dest="service_mode", choices=["dev", "systemd"], default="dev", help="Service mode: dev (setup_service.py) or systemd (default: dev)"
-    )
-
-    service_stop_parser = service_subparsers.add_parser("stop", help="Stop services")
-    service_stop_parser.add_argument(
-        "--mode", dest="service_mode", choices=["dev", "systemd"], default="dev", help="Service mode: dev (setup_service.py) or systemd (default: dev)"
-    )
-
-    _ = service_subparsers.add_parser("install-systemd", help="Install systemd user services")
-
-    return parser
-
-
-def _execute_command(args: argparse.Namespace, manager: GitRepoManager) -> None:
+def execute_command(args: Any, manager: GitRepoManager) -> None:
     """Execute command based on parsed arguments."""
+
     command_handlers: dict[str, Callable[[], None]] = {
         "init": lambda: manager.init_server(),
         "create": lambda: manager.create_repo(args.name, args.description),
@@ -520,31 +358,16 @@ def _execute_command(args: argparse.Namespace, manager: GitRepoManager) -> None:
     }
 
     if args.command == "service":
-        _execute_service_command(args)
+        execute_service_command(args, get_base_path, print_success, print_info)
     elif args.command in command_handlers:
         command_handlers[args.command]()
     else:
         raise ValueError(f"Unknown command: {args.command}")
 
 
-def _execute_service_command(args: argparse.Namespace) -> None:
-    """Execute service subcommand."""
-    service_handlers: dict[str, Callable[[], None]] = {
-        "status": lambda: service_status(),
-        "start": lambda: service_start(args.service_mode),
-        "stop": lambda: service_stop(args.service_mode),
-        "install-systemd": lambda: service_install_systemd(),
-    }
-
-    if args.service_action in service_handlers:
-        service_handlers[args.service_action]()
-    else:
-        raise ValueError(f"Unknown service action: {args.service_action}")
-
-
 def main() -> NoReturn:
     """Main CLI entry point."""
-    parser = _setup_argument_parser()
+    parser = setup_argument_parser()
     args = parser.parse_args()
 
     if args.command is None:
@@ -554,7 +377,7 @@ def main() -> NoReturn:
     manager = GitRepoManager(args.base_path)
 
     try:
-        _execute_command(args, manager)
+        execute_command(args, manager)
     except (RepositoryError, SSHKeyError, ServiceError, GitServerError):
         sys.exit(1)
     except ValueError:

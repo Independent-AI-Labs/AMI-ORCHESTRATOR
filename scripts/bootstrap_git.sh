@@ -2,12 +2,12 @@
 set -euo pipefail
 
 # Git Bootstrap Script for AMI-ORCHESTRATOR
-# Downloads Git from Ubuntu packages and installs in venv
+# Downloads Git from Ubuntu packages and installs in .boot-linux
 # Creates self-contained git installation for git-daemon
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
-VENV_DIR="${REPO_ROOT}/.venv"
+VENV_DIR="${REPO_ROOT}/.boot-linux"
 GIT_DIR="${VENV_DIR}/git"
 
 # Color output
@@ -98,5 +98,5 @@ log_info "  - Git ${INSTALLED_VERSION}"
 log_info "  - Binary: ${GIT_DIR}/bin/git"
 log_info "  - Git core: ${GIT_DIR}/libexec/git-core/"
 log_info ""
-log_info "Git is now available in venv"
-log_info "Symlink will be created at .venv/bin/git"
+log_info "Git is now available in .boot-linux"
+log_info "Symlink will be created at .boot-linux/bin/git"

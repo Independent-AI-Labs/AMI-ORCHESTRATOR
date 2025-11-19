@@ -7,11 +7,11 @@ from pathlib import Path
 import pytest
 import yaml
 
-import scripts.automation.config as config_module
+import scripts.agents.config as config_module
 
 # Import will fail until we implement config.py - that's expected in TDD
 try:
-    from scripts.automation.config import Config, get_config
+    from scripts.agents.config import Config, get_config
 except ImportError:
     Config = None
     get_config = None

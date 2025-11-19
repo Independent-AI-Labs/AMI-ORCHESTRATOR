@@ -2,12 +2,21 @@
 set -euo pipefail
 
 # Podman Bootstrap Script for AMI-ORCHESTRATOR
-# Downloads and installs Podman and podman-compose in the virtual environment
+# Downloads and installs Podman and podman-compose in the .boot-linux environment ONLY
 # This script ensures Podman is available without requiring system-wide installation
+# FORCE INSTALLS TO .boot-linux - NO FALLBACKS, NO .venv, ONLY .boot-linux
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
-VENV_DIR="${REPO_ROOT}/.venv"
+
+# Force installation to .boot-linux only - no alternatives
+if [ -n "${BOOT_LINUX_DIR:-}" ]; then
+    VENV_DIR="${BOOT_LINUX_DIR}"
+else
+    # Default to .boot-linux in the repo root - this is the ONLY supported location
+    VENV_DIR="${REPO_ROOT}/.boot-linux"
+fi
+
 PODMAN_DIR="${VENV_DIR}/podman"
 PODMAN_VERSION="5.6.2"
 PODMAN_COMPOSE_VERSION="1.5.0"

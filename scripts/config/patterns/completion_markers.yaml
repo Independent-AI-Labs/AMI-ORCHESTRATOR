@@ -1,0 +1,10 @@
+# Completion Marker Patterns
+# Used by response validation utilities to identify task completion signals
+#
+# These markers signal that a task is complete or feedback is required.
+
+version: "1.0.0"
+
+completion_markers:
+  - "WORK DONE"
+  - "FEEDBACK:"

@@ -1,0 +1,212 @@
+# Banned Word Patterns Configuration
+# Used by banned_words.py to detect forbidden words and patterns
+#
+# This file contains all patterns that should be banned from the codebase
+# including both simple words and regex patterns for complex detection
+
+version: "1.0.0"
+
+banned_words:
+  # General banned words
+  - "fallback"
+  - "falling"
+  - "backwards"
+  - "compatibility"
+  - "degradation"
+  - "legacy"
+  - "shim"
+  - "shims"
+  - "stub"
+  - "stubs"
+  - "skeleton"
+  - "ignore"
+  - "placeholder"
+  - "placeholders"
+  - "mock"
+  - "parent.parent"
+  - "hallucinate"
+  - "hallucinated"
+  - "lazy"
+  - "maybe"
+  - "@dataclass"
+  - "getattr"
+  - "setattr"
+  - "hasattr"
+  - ".__dict__"
+  - "vars("
+  - "—"  # em-dash
+  - "@pytest.mark.skipif"
+  - "reason=\".*not implemented yet\""
+  - "reason='.*not implemented yet'"
+  - ": Any"
+  - "/home/"
+
+  # UUID version bans - only uuid7 allowed
+  - "uuid.uuid1("
+  - "uuid.uuid3("
+  - "uuid.uuid4("
+  - "uuid.uuid5("
+  - "uuid.uuid6("
+  - "uuid.uuid8("
+  - "uuid1()"
+  - "uuid3()"
+  - "uuid4()"
+  - "uuid5()"
+  - "uuid6()"
+  - "uuid8()"
+
+  # Unreadable nested bracket and comma patterns - AUTOMATED DETECTION
+  # - "tuple[dict["
+  # - "dict[str, dict["
+  # - "list[dict[str,"
+  # - "tuple[.*,.+,.+]"
+  # - "dict[.+, .+, .+]"
+  # - "[str, Any], str, dict["
+  # - "dict[str, list[dict["
+  # - "list[dict[str, list["
+  # - "tuple[.+, .+, .+, .+]"  # tuple with 4+ comma-separated elements
+
+banned_filename_patterns:
+  - "_v1"
+  - "_v2"
+  - "_v3"
+  - "_v4"
+  - "_v5"
+  - "_old"
+  - "_new"
+  - "_fixed"
+  - "_temp"
+  - "_tmp"
+  - "_backup"
+  - "_copy"
+  - "_2"
+  - "_final"
+  - "_latest"
+  - ".old"
+  - ".new"
+  - ".backup"
+  - ".bak"
+  - ".orig"
+
+# Files that should be ignored from banned word scanning
+ignored_files:
+  - "scripts/config/patterns/banned_words.yaml"  # This config file itself
+  - "scripts/quality/banned_words.py"
+  - "base/scripts/quality/banned_words.py"
+  - "base/scripts/meta/cleanup.py"
+  - "base/backend/quality/scanner.py"
+  - "base/tests/integration/test_config_enforcement.py"
+  - "ux/cms/public/js/lib/highlight-engine/index.js"
+  - "ux/scripts/quality/banned_words.py"
+  # Quality infrastructure files that validate ignore patterns
+  - "base/scripts/quality/check_config_ignores.py"
+  - "base/tests/unit/quality/test_scanner.py"
+  - "scripts/quality/check_config_ignores.py"
+  - "tests/unit/quality/test_scanner.py"
+  # Config pattern file that legitimately uses ignore patterns
+  - "scripts/config/patterns/config_ignore_patterns.yaml"  # Pattern config file for ignore checking
+  # Files testing or implementing pattern validation
+  - "base/scripts/quality/code_check.py"  # Implements TYPE_IGNORE_PATTERN checking
+  - "base/scripts/meta/clean_commit_messages.py"  # Regex pattern compilation with re.IGNORECASE
+  - "base/tests/integration/ci/test_command_guard.py"  # Tests Python CLI flags
+  - "AGENTS.md"
+  - "CLAUDE.md"
+  - "claude-agent.sh"
+  - "codex-agent.sh"
+  # Module-specific agent guidelines
+  - "base/AGENTS.md"
+  - "base/CLAUDE.md"
+  - "base/claude-agent.sh"
+  - "browser/AGENTS.md"
+  - "browser/CLAUDE.md"
+  - "browser/claude-agent.sh"
+  - "compliance/AGENTS.md"
+  - "compliance/CLAUDE.md"
+  - "compliance/claude-agent.sh"
+  - "domains/AGENTS.md"
+  - "domains/CLAUDE.md"
+  - "domains/claude-agent.sh"
+  - "files/AGENTS.md"
+  - "files/CLAUDE.md"
+  - "files/claude-agent.sh"
+  - "nodes/AGENTS.md"
+  - "nodes/CLAUDE.md"
+  - "nodes/claude-agent.sh"
+  - "streams/AGENTS.md"
+  - "streams/CLAUDE.md"
+  - "streams/claude-agent.sh"
+  - "ux/AGENTS.md"
+  - "ux/CLAUDE.md"
+  - "ux/claude-agent.sh"
+  # UX documentation explaining antipatterns and design decisions
+  - "ux/cms/AUDIT-MESSAGE-DISCRIMINATION.md"
+  - "ux/cms/AUDIT-LIBRARY-DISCRIMINATION.md"
+  - "ux/SPEC-META.md"
+  - "ux/cms/SPEC-PORTAL.md"
+  - "ux/research/SCHEMA_DRIVEN_UI_CONCEPT.md"
+  - "ux/research/SCHEMA_UI_COMPONENT_CATALOG.md"
+  - "ux/research/SCHEMA_UI_ENTERPRISE_RESEARCH.md"
+  # UX UI files with legitimate skeleton loader patterns and CSS animations
+  - "ux/cms/public/js/main.js"  # Tree skeleton loader UI
+  - "ux/cms/public/styles/shared.css"  # Skeleton loader CSS animations
+  # Root-level documentation and configuration files explaining antipatterns
+  - "scripts/config/prompts/audit.txt"  # Audit rules document fallback checking
+  - "scripts/config/prompts/patterns_core.txt"  # Pattern catalog documents antipatterns we prohibit
+  - "scripts/config/prompts/consolidate.txt"  # Documents what to ignore in consolidation
+  - "scripts/config/prompts/completion_moderator.txt"  # Documents ignored best practices checks
+  - "backend/agents/SPEC-AGENTS.md"  # Architecture spec discusses legacy compatibility
+  - "backend/scheduling/SPEC-SCHEDULING.md"  # Architecture spec uses stub terminology
+  # Root-level scripts with architectural comments
+  - "scripts/backup_to_gdrive.py"  # Documents fallback authentication methods
+  - "scripts/ami-run"  # Comments explain .venv fallback logic
+  - "scripts/ami-uv"  # Comments explain .venv fallback logic
+  - "scripts/automation/agent_cli.py"  # Has legitimate placeholder comments for future work
+  - "scripts/automation/hooks.py"  # Contains error messages explaining forbidden parent.parent patterns
+  - "scripts/automation/validators.py"  # Contains error messages explaining forbidden parent.parent patterns
+  # Root-level automation test files using unittest.mock
+  - "scripts/automation/tests/test_bash_hooks.py"  # Unit tests with mock
+  - "scripts/automation/tests/test_completion_moderator.py"  # Unit tests with mock
+  # Root-level test files that verify pattern detection
+  - "tests/test_backup_to_gdrive.py"  # Tests backup script with parent.parent paths
+  - "tests/conftest.py"  # Test configuration with parent.parent path resolution
+  - "tests/test_automation_hooks.py"  # Tests command guard detecting fallback patterns
+  - "tests/test_automation_wrappers.py"  # Tests git wrappers with mock
+  - "tests/unit/test_hooks.py"  # Unit tests with "ignores" in test docstrings
+  - "tests/integration/test_consolidated_patterns.py"  # Tests pattern detection for fallbacks
+  - "tests/integration/test_ami_agent_tasks.py"  # Tests mock usage patterns
+  - "tests/integration/test_agent_cli_integration.py"  # Documents NO MOCKING policy
+  - "tests/integration/test_sync_integration.py"  # Documents NO MOCKING policy
+  - "tests/integration/test_ami_agent_integration.py"  # Documents NO MOCKING policy
+  - "tests/integration/test_audit_engine_integration.py"  # Documents NO MOCKING policy
+  - "tests/edge_cases/test_edge_cases.py"  # Test fixtures with parent.parent paths
+  # Root-level integration test fixtures containing captured agent transcripts
+  - "tests/integration/fixtures/transcripts/real_case_1_0e02ced7-827.jsonl"  # Captured transcript
+  - "tests/integration/fixtures/transcripts/real_case_2_0383a6b1-e47.jsonl"  # Captured transcript
+  - "tests/integration/fixtures/transcripts/real_case_3_665ffab0-fdb.jsonl"  # Captured transcript
+  # Pattern documentation files showing examples of forbidden patterns
+  - "scripts/config/patterns/python_fast.yaml"  # Documents forbidden patterns as examples
+  # Backend architecture specs explaining design strategies
+  - "backend/agents/SPEC-AGENTS-V2.1.md"  # Architecture spec discusses authentication strategies
+  # Integration tests using mocks (should be unit tests but temporarily exempt)
+  - "tests/integration/test_moderator_hang_reproduction.py"  # Integration test with mock usage
+  # Security prompt files that legitimately discuss malicious behavior patterns for detection
+  - "scripts/config/prompts/malicious_behavior_moderator.txt"  # Security prompt discussing ignore/fallback patterns for detection
+  - "scripts/config/prompts/patterns_python.txt"  # Pattern catalog includes examples of forbidden patterns
+  - "tests/unit/test_moderator_response_parsing.py"  # Tests parsing of moderator responses with banned terms
+  - "tests/unit/test_completion_moderator.py"  # Tests completion moderator with banned terms
+  - "scripts/automation/README_MULTI_CLI.md"  # Documentation includes examples of security patterns
+  - "backend/agents/SPEC-AGENTS-ENTERPRISE.md"  # Architecture spec discusses stub implementations
+  # Additional files that legitimately discuss security concepts
+  - "backend/agents/README-CURRENT-IMPLEMENTATION.md"  # Architecture documentation
+  - "scripts/config/automation.yaml"  # Configuration file with legacy comments
+  - "scripts/git_commit.sh"  # Script discusses config ignore checks
+  - "tests/unit/test_malicious_behavior_moderator.py"  # Tests that verify malicious behavior detection
+  # Files that legitimately use the term 'lazy' in their implementation
+  - "base/backend/dataops/GRAPH_API.md"  # Documentation about lazy loading
+  - "base/backend/dataops/core/graph_relations.py"  # Implementation using lazy loading
+  - "base/backend/dataops/security/cache_layer.py"  # Cache implementation with lazy strategy
+  - "base/backend/dataops/implementations/embedding_service.py"  # Lazy loading of models
+  - "base/backend/dataops/models/base_model.py"  # Lazy import implementation
+  # Commit message file that discusses code changes
+  - "base/COMMIT_MSG.txt"  # Commit message discussing ignore and lazy patterns in code
+  - "COMMIT_MSG.txt"  # Root-level commit message discussing ignore and lazy patterns in code

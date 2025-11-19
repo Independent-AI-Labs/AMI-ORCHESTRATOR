@@ -21,12 +21,14 @@ patterns:
   # Forbidden path manipulation pattern
   - name: "parent_parent"
     check_type: "content_pattern"
-    pattern: '.parent.parent'
+    patterns:
+      - '.parent.parent'
+      - '.parents\[\d+\]'
     allow_removal: true  # Only block ADDITIONS of this pattern
     error_template: |
-      ❌ FORBIDDEN CODE PATTERN: .parent.parent
+      ❌ FORBIDDEN CODE PATTERN: .parent.parent or .parents[x]
 
-      NEVER use Path(__file__).parent.parent or similar patterns.
+      NEVER use Path(__file__).parent.parent or Path(__file__).parents[x] or similar patterns.
 
       Use the _ensure_repo_on_path() pattern from scripts/run_tests.py:
 
@@ -209,3 +211,24 @@ patterns:
 
       WHY BANNED:
       print() is lazy debugging output that bypasses proper logging infrastructure.
+
+  # Banned relative imports
+  - name: "banned_relative_import"
+    check_type: "content_pattern"
+    pattern: 'from \.'
+    is_regex: true
+    allow_removal: true
+    error_template: |
+      ❌ BANNED: Relative Import Pattern "from ."
+
+      ZERO TOLERANCE: Use absolute imports instead of relative imports.
+
+      FORBIDDEN:
+        - from . import ...
+        - from .. import ...
+        - from ... import ...
+
+      REQUIRED: Use absolute imports from the project root or proper package structure.
+
+      WHY BANNED:
+      Relative imports create confusing dependency chains and make code harder to understand and maintain.

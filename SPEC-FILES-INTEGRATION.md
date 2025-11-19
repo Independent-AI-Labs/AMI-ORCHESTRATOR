@@ -109,7 +109,7 @@ From user directive:
    is_valid, feedback = validator.validate_content(content, file_path)
 
    # AFTER (correct)
-   from scripts.automation.validators import validate_python_full
+   from scripts.automation.validators.llm_validators import validate_python_full
 
    # Get old content for diff
    old_content = file_path.read_text() if file_path.exists() else ""

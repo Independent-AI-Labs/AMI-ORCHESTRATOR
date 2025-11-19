@@ -9,7 +9,7 @@ Tests the _parse_moderator_decision method to verify:
 
 import pytest
 
-from scripts.automation.hooks import ResponseScanner
+from scripts.agents.workflows.response_validators import ResponseScanner
 
 
 class TestModeratorResponseParsing:
@@ -29,15 +29,14 @@ class TestModeratorResponseParsing:
         assert result.decision == "allow"
         assert result.system_message == "✅ MODERATOR: User requested fix auth bug. Assistant fixed auth/validator.py and added test. All verified."
 
-    def test_legacy_bare_allow_format(self, scanner):
-        """Verify legacy bare ALLOW format still works with backwards compatibility."""
+    def test_legacy_bare_allow_format_blocks_for_security(self, scanner):
+        """Verify legacy bare ALLOW format is blocked for security (no longer allowed)."""
         output = "ALLOW"
 
         result = scanner._parse_moderator_decision("test-session", output)
 
-        assert result.decision == "allow"
-        assert "MODERATOR:" in result.system_message
-        assert "legacy format" in result.system_message
+        assert result.decision == "block"
+        assert "BLOCKED: ALLOW without explanation" in result.reason
 
     def test_block_format_shows_full_reason(self, scanner):
         """Verify BLOCK: format shows full moderator reasoning."""

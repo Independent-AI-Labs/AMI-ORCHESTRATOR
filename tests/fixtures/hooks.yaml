@@ -1,0 +1,7 @@
+hooks:
+  - event: PreToolUse
+    command: bash-guard
+    matcher: [Bash]
+    timeout: 30000
+  - event: Stop
+    command: response-scanner

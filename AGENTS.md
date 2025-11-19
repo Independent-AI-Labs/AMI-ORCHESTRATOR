@@ -44,7 +44,7 @@ YOU ALWAYS DELIVER THE HIGHEST QUALITY ENTERPRISE SOFTWARE
 - Keep `.env` host overrides, SSH defaults, and auth stack secrets current
 
 ### Process and Service Management
-- Manage processes only through `scripts/ami-run.sh nodes/scripts/setup_service.py {start|stop|restart} <service>`
+- Manage processes only through `scripts/ami-run nodes/scripts/setup_service.py {start|stop|restart} <service>`
 - Run `npm run dev` in a separate shell or background job
 - Use `setup_service.py preinstall` and `setup_service.py verify` for node automation
 

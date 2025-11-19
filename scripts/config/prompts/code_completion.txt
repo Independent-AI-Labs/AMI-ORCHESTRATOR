@@ -1,0 +1,9 @@
+Complete the following {language} code:
+
+```{language}
+{code}
+```
+
+{context_template}
+
+Provide only the completed code without explanations.

@@ -6,7 +6,7 @@ import json
 import tempfile
 from pathlib import Path
 
-from scripts.automation.hooks import load_session_todos, prepare_moderator_context
+from scripts.agents.workflows.core import load_session_todos, prepare_moderator_context
 
 # Test constants
 THREE_TODOS = 3

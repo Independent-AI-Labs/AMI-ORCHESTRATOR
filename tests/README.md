@@ -185,36 +185,36 @@ JSONL files representing conversation transcripts:
 ### Run All Tests
 
 ```bash
-./scripts/ami-run.sh scripts/run_tests.py
+./scripts/ami-run scripts/run_tests.py
 ```
 
 ### Run Specific Test Categories
 
 ```bash
 # Unit tests only (fast)
-./scripts/ami-run.sh scripts/run_tests.py tests/unit/
+./scripts/ami-run scripts/run_tests.py tests/unit/
 
 # Integration tests only
-./scripts/ami-run.sh scripts/run_tests.py tests/integration/
+./scripts/ami-run scripts/run_tests.py tests/integration/
 
 # Edge cases
-./scripts/ami-run.sh scripts/run_tests.py tests/edge_cases/
+./scripts/ami-run scripts/run_tests.py tests/edge_cases/
 
 # Performance tests
-./scripts/ami-run.sh scripts/run_tests.py tests/performance/
+./scripts/ami-run scripts/run_tests.py tests/performance/
 ```
 
 ### Run by Markers
 
 ```bash
 # Only integration tests that require Claude CLI
-./scripts/ami-run.sh scripts/run_tests.py -m requires_claude_cli
+./scripts/ami-run scripts/run_tests.py -m requires_claude_cli
 
 # Skip slow tests
-./scripts/ami-run.sh scripts/run_tests.py -m "not slow"
+./scripts/ami-run scripts/run_tests.py -m "not slow"
 
 # Only performance tests
-./scripts/ami-run.sh scripts/run_tests.py -m performance
+./scripts/ami-run scripts/run_tests.py -m performance
 ```
 
 ## Exemption Comments for Test Files
@@ -348,7 +348,7 @@ Integration tests marked with `@pytest.mark.requires_claude_cli` require Claude 
 
 **Skip these tests:**
 ```bash
-./scripts/ami-run.sh scripts/run_tests.py -m "not requires_claude_cli"
+./scripts/ami-run scripts/run_tests.py -m "not requires_claude_cli"
 ```
 
 ### Tests Timeout
@@ -390,7 +390,7 @@ rm -rf .cache/audit
 Generate coverage report:
 
 ```bash
-./scripts/ami-run.sh scripts/run_tests.py --cov=automation --cov-report=html
+./scripts/ami-run scripts/run_tests.py --cov=automation --cov-report=html
 ```
 
 View report at `htmlcov/index.html`
@@ -422,7 +422,7 @@ tests/
 Fast isolated tests with mocking:
 
 ```bash
-./scripts/ami-run.sh scripts/run_tests.py tests/unit/test_ami_repo.py
+./scripts/ami-run scripts/run_tests.py tests/unit/test_ami_repo.py
 ```
 
 **Coverage:**
@@ -447,7 +447,7 @@ def test_validates_ed25519_key(self, tmp_path):
 Real git operations, NO mocking:
 
 ```bash
-./scripts/ami-run.sh scripts/run_tests.py tests/integration/test_ami_repo_e2e.py
+./scripts/ami-run scripts/run_tests.py tests/integration/test_ami_repo_e2e.py
 ```
 
 **Coverage:**
@@ -477,7 +477,7 @@ def test_full_repo_lifecycle(self, tmp_path):
 **CRITICAL:** Tests over eth0 (192.168.50.66) NOT loopback!
 
 ```bash
-./scripts/ami-run.sh scripts/run_tests.py tests/integration/test_ami_repo_network.py -m network
+./scripts/ami-run scripts/run_tests.py tests/integration/test_ami_repo_network.py -m network
 ```
 
 **Prerequisites:**
@@ -517,22 +517,22 @@ def test_shell_access_blocked(self, real_git_server, ssh_test_key):
 
 ```bash
 # All ami-repo tests
-./scripts/ami-run.sh scripts/run_tests.py -k ami_repo
+./scripts/ami-run scripts/run_tests.py -k ami_repo
 
 # Unit tests only (fast)
-./scripts/ami-run.sh scripts/run_tests.py tests/unit/test_ami_repo.py
+./scripts/ami-run scripts/run_tests.py tests/unit/test_ami_repo.py
 
 # Integration tests only
-./scripts/ami-run.sh scripts/run_tests.py tests/integration/test_ami_repo_e2e.py
+./scripts/ami-run scripts/run_tests.py tests/integration/test_ami_repo_e2e.py
 
 # Network tests only (requires SSH server)
-./scripts/ami-run.sh scripts/run_tests.py tests/integration/test_ami_repo_network.py
+./scripts/ami-run scripts/run_tests.py tests/integration/test_ami_repo_network.py
 
 # Skip network tests (no SSH server)
-./scripts/ami-run.sh scripts/run_tests.py -k ami_repo -m "not network"
+./scripts/ami-run scripts/run_tests.py -k ami_repo -m "not network"
 
 # Only security restriction tests
-./scripts/ami-run.sh scripts/run_tests.py -m ssh_security
+./scripts/ami-run scripts/run_tests.py -m ssh_security
 ```
 
 ### Test Fixtures

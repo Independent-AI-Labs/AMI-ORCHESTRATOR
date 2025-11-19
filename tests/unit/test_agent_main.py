@@ -7,7 +7,8 @@ from unittest.mock import Mock, patch
 import pytest
 import yaml
 
-from scripts.automation import agent_main
+from scripts.agents.cli import main as agent_main
+from scripts.agents.cli.hooks_utils import create_mcp_config_file, create_settings_file_from_hooks_config
 
 # Test constants
 HOOK_TIMEOUT_MS = 60000
@@ -21,7 +22,7 @@ class TestCreateMCPConfigFile:
         config = Mock()
         config.get.return_value = False  # MCP disabled
 
-        result = agent_main._create_mcp_config_file(config)
+        result = create_mcp_config_file(config)
 
         assert result is None
 
@@ -33,7 +34,7 @@ class TestCreateMCPConfigFile:
             "mcp.servers": {},
         }.get(key, default)
 
-        result = agent_main._create_mcp_config_file(config)
+        result = create_mcp_config_file(config)
 
         assert result is None
 
@@ -51,7 +52,7 @@ class TestCreateMCPConfigFile:
             },
         }.get(key, default)
 
-        result = agent_main._create_mcp_config_file(config)
+        result = create_mcp_config_file(config)
 
         assert result is not None
         assert result.exists()
@@ -83,7 +84,7 @@ class TestCreateMCPConfigFile:
             },
         }.get(key, default)
 
-        result = agent_main._create_mcp_config_file(config)
+        result = create_mcp_config_file(config)
 
         assert result is not None
 
@@ -112,7 +113,7 @@ class TestCreateMCPConfigFile:
             },
         }.get(key, default)
 
-        result = agent_main._create_mcp_config_file(config)
+        result = create_mcp_config_file(config)
 
         assert result is not None
 
@@ -157,9 +158,10 @@ class TestCreateSettingsFile:
         """Creates settings file from hooks configuration."""
         config = Mock()
         config.root = mock_hooks_file.parent
-        config.get.return_value = "hooks.yaml"
+        # Updated to use dictionary format instead of string for security
+        config.get.return_value = {"file": "hooks.yaml"}
 
-        result = agent_main._create_settings_file(config)
+        result = create_settings_file_from_hooks_config(config)
 
         assert result is not None
         assert result.exists()
@@ -171,15 +173,43 @@ class TestCreateSettingsFile:
         assert "PreToolUse" in settings["hooks"]
         assert "Stop" in settings["hooks"]
 
+        # Verify the structure follows Claude Code format
+        # Each event should have an array of hook containers with nested "hooks" arrays
+        pre_tool_use_hooks = settings["hooks"]["PreToolUse"]
+        assert len(pre_tool_use_hooks) > 0
+        hook_container = pre_tool_use_hooks[0]
+        assert "hooks" in hook_container
+        assert isinstance(hook_container["hooks"], list)
+        assert len(hook_container["hooks"]) > 0
+
+        # Verify inner hook has proper Claude Code format
+        inner_hook = hook_container["hooks"][0]
+        assert "type" in inner_hook
+        assert inner_hook["type"] == "command"
+        assert "command" in inner_hook
+        # Verify that legacy fields are not present for command-based hooks
+        assert "name" not in inner_hook
+        assert "allow_bypass" not in inner_hook
+
+        # Check Stop hooks as well
+        stop_hooks = settings["hooks"]["Stop"]
+        if stop_hooks:  # Only check if Stop hooks exist
+            stop_hook_container = stop_hooks[0]
+            if "hooks" in stop_hook_container and stop_hook_container["hooks"]:
+                stop_inner_hook = stop_hook_container["hooks"][0]
+                assert "type" in stop_inner_hook
+                assert stop_inner_hook["type"] == "command"
+
         result.unlink()
 
     def test_converts_list_matcher_to_regex(self, mock_hooks_file: Path) -> None:
         """Converts list matchers to regex string."""
         config = Mock()
         config.root = mock_hooks_file.parent
-        config.get.return_value = "hooks.yaml"
+        # Updated to use dictionary format instead of string for security
+        config.get.return_value = {"file": "hooks.yaml"}
 
-        result = agent_main._create_settings_file(config)
+        result = create_settings_file_from_hooks_config(config)
 
         assert result is not None
 
@@ -190,19 +220,26 @@ class TestCreateSettingsFile:
         hook_entry = settings["hooks"]["PreToolUse"][0]
         assert hook_entry["matcher"] in ["Bash", "Write|Edit|Bash"]  # Accept either old or new format
 
+        # Verify the inner hook has the correct Claude Code format
+        inner_hook = hook_entry["hooks"][0]
+        assert inner_hook["type"] == "command"
+        assert "name" not in inner_hook
+        assert "allow_bypass" not in inner_hook
+
         result.unlink()
 
     def test_raises_error_if_hooks_file_not_found(self) -> None:
         """Raises RuntimeError if hooks file doesn't exist."""
         config = Mock()
         config.root = Path("/test/root")
-        config.get.return_value = "nonexistent/hooks.yaml"
+        # Updated to use dictionary format instead of string for security
+        config.get.return_value = {"file": "nonexistent/hooks.yaml"}
 
         with (
-            patch("scripts.automation.agent_cli.get_config", return_value=config),
+            patch("scripts.agents.config.get_config", return_value=config),
             pytest.raises(RuntimeError, match="Hooks file not found"),
         ):
-            agent_main._create_settings_file(config)
+            create_settings_file_from_hooks_config(config)
 
     def test_includes_hook_command_timeout(self, tmp_path: Path) -> None:
         """Includes timeout in hook command if specified."""
@@ -222,16 +259,21 @@ class TestCreateSettingsFile:
 
         config = Mock()
         config.root = tmp_path
-        config.get.return_value = "hooks.yaml"
+        # Updated to use dictionary format instead of string for security
+        config.get.return_value = {"file": "hooks.yaml"}
 
-        with patch("scripts.automation.agent_cli.get_config", return_value=config):
-            result = agent_main._create_settings_file(config)
+        with patch("scripts.agents.config.get_config", return_value=config):
+            result = create_settings_file_from_hooks_config(config)
 
         with result.open() as f:
             settings = json.load(f)
 
         hook_command = settings["hooks"]["PreToolUse"][0]["hooks"][0]
         assert hook_command["timeout"] == HOOK_TIMEOUT_MS
+        assert hook_command["type"] == "command"
+        # Verify that name and allow_bypass are not present for command-based hooks
+        assert "name" not in hook_command
+        assert "allow_bypass" not in hook_command
 
         result.unlink()
 
@@ -253,16 +295,23 @@ class TestCreateSettingsFile:
 
         config = Mock()
         config.root = tmp_path
-        config.get.return_value = "hooks.yaml"
+        # Updated to use dictionary format instead of string for security
+        config.get.return_value = {"file": "hooks.yaml"}
 
-        with patch("scripts.automation.agent_cli.get_config", return_value=config):
-            result = agent_main._create_settings_file(config)
+        with patch("scripts.agents.config.get_config", return_value=config):
+            result = create_settings_file_from_hooks_config(config)
 
         with result.open() as f:
             settings = json.load(f)
 
         hook_entry = settings["hooks"]["PreToolUse"][0]
         assert hook_entry["matcher"] == "Edit|Write|Delete"
+
+        # Verify the inner hook has the correct Claude Code format
+        inner_hook = hook_entry["hooks"][0]
+        assert inner_hook["type"] == "command"
+        assert "name" not in inner_hook
+        assert "allow_bypass" not in inner_hook
 
         result.unlink()
 
@@ -273,13 +322,14 @@ class TestModeInteractive:
     def test_mode_interactive_loads_agent_instruction(self) -> None:
         """mode_interactive loads agent instruction from file."""
         with (
-            patch("scripts.automation.agent_main.get_config") as mock_get_config,
-            patch("scripts.automation.agent_main.get_logger"),
-            patch("scripts.automation.agent_main._create_mcp_config_file", return_value=None),
-            patch("scripts.automation.agent_main._create_settings_file") as mock_create_settings,
-            patch("scripts.automation.agent_main.subprocess.run") as mock_subprocess,
+            patch("scripts.agents.cli.mode_handlers.get_config") as mock_get_config,
+            patch("scripts.agents.cli.mode_handlers.logger"),
+            patch("scripts.agents.cli.mode_handlers.create_mcp_config_file", return_value=None),
+            patch("scripts.agents.cli.mode_handlers.create_settings_file_from_hooks_config") as mock_create_settings,
+            patch("subprocess.run") as mock_subprocess,
+            patch("shutil.which", return_value="/mock/path/to/claude"),
         ):
-            # Mock settings file
+            # Mock settings file that will be created and cleaned up
             mock_settings_file = Mock()
             mock_settings_file.unlink = Mock()
             mock_create_settings.return_value = mock_settings_file

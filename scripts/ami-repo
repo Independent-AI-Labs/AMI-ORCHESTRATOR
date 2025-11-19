@@ -6,5 +6,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(dirname "$SCRIPT_DIR")"
 
+# Add .boot-linux/bin to PATH so git/ssh tools are available (bootstrapped tools)
+export PATH="$ROOT_DIR/.boot-linux/bin:$PATH"
+
 # Use root venv since ami_repo.py is under scripts/
 exec "$ROOT_DIR/.venv/bin/python" "$SCRIPT_DIR/ami_repo.py" "$@"

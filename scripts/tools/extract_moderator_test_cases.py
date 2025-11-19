@@ -1,4 +1,8 @@
-#!/usr/bin/env python3
+#!/usr/bin/env bash
+""":'
+exec "$(dirname "$0")/../ami-run" "$0" "$@"
+"""
+
 """Extract real transcript contexts for moderator e2e tests.
 
 Uses production prepare_moderator_context() to verify EXACT context
@@ -24,7 +28,7 @@ def _ensure_repo_on_path() -> Path:
 
 _ensure_repo_on_path()
 
-from scripts.automation.hooks import prepare_moderator_context
+from scripts.agents.workflows.core import prepare_moderator_context
 
 logger = logging.getLogger(__name__)
 

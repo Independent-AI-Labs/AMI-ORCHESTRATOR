@@ -152,8 +152,11 @@ echo "     SERVICE_ACCOUNT_EMAIL \\"
 echo "     --member=\"user:YOUR_EMAIL\" \\"
 echo "     --role=\"roles/iam.serviceAccountTokenCreator\""
 echo
-echo "3. Configure .env with service account email:"
+echo "3. Configure .env with service account email (GDRIVE_AUTH_METHOD defaults to impersonation):"
 echo "   GDRIVE_SERVICE_ACCOUNT_EMAIL=backup@project.iam.gserviceaccount.com"
+echo "   # Or explicitly set auth method:"
+echo "   # GDRIVE_AUTH_METHOD=impersonation"
+echo "   # GDRIVE_SERVICE_ACCOUNT_EMAIL=backup@project.iam.gserviceaccount.com"
 echo
 echo "4. Run backup:"
 echo "   ./scripts/backup_to_gdrive.py"

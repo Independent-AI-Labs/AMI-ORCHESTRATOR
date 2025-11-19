@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# ami-agent: Wrapper for scripts/automation/agent_main.py
-# Always uses root venv since automation/ is under scripts/
+# ami-agent: Wrapper for scripts/agents/cli/main.py
+# Always uses root venv since agents/ is under scripts/
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -23,6 +23,19 @@ if [ -f "$ROOT_DIR/.env" ]; then
     done < "$ROOT_DIR/.env"
 fi
 
+# Always disable Claude CLI auto-updates by default
+export DISABLE_AUTOUPDATER=1
+
+# Enforce venv-only Claude CLI (no system alternative)
+CLAUDE_BIN="$ROOT_DIR/.venv/node_modules/.bin/claude"
+
+# FAIL if Claude CLI is not present - install must be properly run
+if [ ! -x "$CLAUDE_BIN" ]; then
+    echo "Error: Claude CLI not found at $CLAUDE_BIN" >&2
+    echo "Run: ./install to install Node.js CLI agents properly" >&2
+    exit 1
+fi
+
 # Check Claude CLI version
 check_claude_version() {
     local claude_path="$1"
@@ -41,70 +54,36 @@ check_claude_version() {
     return 0
 }
 
-# Install Claude CLI using bootstrapped npm from venv (non-interactive)
-install_claude_cli() {
-    local npm_bin="$ROOT_DIR/.venv/bin/npm"
-
-    if [ ! -f "$npm_bin" ]; then
-        echo "Error: npm not found in venv. Run module_setup.py first to bootstrap Node.js." >&2
-        return 1
-    fi
-
-    echo "Installing Claude CLI version $CLAUDE_REQUIRED_VERSION to venv..." >&2
-    if "$npm_bin" install --prefix "$ROOT_DIR/.venv" "@anthropic-ai/claude-code@$CLAUDE_REQUIRED_VERSION"; then
-        echo "✓ Successfully installed Claude CLI $CLAUDE_REQUIRED_VERSION to .venv/node_modules/" >&2
-        return 0
-    else
-        echo "✗ Failed to install Claude CLI" >&2
-        return 1
-    fi
-}
-
-# Enforce venv-only Claude CLI (no system fallback)
-CLAUDE_BIN="$ROOT_DIR/.venv/node_modules/.bin/claude"
-
-# Auto-install if not present
-if [ ! -x "$CLAUDE_BIN" ]; then
-    echo "Claude CLI not found in venv, installing version $CLAUDE_REQUIRED_VERSION..." >&2
-    if ! install_claude_cli; then
-        echo "Error: Failed to install Claude CLI to venv" >&2
-        echo "Run: module_setup.py to bootstrap Node.js first" >&2
-        exit 1
-    fi
-fi
-
-# Verify binary exists after installation
-if [ ! -x "$CLAUDE_BIN" ]; then
-    echo "Error: Claude CLI installation completed but binary not found at:" >&2
-    echo "  $CLAUDE_BIN" >&2
-    exit 1
-fi
-
 # Verify version matches requirement
 if ! check_claude_version "$CLAUDE_BIN"; then
     ret=$?
     if [ $ret -eq 2 ]; then
         current=$("$CLAUDE_BIN" --version 2>/dev/null | awk '{print $1}')
-        echo "Claude CLI version mismatch. Required: $CLAUDE_REQUIRED_VERSION, Found: $current" >&2
-        echo "Reinstalling correct version..." >&2
-
-        if ! install_claude_cli; then
-            echo "Error: Failed to install correct Claude CLI version" >&2
-            exit 1
-        fi
-
-        # Re-verify after reinstall
-        if ! check_claude_version "$CLAUDE_BIN"; then
-            echo "Error: Version check still fails after reinstall" >&2
-            exit 1
-        fi
+        echo "Error: Claude CLI version mismatch. Required: $CLAUDE_REQUIRED_VERSION, Found: $current" >&2
+        echo "Run: ./install to install correct version" >&2
+        exit 1
     else
         echo "Error: Claude CLI check failed" >&2
         exit 1
     fi
 fi
 
+# Set Claude configuration to disable updates
+if [ -x "$CLAUDE_BIN" ]; then
+    "$CLAUDE_BIN" config set -g autoUpdates disabled 2>/dev/null || true
+fi
+
 # === Gemini CLI Bootstrap ===
+
+# Enforce venv-only Gemini CLI (no system alternative)
+GEMINI_BIN="$ROOT_DIR/.venv/node_modules/.bin/gemini"
+
+# FAIL if Gemini CLI is not present - install must be properly run
+if [ ! -x "$GEMINI_BIN" ]; then
+    echo "Error: Gemini CLI not found at $GEMINI_BIN" >&2
+    echo "Run: ./install to install Node.js CLI agents properly" >&2
+    exit 1
+fi
 
 # Check Gemini CLI version
 check_gemini_version() {
@@ -124,63 +103,14 @@ check_gemini_version() {
     return 0
 }
 
-# Install Gemini CLI using bootstrapped npm from venv (non-interactive)
-install_gemini_cli() {
-    local npm_bin="$ROOT_DIR/.venv/bin/npm"
-
-    if [ ! -f "$npm_bin" ]; then
-        echo "Error: npm not found in venv. Run module_setup.py first to bootstrap Node.js." >&2
-        return 1
-    fi
-
-    echo "Installing Gemini CLI version $GEMINI_REQUIRED_VERSION to venv..." >&2
-    if "$npm_bin" install --prefix "$ROOT_DIR/.venv" "@google/gemini-cli@$GEMINI_REQUIRED_VERSION"; then
-        echo "✓ Successfully installed Gemini CLI $GEMINI_REQUIRED_VERSION to .venv/node_modules/" >&2
-        return 0
-    else
-        echo "✗ Failed to install Gemini CLI" >&2
-        return 1
-    fi
-}
-
-# Enforce venv-only Gemini CLI (no system fallback)
-GEMINI_BIN="$ROOT_DIR/.venv/node_modules/.bin/gemini"
-
-# Auto-install if not present
-if [ ! -x "$GEMINI_BIN" ]; then
-    echo "Gemini CLI not found in venv, installing version $GEMINI_REQUIRED_VERSION..." >&2
-    if ! install_gemini_cli; then
-        echo "Error: Failed to install Gemini CLI to venv" >&2
-        echo "Run: module_setup.py to bootstrap Node.js first" >&2
-        exit 1
-    fi
-fi
-
-# Verify binary exists after installation
-if [ ! -x "$GEMINI_BIN" ]; then
-    echo "Error: Gemini CLI installation completed but binary not found at:" >&2
-    echo "  $GEMINI_BIN" >&2
-    exit 1
-fi
-
 # Verify version matches requirement
 if ! check_gemini_version "$GEMINI_BIN"; then
     ret=$?
     if [ $ret -eq 2 ]; then
         current=$("$GEMINI_BIN" --version 2>/dev/null | grep -oP '^\d+\.\d+\.\d+')
-        echo "Gemini CLI version mismatch. Required: $GEMINI_REQUIRED_VERSION, Found: $current" >&2
-        echo "Reinstalling correct version..." >&2
-
-        if ! install_gemini_cli; then
-            echo "Error: Failed to install correct Gemini CLI version" >&2
-            exit 1
-        fi
-
-        # Re-verify after reinstall
-        if ! check_gemini_version "$GEMINI_BIN"; then
-            echo "Error: Version check still fails after reinstall" >&2
-            exit 1
-        fi
+        echo "Error: Gemini CLI version mismatch. Required: $GEMINI_REQUIRED_VERSION, Found: $current" >&2
+        echo "Run: ./install to install correct version" >&2
+        exit 1
     else
         echo "Error: Gemini CLI check failed" >&2
         exit 1
@@ -188,25 +118,6 @@ if ! check_gemini_version "$GEMINI_BIN"; then
 fi
 
 # === gcloud CLI Bootstrap ===
-
-# Install gcloud CLI to .gcloud/ if not present
-install_gcloud_cli() {
-    local gcloud_script="$SCRIPT_DIR/install_gcloud.sh"
-
-    if [ ! -f "$gcloud_script" ]; then
-        echo "Error: gcloud install script not found at $gcloud_script" >&2
-        return 1
-    fi
-
-    echo "Installing gcloud CLI to .gcloud/..." >&2
-    if bash "$gcloud_script"; then
-        echo "✓ Successfully installed gcloud CLI" >&2
-        return 0
-    else
-        echo "✗ Failed to install gcloud CLI" >&2
-        return 1
-    fi
-}
 
 # Find gcloud binary (local or system)
 find_gcloud() {
@@ -233,51 +144,16 @@ has_gemini_credentials() {
     [ -f "$oauth_creds" ]
 }
 
-# Ensure Gemini CLI authentication is set up
+# Ensure Gemini CLI authentication is set up - FAIL if not authenticated
 ensure_gemini_auth() {
     # Check if already authenticated
     if has_gemini_credentials; then
-        echo "✓ Gemini CLI OAuth credentials found" >&2
         return 0
     fi
 
-    # Need to authenticate
-    echo "" >&2
-    echo "========================================" >&2
-    echo "Gemini CLI Authentication Required" >&2
-    echo "========================================" >&2
-    echo "" >&2
-    echo "Gemini CLI requires authentication for free tier access (60 req/min, 1,000 req/day)." >&2
-    echo "" >&2
-    echo "Please run the following command in a separate terminal to authenticate:" >&2
-    echo "" >&2
-    echo "    gemini" >&2
-    echo "" >&2
-    echo "Then select 'Login with Google' and complete the browser authentication flow." >&2
-    echo "After authentication completes, your credentials will be cached and this script will proceed." >&2
-    echo "" >&2
-    echo "Waiting for authentication..." >&2
-
-    # Poll for credentials file with proper timeout handling
-    local wait_count=0
-    local max_wait=300  # 5 minutes max wait
-    while [ $wait_count -lt $max_wait ]; do
-        if has_gemini_credentials; then
-            echo "" >&2
-            echo "✓ Gemini CLI authentication detected!" >&2
-            echo "" >&2
-            return 0
-        fi
-        sleep 2 || {
-            echo "Error: Sleep interrupted" >&2
-            return 1
-        }
-        wait_count=$((wait_count + 2))
-    done
-
-    echo "" >&2
-    echo "Error: Authentication timeout after 5 minutes" >&2
-    echo "Please complete authentication and try again" >&2
+    # Need to authenticate - FAIL instead of prompting
+    echo "Error: Gemini CLI OAuth credentials not found" >&2
+    echo "Run: gemini (then select 'Login with Google' in browser) to authenticate first" >&2
     return 1
 }
 
@@ -304,5 +180,5 @@ if [ -z "${GOOGLE_CLOUD_LOCATION:-}" ]; then
     export GOOGLE_CLOUD_LOCATION="us-central1"
 fi
 
-# Force root venv for scripts/automation/agent_main.py - it requires root dependencies
-exec "$ROOT_DIR/.venv/bin/python" "$SCRIPT_DIR/automation/agent_main.py" "$@"
+# Force root venv for scripts/agents/cli/main.py - it requires root dependencies
+exec "$ROOT_DIR/.venv/bin/python" "$SCRIPT_DIR/agents/cli/main.py" "$@"

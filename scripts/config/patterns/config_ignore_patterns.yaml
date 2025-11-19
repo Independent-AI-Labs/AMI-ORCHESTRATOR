@@ -1,0 +1,56 @@
+# Config Ignore Patterns
+# Used by check_config_ignores.py to detect forbidden ignore directives in config files
+#
+# These patterns identify forbidden ignore directives in configuration files.
+
+version: "1.0.0"
+
+# Patterns that indicate config-based ignore directives
+ignore_patterns:
+  # Ruff ignores
+  - pattern: "^\\s*ignore\\s*=\\s*\\["
+    description: "Ruff ignore directive"
+    
+  - pattern: "^\\s*extend-ignore\\s*=\\s*\\["
+    description: "Ruff extend-ignore directive"
+    
+  - pattern: "^\\s*per-file-ignores\\s*="
+    description: "Ruff per-file-ignores directive"
+    
+  - pattern: "^\\s*extend-per-file-ignores\\s*]"
+    description: "Ruff extend-per-file-ignores directive"
+    
+  - pattern: '^\\s*"[^"]+"\\s*=\\s*\\[[^\\]]*[A-Z]\\d+'
+    description: "File-specific ignores"
+  
+  # Mypy ignores (except ignore_missing_imports for external libs without type defs)
+  - pattern: "^\\s*ignore_errors\\s*=\\s*[Tt]rue"
+    description: "Mypy ignore_errors directive"
+    
+  - pattern: "^\\s*disable_error_code\\s*="
+    description: "Mypy disable_error_code directive"
+  
+  # Pylint ignores
+  - pattern: "^\\s*disable\\s*="
+    description: "Pylint disable directive"
+  
+  # Flake8 ignores
+  - pattern: "^\\s*exclude\\s*=.*# ignore"
+    description: "Flake8 exclude with ignore comment"
+
+# Config files to scan
+config_file_patterns:
+  - "pyproject.toml"
+  - "ruff.toml"
+  - ".ruff.toml"
+  - "mypy.ini"
+  - ".mypy.ini"
+  - "setup.cfg"
+  - "tox.ini"
+  - ".pylintrc"
+  - "pylintrc"
+
+# Allowed per-file-ignores (whitelist)
+allowed_per_file_ignores:
+  '"**/test_*.py"': ["S101", "PLR2004"]  # Asserts and magic values required for tests
+  '"tests/**/*.py"': ["S101", "PLR2004"]  # Asserts and magic values required for tests

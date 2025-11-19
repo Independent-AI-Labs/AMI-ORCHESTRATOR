@@ -28,7 +28,7 @@ class GitServiceOps:
         # Check development mode (setup_service.py)
         try:
             result = self.system_worker.run_command(
-                "scripts/ami-run.sh",
+                "scripts/ami-run",
                 ["nodes/scripts/setup_service.py", "process", "status", "git-sshd"],
                 timeout=10.0,
             )
@@ -78,7 +78,7 @@ class GitServiceOps:
         """
         if mode == "dev":
             result = self.system_worker.run_command(
-                "scripts/ami-run.sh",
+                "scripts/ami-run",
                 ["nodes/scripts/setup_service.py", "profile", "start", "git-server"],
                 timeout=30.0,
             )
@@ -108,7 +108,7 @@ class GitServiceOps:
         """
         if mode == "dev":
             result = self.system_worker.run_command(
-                "scripts/ami-run.sh",
+                "scripts/ami-run",
                 ["nodes/scripts/setup_service.py", "profile", "stop", "git-server"],
                 timeout=30.0,
             )

@@ -71,7 +71,7 @@ The `/base/scripts/` directory remains UNTOUCHED until migration is complete.
     ├── ami-agent                              # NEW: Unified entry point (Python, 300 lines)
     │                                          #      Replaces: claude-agent.sh, ami-hook, ami-audit
     │                                          #      4 modes: --interactive, --print, --hook, --audit
-    ├── ami-run.sh                             # KEEP: Python wrapper (unchanged)
+    ├── ami-run                                # KEEP: Python wrapper (unchanged)
     ├── git_commit.sh                          # KEEP: Git commit wrapper (unchanged)
     └── git_push.sh                            # KEEP: Git push wrapper (unchanged)
 
