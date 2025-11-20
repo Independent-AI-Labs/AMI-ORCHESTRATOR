@@ -106,7 +106,7 @@ bootstrap_podman_only() {
 }
 
 
-# Recreate flow - delete .venv, bootstrap node/podman using .boot-linux, proceed with regular flow
+# Recreate flow - delete .venv AND .boot-linux, bootstrap node/podman, proceed with regular flow
 recreate_flow() {
     log_info "Starting recreate flow..."
 
@@ -117,7 +117,14 @@ recreate_flow() {
         log_success "Removed .venv"
     fi
 
-    # 2. Proceed with regular flow (which will set up environment and install agents)
+    # 2. Delete .boot-linux
+    if [ -d ".boot-linux" ]; then
+        log_info "Removing existing .boot-linux..."
+        rm -rf .boot-linux
+        log_success "Removed .boot-linux"
+    fi
+
+    # 3. Proceed with regular flow (which will set up environment and install agents)
     regular_flow
     return $?
 }

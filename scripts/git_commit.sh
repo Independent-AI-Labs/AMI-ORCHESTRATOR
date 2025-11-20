@@ -174,10 +174,10 @@ if [ "$RUN_AUTOFIXES" = true ]; then
     fi
 
     echo "Running ruff format on $AUTOFIX_TARGETS..."
-    "$RUFF_BIN" format --no-cache --config "$RUFF_CONFIG" --exclude ".gcloud" $AUTOFIX_TARGETS || true
+    "$RUFF_BIN" format --no-cache --config "$RUFF_CONFIG" --exclude ".gcloud" --exclude ".boot-linux" $AUTOFIX_TARGETS || true
 
     echo "Running ruff check --fix --unsafe-fixes on $AUTOFIX_TARGETS..."
-    "$RUFF_BIN" check --no-cache --config "$RUFF_CONFIG" --fix --unsafe-fixes --exclude ".gcloud" $AUTOFIX_TARGETS || true
+    "$RUFF_BIN" check --no-cache --config "$RUFF_CONFIG" --fix --unsafe-fixes --exclude ".gcloud" --exclude ".boot-linux" $AUTOFIX_TARGETS || true
 
     echo "✓ Auto-fixes complete"
 
@@ -303,17 +303,20 @@ echo "✓ No merge conflicts"
 # Max line check
 echo ""
 echo "Checking for files with too many lines..."
-MAX_LINE_FILES=$(git diff --cached --name-only --diff-filter=ACM | grep '\.py$' | while read file; do
-    if [ -f "$file" ]; then
+# Use mapfile to properly read file names with special characters
+mapfile -t py_files < <(git diff --cached --name-only --diff-filter=ACM | grep '\.py$' | grep -v '^\.boot-linux/')
+MAX_LINE_FILES=""
+for file in "${py_files[@]}"; do
+    if [ -n "$file" ] && [ -f "$file" ]; then
         # Check if it's a text file and count lines
         if file --mime-type "$file" 2>/dev/null | grep -q 'text/'; then
             LINE_COUNT=$(wc -l < "$file")
             if [ "$LINE_COUNT" -gt 512 ]; then
-                echo "$file: $LINE_COUNT lines"
+                MAX_LINE_FILES="${MAX_LINE_FILES}${file}: $LINE_COUNT lines"$'\n'
             fi
         fi
     fi
-done)
+done
 if [ -n "$MAX_LINE_FILES" ]; then
     echo "✗ Files with more than 512 lines detected:"
     echo "$MAX_LINE_FILES"
@@ -326,7 +329,7 @@ echo "✓ All files have reasonable line counts"
 # Format check
 echo ""
 echo "Running format check..."
-if ! "$RUFF_BIN" format --no-cache --check --config "$RUFF_CONFIG" --exclude ".gcloud" $CHECK_TARGETS; then
+if ! "$RUFF_BIN" format --no-cache --check --config "$RUFF_CONFIG" --exclude ".gcloud" --exclude ".boot-linux" $CHECK_TARGETS; then
     echo "✗ Format check failed - files need formatting"
     echo "Run with --fix flag to auto-format"
     exit 1
@@ -336,7 +339,7 @@ echo "✓ Format check passed"
 # Lint check
 echo ""
 echo "Running lint check..."
-if ! "$RUFF_BIN" check --no-cache --config "$RUFF_CONFIG" --exclude ".gcloud" $CHECK_TARGETS; then
+if ! "$RUFF_BIN" check --no-cache --config "$RUFF_CONFIG" --exclude ".gcloud" --exclude ".boot-linux" $CHECK_TARGETS; then
     echo "✗ Lint check failed - violations detected"
     echo "Run with --fix flag to auto-fix"
     exit 1
@@ -413,12 +416,12 @@ echo "Running mypy..."
 MYPY_CONFIG="${ORCHESTRATOR_ROOT}/base/scripts/mypy.ini"
 if [ "$IS_ROOT" = true ]; then
     MYPY_TARGETS="backend scripts"
-    if ! (cd "$ORCHESTRATOR_ROOT" && "$PYTHON_BIN" -m mypy $MYPY_TARGETS --config-file="$MYPY_CONFIG"); then
+    if ! (cd "$ORCHESTRATOR_ROOT" && "$PYTHON_BIN" -m mypy $MYPY_TARGETS --config-file="$MYPY_CONFIG" --exclude .boot-linux); then
         echo "✗ Mypy check failed"
         exit 1
     fi
 else
-    if ! (cd "$ORCHESTRATOR_ROOT" && "$PYTHON_BIN" -m mypy "$MODULE_ARG" --config-file="$MYPY_CONFIG"); then
+    if ! (cd "$ORCHESTRATOR_ROOT" && "$PYTHON_BIN" -m mypy "$MODULE_ARG" --config-file="$MYPY_CONFIG" --exclude .boot-linux); then
         echo "✗ Mypy check failed"
         exit 1
     fi
@@ -444,8 +447,11 @@ fi
 # Large files check
 echo ""
 echo "Checking for large files..."
-LARGE_FILES=$(git diff --cached --name-only --diff-filter=ACM | while read file; do
-    if [ -f "$file" ]; then
+# Use mapfile to properly read file names with special characters
+mapfile -t all_files < <(git diff --cached --name-only --diff-filter=ACM | grep -v '^\.boot-linux/')
+LARGE_FILES=""
+for file in "${all_files[@]}"; do
+    if [ -n "$file" ] && [ -f "$file" ]; then
         if stat -f%z "$file" >/dev/null 2>&1; then
             SIZE=$(stat -f%z "$file")
         elif stat -c%s "$file" >/dev/null 2>&1; then
@@ -455,10 +461,10 @@ LARGE_FILES=$(git diff --cached --name-only --diff-filter=ACM | while read file;
             exit 1
         fi
         if [ "$SIZE" -gt 52428800 ]; then
-            echo "$file"
+            LARGE_FILES="${LARGE_FILES}${file}"$'\n'
         fi
     fi
-done)
+done
 if [ -n "$LARGE_FILES" ]; then
     echo "✗ Large files detected (>50MB):"
     echo "$LARGE_FILES"
@@ -469,22 +475,20 @@ echo "✓ No large files"
 # Debug statements
 echo ""
 echo "Checking for debug statements..."
-PY_FILES=$(git diff --cached --name-only --diff-filter=ACM | grep '\.py$' || true)
-if [ -n "$PY_FILES" ]; then
-    DEBUG_FILES=$(echo "$PY_FILES" | while read file; do
-        if [ -f "$file" ] && grep -qE '(^|[^a-zA-Z0-9_])(pdb|ipdb|pudb|debugpy|breakpoint)\.(set_trace|runcall)\(' "$file"; then
-            echo "$file"
-        fi
-    done)
-    if [ -n "$DEBUG_FILES" ]; then
-        echo "✗ Debug statements found:"
-        echo "$DEBUG_FILES"
-        exit 1
+# Use mapfile to properly read file names with special characters
+mapfile -t debug_py_files < <(git diff --cached --name-only --diff-filter=ACM | grep '\.py$' | grep -v '^\.boot-linux/')
+DEBUG_FILES=""
+for file in "${debug_py_files[@]}"; do
+    if [ -n "$file" ] && [ -f "$file" ] && grep -qE '(^|[^a-zA-Z0-9_])(pdb|ipdb|pudb|debugpy|breakpoint)\.(set_trace|runcall)\(' "$file"; then
+        DEBUG_FILES="${DEBUG_FILES}${file}"$'\n'
     fi
-    echo "✓ No debug statements"
-else
-    echo "✓ No Python files to check"
+done
+if [ -n "$DEBUG_FILES" ]; then
+    echo "✗ Debug statements found:"
+    echo "$DEBUG_FILES"
+    exit 1
 fi
+echo "✓ No debug statements"
 
 # Commit message validation
 echo ""

@@ -70,8 +70,8 @@ setup_node_env() {
         rm -rf "$venv_dir"
     fi
 
-    nodeenv "$venv_dir" || {
-        log_error "Failed to create isolated Node.js environment in .boot-linux/node-env"
+    nodeenv --node=24.11.1 "$venv_dir" || {
+        log_error "Failed to create isolated Node.js environment in .boot-linux/node-env with Node.js 24.11.1"
         return 1
     }
 
@@ -161,7 +161,8 @@ install_node_agents() {
     # Install packages to the .venv directory using prefix
     # Using the npm from .boot-linux/node-env directly
     # Use --no-save to prevent creating package.json in .venv and ensure clean local installation
-    "$project_root/.boot-linux/node-env/bin/npm" install --prefix "$PWD/.venv" --no-save @anthropic-ai/claude-code@2.0.10 @google/gemini-cli@0.11.3 @qwen-code/qwen-code || {
+    # Use --ignore-scripts to avoid running postinstall scripts that might create unwanted node_modules
+    "$project_root/.boot-linux/node-env/bin/npm" install --prefix "$PWD/.venv" --no-save --ignore-scripts @anthropic-ai/claude-code@2.0.10 @google/gemini-cli@0.11.3 @qwen-code/qwen-code || {
         log_error "Node.js agents installation failed"
         return 1
     }

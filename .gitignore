@@ -5,6 +5,9 @@ __pycache__/
 *.so
 .Python
 
+# Node.js
+.node_modules/
+
 # Backup directories
 *backup*/
 build/
@@ -28,7 +31,6 @@ venv/
 ENV/
 .venv/
 # Platform-specific venv copies
-.venv-linux/
 .venv-windows/
 
 # Chrome/Selenium
@@ -123,3 +125,6 @@ tmp/
 .tmp/
 
 *.backup*
+
+# Bootstrapped node environment
+.boot-linux/node-env

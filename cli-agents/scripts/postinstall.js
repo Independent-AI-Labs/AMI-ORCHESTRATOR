@@ -30,18 +30,9 @@ function buildAndInstallAgents() {
       console.log('Qwen source directory not found, skipping build');
     }
 
-    // Install all agents using npm
-    console.log('Installing CLI agents to venv...');
-    execSync('npm install --global', { 
-      cwd: cliAgentsDir,
-      stdio: 'inherit',
-      env: {
-        ...process.env,
-        // Point to the venv's npm
-        PATH: `${join(venvDir, 'bin')}:${process.env.PATH}`
-      }
-    });
-    
+    // Skip installation in postinstall to avoid creating unwanted .node_modules in root
+    // The main installation is handled in the install_node_agents function in node.sh
+    console.log('Skipped postinstall - agents installed via install_node_agents function');
     console.log('CLI agents installed successfully');
   } catch (error) {
     console.error('Failed to build/install CLI agents:', error.message);
