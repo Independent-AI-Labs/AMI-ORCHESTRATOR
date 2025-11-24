@@ -28,7 +28,7 @@ Safely integrates with **any** **web**, **data** or **API** service.
 
 ## Why AMI-ORCHESTRATOR
 
-### I. Get to own your software, data and AI. Your privacy is your most important asset.
+### I. Get to own your software, data and AI. Your privacy is your most important asset. Period.
 ### II. Reduces your dependence and spending on SaaS and third-party infrastructure.* 
 ### III. Provdes enterprise multi-cloud orchestration with **zero** vendor lock-in.
 ### IV. Built for safety, verifiability and regulatory compliance.
@@ -37,7 +37,7 @@ Safely integrates with **any** **web**, **data** or **API** service.
 
 ## What You Get
 
-### 🏗️ **Infrastructure Orchestration**
+### 🏗️ **IEnvironment Integration and Infrastructure Orchestration**
 - **Multi-Cloud Infrastructure as Code**: Full OpenTofu integration for vendor-neutral IaC (bare metal / private cloud, AWS, Azure, GCP)
 - **VM & Hypervisor Management**: Production-ready Windows VM orchestration with GPU passthrough (Hyper-V), Linux VM support in development
 - **Service Launcher**: Unified orchestration for Podman containers, Python services, Node.js apps, and custom processes

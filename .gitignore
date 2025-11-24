@@ -128,3 +128,6 @@ tmp/
 
 # Bootstrapped node environment
 .boot-linux/node-env
+
+# Forecasting directory
+learning/forecasting/
