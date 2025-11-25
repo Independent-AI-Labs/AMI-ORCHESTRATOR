@@ -792,6 +792,9 @@ ami-info() {
 # 12. SUMMARY OUTPUT
 # ============================================================================
 
+# Add text input CLI alias
+alias @="ami-run scripts/cli_components/text_input_cli.py"
+
 # Display the banner if not in quiet mode
 if [[ "$AMI_QUIET_MODE" != "1" ]]; then
     display_banner

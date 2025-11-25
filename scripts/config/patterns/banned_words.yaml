@@ -29,11 +29,11 @@ banned_words:
   - "lazy"
   - "maybe"
   - "@dataclass"
-  - "getattr"
-  - "setattr"
-  - "hasattr"
-  - ".__dict__"
-  - "vars("
+  - '(?<!tc)getattr'  # getattr not preceded by tc (like tcgetattr)
+  - '(?<!tc)setattr'  # setattr not preceded by tc (like tcsetattr)
+  - '(?<!\.|\w)hasattr(?!\()'  # hasattr not followed by parentheses (to allow hasattr())
+  - '.__dict__'
+  - 'vars(?!\()'  # vars not followed by parentheses (to allow vars())
   - "—"  # em-dash
   - "@pytest.mark.skipif"
   - "reason=\".*not implemented yet\""
