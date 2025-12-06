@@ -21,8 +21,8 @@ AMI-ORCHESTRATOR now supports multiple AI CLI providers (Claude Code CLI and Gem
 The `scripts/ami-agent` wrapper automatically installs and configures everything needed:
 
 **On first run:**
-1. Installs Claude CLI (`@anthropic-ai/claude-code@2.0.10`) to `.venv/node_modules/`
-2. Installs Gemini CLI (`@google/gemini-cli@0.11.3`) to `.venv/node_modules/`
+1. Installs Claude CLI (`@anthropic-ai/claude-code@2.0.58`) to `.venv/node_modules/`
+2. Installs Gemini CLI (`@google/gemini-cli@0.19.1`) to `.venv/node_modules/`
 3. Installs gcloud CLI to `.gcloud/google-cloud-sdk/` (local, not system-wide)
 4. Triggers `gcloud auth application-default login` for Vertex AI authentication
 5. Sets required environment variables (`GOOGLE_GENAI_USE_VERTEXAI=true`, `GOOGLE_CLOUD_LOCATION=us-central1`)
@@ -33,11 +33,11 @@ The `scripts/ami-agent` wrapper automatically installs and configures everything
 scripts/ami-agent
 
 # Output:
-# Claude CLI not found in venv, installing version 2.0.10...
-# ✓ Successfully installed Claude CLI 2.0.10 to .venv/node_modules/
+# Claude CLI not found in venv, installing version 2.0.58...
+# ✓ Successfully installed Claude CLI 2.0.58 to .venv/node_modules/
 #
-# Gemini CLI not found in venv, installing version 0.11.3...
-# ✓ Successfully installed Gemini CLI 0.11.3 to .venv/node_modules/
+# Gemini CLI not found in venv, installing version 0.19.1...
+# ✓ Successfully installed Gemini CLI 0.19.1 to .venv/node_modules/
 #
 # gcloud CLI not found, installing to .gcloud/...
 # ✓ Successfully installed gcloud CLI

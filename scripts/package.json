@@ -1,0 +1,32 @@
+{
+  "name": "@ami-orchestrator/cli-agents",
+  "version": "1.0.0",
+  "description": "Centralized CLI agents configuration for AMI Orchestrator",
+  "private": true,
+  "scripts": {
+    "install": "npm install",
+    "postinstall": "node scripts/postinstall.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-code": "^2.0.58",
+    "@google/gemini-cli": "^0.19.1",
+    "@qwen-code/qwen-code": "^0.3.0"
+  },
+  "devDependencies": {
+    "nodeenv": "^1.9.1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Independent-AI-Labs/AMI-ORCHESTRATOR"
+  },
+  "keywords": [
+    "ami-orchestrator",
+    "cli-agents",
+    "ai-agents",
+    "claude",
+    "gemini",
+    "qwen"
+  ],
+  "author": "Independent AI Labs",
+  "license": "SEE LICENSE IN LICENSE"
+}

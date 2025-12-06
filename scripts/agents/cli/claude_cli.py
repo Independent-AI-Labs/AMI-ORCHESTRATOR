@@ -14,14 +14,17 @@ from typing import Any
 from uuid import UUID
 
 from base.backend.utils.uuid_utils import uuid7
-from scripts.agents.cli.base_provider import CLIProvider
+from scripts.agents.cli.base_provider import CLIProvider as BaseProvider
 from scripts.agents.cli.config import AgentConfig
+from scripts.agents.cli.config_service import ConfigService
 from scripts.agents.cli.hooks_utils import create_settings_file_from_hooks_config
 from scripts.agents.cli.interface import AgentCLI
+from scripts.agents.cli.provider_type import ProviderType
 from scripts.agents.cli.streaming_utils import load_instruction_with_replacements
+from scripts.agents.config import get_config
 
 
-class ClaudeAgentCLI(CLIProvider, AgentCLI):
+class ClaudeAgentCLI(BaseProvider, AgentCLI):
     """Implementation of AgentCLI using Claude Code CLI."""
 
     # All Claude Code tools (capitalized as used by Claude CLI)
@@ -84,6 +87,7 @@ class ClaudeAgentCLI(CLIProvider, AgentCLI):
         return AgentConfig(
             model="claude-sonnet-4-5",
             session_id=uuid7(),
+            provider=ProviderType.CLAUDE,
             allowed_tools=None,
             enable_hooks=True,
             timeout=180,
@@ -125,15 +129,13 @@ class ClaudeAgentCLI(CLIProvider, AgentCLI):
             # Security restriction: Path should only be passed as instruction_file parameter
             raise ValueError("Path objects should be passed as instruction_file parameter, not instruction parameter")
         else:
-            # instruction is a string
-            instruction_content = instruction  # type: ignore
+            # instruction should be a string or None
+            instruction_content = instruction if instruction is not None else ""
 
         config = agent_config or self._get_default_config()
 
         # Temporarily add settings file to instance if hooks are enabled
         if config.enable_hooks:
-            from scripts.agents.config import get_config  # noqa: PLC0415
-
             global_config = get_config()
             settings_file = create_settings_file_from_hooks_config(global_config)
 
@@ -166,19 +168,24 @@ class ClaudeAgentCLI(CLIProvider, AgentCLI):
         Returns:
             List of command arguments
         """
-        # Start with the base claude command
-        cmd = ["claude"]
+        # Get the configured Claude command from config service
+        config_service: ConfigService = ConfigService()
+        claude_cmd = config_service.get_provider_command(ProviderType.CLAUDE)
+
+        cmd = [claude_cmd]  # Use the configured command
 
         # Add model flag
         cmd.extend(["--model", config.model])
 
         # Note: Claude CLI may not support --session flag directly
         # Add session ID if provided and properly formatted as UUID (Claude CLI uses --session-id)
-        if config.session_id:
+        if config.session_id is not None and config.session_id:  # Explicit None check
+            # Validate that config.session_id is a string before assignment
+            session_id: str = str(config.session_id)
             # Validate that session_id is a proper UUID format to avoid Claude CLI errors
             try:
-                UUID(config.session_id)
-                cmd.extend(["--session-id", config.session_id])
+                UUID(session_id)
+                cmd.extend(["--session-id", session_id])
             except ValueError:
                 # If not a valid UUID, skip the session-id flag
                 # This allows for test scenarios with non-UUID session IDs
@@ -242,34 +249,52 @@ class ClaudeAgentCLI(CLIProvider, AgentCLI):
         Returns:
             Tuple of (output text, metadata dict or None)
         """
-        output_text = ""
-        metadata = None
-
         if not line.strip():
-            return output_text, metadata
+            return "", None
 
-        # Claude CLI can output JSON lines mixed with regular output
         try:
             # Try to parse as JSON first
             data = json.loads(line)
             if isinstance(data, dict):
-                # This is a structured response
-                if "type" in data:
-                    msg_type = data["type"]
-                    # Add delta content to output for content_block_delta, empty string for all other message types
-                    output_text = data.get("delta", {}).get("text", "") if msg_type == "content_block_delta" else ""
-                    metadata = data
-                else:
-                    # Not a recognized message type, return as text
-                    output_text = json.dumps(data)
-                    metadata = None
-            else:
-                # Not a dict, return as string
-                output_text = str(data)
-                metadata = None
+                return self._handle_json_dict(data)
+            # Not a dict, return as string
+            return str(data), None
         except json.JSONDecodeError:
             # Not JSON, return as regular text
-            output_text = line
+            return line, None
+
+    def _handle_json_dict(self, data: dict[str, Any]) -> tuple[str, dict[str, Any] | None]:
+        """Handle parsing of JSON dictionary from Claude CLI output."""
+        if "type" in data:
+            msg_type = data["type"]
+            metadata = data
+
+            if msg_type == "content_block_delta":
+                # Streaming delta (for real-time output)
+                delta = data.get("delta", {})
+                output_text = delta.get("text", "") if isinstance(delta, dict) else ""
+            elif msg_type == "assistant" and "message" in data:
+                output_text = self._extract_assistant_message(data["message"])
+            elif msg_type in {"system", "result"}:
+                # These message types contain metadata but not ongoing conversation text
+                output_text = ""
+            else:
+                # Other message types
+                output_text = json.dumps(data)
+        else:
+            # Not a recognized message type, return as text
+            output_text = json.dumps(data)
             metadata = None
 
         return output_text, metadata
+
+    def _extract_assistant_message(self, message_data: dict[str, Any]) -> str:
+        """Extract text content from assistant message."""
+        if "content" in message_data and isinstance(message_data["content"], list):
+            # Extract text from content array
+            text_parts: list[str] = []
+            for content_item in message_data["content"]:
+                if content_item.get("type") == "text" and "text" in content_item:
+                    text_parts.append(content_item["text"])
+            return "".join(text_parts)
+        return ""

@@ -1,0 +1,55 @@
+# Scanner Configuration
+# Used by scanner.py to determine which files/directories to exclude during quality checks
+#
+# This file contains all the exclude patterns for the quality scanner
+
+version: "1.0.0"
+
+ignored_dirs:
+  - ".git"
+  - ".gcloud"  # Third-party vendor directory (Google Cloud SDK)
+  - "node_modules"
+  - "dist"
+  - "build"
+  - "__pycache__"
+  - ".pytest_cache"
+  - ".mypy_cache"
+  - ".venv"
+  - ".venv-linux"
+  - "uv_cache"
+  - "cli-agents"
+  - ".next"
+  - "vendor"  # Third-party libraries (unmaintainable)
+  - "site-packages"
+  - "dist-info"
+  - "egg-info"
+  - "third_party"
+  - "pkg"
+  - "coverage"
+  - "out"
+  - "templates"
+  - "data"
+  - "docs"  # Research documentation may contain banned words in context
+  - "tests"  # Test files may contain terms that would normally be banned in testing context
+  - "ui-concept"  # Reference-only UX prototype (CLAUDE.md)
+
+ignored_suffixes:
+  - ".tsbuildinfo"
+  - ".log"
+  - ".lock"
+  - ".min.js.map"
+  - ".min.js"
+  - ".min.css"
+  - ".ini"  # Configuration files with tool-specific keywords
+  - ".toml"  # Configuration files with tool-specific keywords
+  - ".template"  # Template configuration files (e.g., mypy.ini.template)
+
+ignored_names:
+  - "README.md"
+  - "CHANGELOG.md"  # Documentation files may contain technical terms
+  - "commit-msg"
+  - "pre-commit"  # Git hooks may reference pattern names
+  - "CODE_EXCEPTIONS.md"
+  - "REPORT_DEFAULTS.md"
+  - "TODO-MYPY.md"  # Technical documentation explaining antipatterns
+  - "package-lock.json"  # NPM lockfile (third-party dependency manifest)

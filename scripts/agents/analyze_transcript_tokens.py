@@ -10,10 +10,10 @@ to help determine if full transcripts can fit within the 200K token context limi
 for the completion moderator.
 """
 
-import statistics  # noqa: E402
-import sys  # noqa: E402
-from pathlib import Path  # noqa: E402
-from typing import TypedDict  # noqa: E402
+import statistics
+import sys
+from pathlib import Path
+from typing import TypedDict
 
 
 def _ensure_repo_on_path() -> Path:
@@ -30,9 +30,9 @@ def _ensure_repo_on_path() -> Path:
 _ensure_repo_on_path()
 
 # Import after adding repo to path
-import tiktoken  # noqa: E402
+import tiktoken
 
-from scripts.agents.transcript import format_messages_for_prompt, get_last_n_messages  # noqa: E402
+from scripts.agents.transcript import format_messages_for_prompt, get_last_n_messages
 
 # Token count thresholds for analysis
 TOKEN_THRESHOLD_200K = 200_000

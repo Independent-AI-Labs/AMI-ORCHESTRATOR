@@ -8,7 +8,9 @@ import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
+import yaml
 from pydantic import BaseModel
 
 sys.path.insert(0, str(next(p for p in Path(__file__).resolve().parents if (p / "base").exists())))
@@ -19,16 +21,28 @@ if _temp_root is None:
     raise RuntimeError("Unable to locate AMI orchestrator root")
 REPO_ROOT: Path = _temp_root
 
-SUBMODULES = [
-    "base",
-    "browser",
-    "compliance",
-    "domains",
-    "files",
-    "nodes",
-    "streams",
-    "ux",
-]
+
+def load_submodules() -> list[str]:
+    """Load submodules from YAML configuration."""
+    config_file = REPO_ROOT / "config" / "modules.yaml"
+    if config_file.exists():
+        with config_file.open() as f:
+            config: dict[str, Any] = yaml.safe_load(f)
+        # Use main_modules as the source for git history export
+        modules = config.get("main_modules", [])
+        return modules if isinstance(modules, list) else []
+    # Default to hardcoded list if config doesn't exist
+    return [
+        "base",
+        "browser",
+        "compliance",
+        "domains",
+        "files",
+        "nodes",
+        "streams",
+        "ux",
+    ]
+
 
 # Constants for git log parsing
 MIN_COMMIT_PARTS = 4
@@ -105,7 +119,7 @@ def get_git_log(repo_path: Path, since: str, until: str) -> list[Commit]:
         if cmd and cmd[0] == "git":
             cmd[0] = git_exec
 
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True)  # noqa: S603
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
     except subprocess.CalledProcessError:
         return []
 
@@ -199,7 +213,8 @@ def generate_report(since: str, until: str) -> str:
     lines.append("")
 
     # Submodules
-    for submodule in SUBMODULES:
+    submodules = load_submodules()
+    for submodule in submodules:
         submodule_path = REPO_ROOT / submodule
         if not submodule_path.exists():
             continue
@@ -228,7 +243,7 @@ def generate_report(since: str, until: str) -> str:
     lines.append(f"- Lines removed: -{total_deletions}")
     lines.append("")
 
-    for submodule in SUBMODULES:
+    for submodule in submodules:
         submodule_path = REPO_ROOT / submodule
         if not submodule_path.exists():
             continue

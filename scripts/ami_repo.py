@@ -8,12 +8,12 @@ exec "$(dirname "$0")/ami-run" "$0" "$@"
 Creates and manages bare git repositories for local/remote development.
 """
 
-import sys  # noqa: E402
-from collections.abc import Callable  # noqa: E402
-from pathlib import Path  # noqa: E402
-from typing import Any, NoReturn  # noqa: E402
+import sys
+from collections.abc import Callable
+from pathlib import Path
+from typing import Any, NoReturn
 
-from base.scripts.env.paths import setup_imports  # noqa: E402
+from base.scripts.env.paths import setup_imports
 
 # Bootstrap imports
 setup_imports(Path(__file__))

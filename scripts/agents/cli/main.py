@@ -8,15 +8,11 @@ from __future__ import annotations
 """AMI Agent - Unified automation entry point.
 
 Replaces multiple bash scripts (claude-agent.sh, claude-audit.sh, etc.)
-with a single Python entry point supporting multiple modes.
+with a single Python entry point supporting multiple non-interactive modes.
 
 Called via ami-run wrapper (scripts/ami-agent).
 
 Usage:
-    ami-agent                           # Interactive mode (default)
-    ami-agent --interactive             # Interactive mode (explicit)
-    ami-agent --continue                # Continue most recent conversation
-    ami-agent --resume [SESSION_ID]     # Resume conversation (interactive or by ID)
     ami-agent --print <instruction>     # Non-interactive mode
     ami-agent --hook <validator>        # Hook validator mode
     ami-agent --audit <directory>       # Batch audit mode
@@ -25,21 +21,6 @@ Usage:
     ami-agent --docs <directory>        # Documentation maintenance mode
 
 Examples:
-    # Interactive agent with hooks
-    ami-agent
-
-    # Continue most recent conversation
-    ami-agent --continue
-
-    # Resume specific conversation
-    ami-agent --resume abc123
-
-    # Resume with interactive selection
-    ami-agent --resume
-
-    # Fork session when resuming
-    ami-agent --resume --fork-session
-
     # Non-interactive audit from stdin
     cat file.py | ami-agent --print config/prompts/audit.txt
 
@@ -49,38 +30,45 @@ Examples:
     # Batch audit
     ami-agent --audit base/
 
+    # Task execution
+    ami-agent --tasks tasks/
+
     # Documentation maintenance
     ami-agent --docs docs/
+
+    # Git synchronization
+    ami-agent --sync base/
 """
 
-import argparse  # noqa: E402
-import sys  # noqa: E402
-from collections.abc import Callable  # noqa: E402
-from pathlib import Path  # noqa: E402
+import argparse
+import sys
+from collections.abc import Callable
+from pathlib import Path
 
 # Standard /base imports pattern to find orchestrator root
 _root = next(p for p in Path(__file__).resolve().parents if (p / "base").exists())
 sys.path.insert(0, str(_root))
-from base.scripts.env.paths import setup_imports  # noqa: E402
+from base.scripts.env.paths import setup_imports
 
 ORCHESTRATOR_ROOT, MODULE_ROOT = setup_imports()
 
 # Additional imports after path setup
 
 # Load .env file before importing automation modules (ensures env vars available for Config)
-from dotenv import load_dotenv  # noqa: E402
+from dotenv import load_dotenv
 
 load_dotenv(ORCHESTRATOR_ROOT / ".env")
 
 # Ensure scripts.automation is importable
 sys.path.insert(0, str(ORCHESTRATOR_ROOT))
 
-from scripts.agents.cli.mode_handlers import (  # noqa: E402
+from scripts.agents.cli.mode_handlers import (
     mode_audit,
     mode_docs,
     mode_hook,
-    mode_interactive,
+    mode_interactive_editor,
     mode_print,
+    mode_query,
     mode_sync,
     mode_tasks,
 )
@@ -91,12 +79,6 @@ def main() -> int:
     parser = argparse.ArgumentParser(
         description="AMI Agent - Unified automation entry point",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-    )
-
-    parser.add_argument(
-        "--interactive",
-        action="store_true",
-        help="Interactive mode (default)",
     )
 
     parser.add_argument(
@@ -162,33 +144,25 @@ def main() -> int:
         help="Enable parallel execution (for --tasks, --docs, or --audit)",
     )
 
+    # New argument for editor mode
     parser.add_argument(
-        "-c",
-        "--continue",
-        dest="continue_session",
+        "--interactive-editor",
         action="store_true",
-        help="Continue the most recent conversation (interactive mode only)",
+        help="Interactive editor mode - opens text editor first, Ctrl+S sends to agent",
     )
 
     parser.add_argument(
-        "-r",
-        "--resume",
-        nargs="?",
-        const=True,
-        metavar="SESSION_ID",
-        help="Resume a conversation - provide a session ID or interactively select (interactive mode only)",
-    )
-
-    parser.add_argument(
-        "--fork-session",
-        action="store_true",
-        help="Create a new session ID when resuming (use with --resume or --continue)",
+        "--query",
+        metavar="QUERY",
+        help="Non-interactive mode - run Claude CLI with provided query string",
     )
 
     args = parser.parse_args()
 
     # Route to appropriate mode using dispatch
     mode_handlers_list: list[tuple[str | bool | None, Callable[[], int]]] = [
+        (args.interactive_editor, lambda: mode_interactive_editor() if args.interactive_editor else 1),
+        (args.query, lambda: mode_query(args.query) if args.query else 1),
         (args.print, lambda: mode_print(args.print) if args.print else 1),
         (args.hook, lambda: mode_hook(args.hook) if args.hook else 1),
         (args.audit, lambda: mode_audit(args.audit, retry_errors=args.retry_errors, user_instruction=args.user_instruction) if args.audit else 1),
@@ -204,12 +178,13 @@ def main() -> int:
         if condition:
             return handler()
 
-    # Default to interactive
-    return mode_interactive(
-        continue_session=args.continue_session,
-        resume=args.resume,
-        fork_session=args.fork_session,
-    )
+    # NEW: If no arguments provided, default to interactive editor mode
+    if not any([args.print, args.hook, args.audit, args.tasks, args.sync, args.docs, args.interactive_editor]):
+        return mode_interactive_editor()
+
+    # Show help if no mode specified
+    parser.print_help()
+    return 1
 
 
 if __name__ == "__main__":

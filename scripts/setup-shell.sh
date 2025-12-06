@@ -362,6 +362,7 @@ ami-qwen() {
     "$AMI_ROOT/.venv/node_modules/.bin/qwen" "$@"
 }
 
+
 # ============================================================================
 # 5. SERVICE MANAGEMENT (Root-only execution)
 # ============================================================================
@@ -794,6 +795,7 @@ ami-info() {
 
 # Add text input CLI alias
 alias @="ami-run scripts/cli_components/text_input_cli.py"
+alias msg="ami-run scripts/cli_components/text_input_cli.py"
 
 # Display the banner if not in quiet mode
 if [[ "$AMI_QUIET_MODE" != "1" ]]; then

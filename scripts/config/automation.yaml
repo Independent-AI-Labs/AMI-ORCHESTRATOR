@@ -54,6 +54,12 @@ agent:
     model_default: "gemini-2.5-pro"
     model_audit: "gemini-2.5-flash"  # Faster for hooks
 
+  # Qwen CLI settings
+  qwen:
+    command: "qwen"  # Or: "{root}/.venv/node_modules/.bin/qwen"
+    model_default: "qwen-coder"
+    model_audit: "qwen-coder"  # Faster for hooks
+
 # Legacy claude_cli config (for backward compatibility - will be deprecated)
 claude_cli:
   command: "{root}/.venv/node_modules/.bin/claude"

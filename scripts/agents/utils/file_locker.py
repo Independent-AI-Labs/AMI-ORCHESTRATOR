@@ -71,8 +71,7 @@ class FileLockManager:
             if not chattr_exec:
                 raise RuntimeError("chattr command not found in PATH")
             cmd = [chattr_exec, "+i", str(file_path)]
-            # S603: chattr_exec validated via shutil.which()
-            result = subprocess.run(cmd, check=False, capture_output=True, text=True)  # noqa: S603
+            result = subprocess.run(cmd, check=False, capture_output=True, text=True)
             if result.returncode != 0:
                 # Check if filesystem doesn't support it
                 if "Operation not supported" in result.stderr:
@@ -88,8 +87,7 @@ class FileLockManager:
             if not chattr_exec:
                 raise RuntimeError("chattr command not found in PATH")
             cmd = [sudo_exec, "-S", chattr_exec, "+i", str(file_path)]
-            # S603: sudo_exec and chattr_exec validated via shutil.which()
-            process = subprocess.Popen(  # noqa: S603
+            process = subprocess.Popen(
                 cmd,
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
@@ -120,8 +118,7 @@ class FileLockManager:
             if not chattr_exec:
                 raise RuntimeError("chattr command not found in PATH")
             cmd = [chattr_exec, "-i", str(file_path)]
-            # S603: chattr_exec validated via shutil.which()
-            result = subprocess.run(cmd, check=False, capture_output=True, text=True)  # noqa: S603
+            result = subprocess.run(cmd, check=False, capture_output=True, text=True)
             if result.returncode != 0:
                 raise subprocess.CalledProcessError(result.returncode, cmd, result.stdout, result.stderr)
         else:
@@ -133,8 +130,7 @@ class FileLockManager:
             if not chattr_exec:
                 raise RuntimeError("chattr command not found in PATH")
             cmd = [sudo_exec, "-S", chattr_exec, "-i", str(file_path)]
-            # S603: sudo_exec and chattr_exec validated via shutil.which()
-            process = subprocess.Popen(  # noqa: S603
+            process = subprocess.Popen(
                 cmd,
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,

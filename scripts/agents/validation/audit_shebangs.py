@@ -20,22 +20,22 @@ Usage:
     scripts/agents/validation/audit_shebangs.py --staged-only            # Check only git staged files
 """
 
-import argparse  # noqa: E402
-import shutil  # noqa: E402
-import subprocess  # noqa: E402
-import sys  # noqa: E402
-from pathlib import Path  # noqa: E402
-from typing import Any  # noqa: E402
+import argparse
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+from typing import Any
 
-import yaml  # noqa: E402
-from loguru import logger  # noqa: E402
+import yaml
+from loguru import logger
 
 # Root directory
 ROOT = Path(__file__).resolve().parents[1]
 
 # Import config after setting up sys.path to avoid circular imports
 sys.path.insert(0, str(ROOT))
-from scripts.agents.config import get_config  # noqa: E402
+from scripts.agents.config import get_config
 
 # Correct shebang patterns
 CORRECT_AMI_RUN_SHEBANG = '#!/usr/bin/env bash\n"""\'exec "$(dirname "$0")/ami-run" "$(dirname "$0")'
@@ -281,7 +281,7 @@ def get_staged_python_files(scan_dir: Path) -> list[Path]:
         return []
 
     try:
-        result = subprocess.run(  # noqa: S603
+        result = subprocess.run(
             [git_cmd, "diff", "--cached", "--name-only", "--diff-filter=ACM"],
             cwd=scan_dir,
             capture_output=True,

@@ -7,8 +7,8 @@ from __future__ import annotations
 
 """Test how Claude Code Bash tool displays different output scenarios."""
 
-import argparse  # noqa: E402
-import sys  # noqa: E402
+import argparse
+import sys
 
 
 def test_stdout_only() -> None:

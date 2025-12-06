@@ -54,6 +54,8 @@ banned_words:
   - "uuid5()"
   - "uuid6()"
   - "uuid8()"
+  - "self\\.get\\("
+  - "self\\.set\\("
 
   # Unreadable nested bracket and comma patterns - AUTOMATED DETECTION
   # - "tuple[dict["
@@ -95,16 +97,17 @@ ignored_files:
   - "base/scripts/quality/banned_words.py"
   - "base/scripts/meta/cleanup.py"
   - "base/backend/quality/scanner.py"
+  - "scripts/config/patterns/scanner.yaml"  # Scanner configuration with structural ignore patterns
   - "base/tests/integration/test_config_enforcement.py"
   - "ux/cms/public/js/lib/highlight-engine/index.js"
   - "ux/scripts/quality/banned_words.py"
   # Quality infrastructure files that validate ignore patterns
-  - "base/scripts/quality/check_config_ignores.py"
+  - "base/scripts/quality/check_config_exclusions.py"
   - "base/tests/unit/quality/test_scanner.py"
-  - "scripts/quality/check_config_ignores.py"
+  - "scripts/quality/check_config_exclusions.py"
   - "tests/unit/quality/test_scanner.py"
   # Config pattern file that legitimately uses ignore patterns
-  - "scripts/config/patterns/config_ignore_patterns.yaml"  # Pattern config file for ignore checking
+  - "scripts/config/patterns/config_exclusion_patterns.yaml"  # Pattern config file for exclusion checking
   # Files testing or implementing pattern validation
   - "base/scripts/quality/code_check.py"  # Implements TYPE_IGNORE_PATTERN checking
   - "base/scripts/meta/clean_commit_messages.py"  # Regex pattern compilation with re.IGNORECASE

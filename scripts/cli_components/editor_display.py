@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
 
-import contextlib
-import shutil
 import sys
 
 from scripts.cli_components.text_input_utils import Colors, display_final_output
@@ -21,60 +19,18 @@ class EditorDisplay:
 
     def display_editor(self, lines: list[str], current_line: int, current_col: int) -> None:
         """Display the current state of the editor."""
-        # Get terminal size with default
-        with contextlib.suppress(OSError):
-            _, terminal_width = shutil.get_terminal_size()
+        # Calculate the total display lines before making changes
+        total_display_lines = 1 + 2 + len(lines) + 1  # 1 for header + 2 for borders + content + 1 for status
 
-        # Display ALL input lines to maintain terminal scrollability
-        total_lines = len(lines)
-
-        # Count how many lines we're about to print to track for redraw
-        lines_to_print = []
-
-        # Show ALL lines as required by spec
-        for i in range(total_lines):
-            if i == current_line:
-                # Highlight current line by inverting the line number
-                line_content = lines[i]
-
-                # Apply inverted video to the character at cursor position
-                if current_col < len(line_content):
-                    # Split the line to apply reverse video to the character at cursor
-                    before_cursor = line_content[:current_col]
-                    cursor_char = line_content[current_col]
-                    after_cursor = line_content[current_col + 1 :]
-                    formatted_line = f"{before_cursor}{Colors.REVERSE}{cursor_char}{Colors.RESET}{after_cursor}"
-                else:
-                    # If cursor is at the end of the line, just append a space with reverse video
-                    formatted_line = f"{line_content}{Colors.REVERSE} {Colors.RESET}"
-
-                lines_to_print.append(f" {Colors.REVERSE}{i + 1:2d}{Colors.RESET}| {formatted_line}")
-            else:
-                line_content = lines[i]
-                lines_to_print.append(f" {Colors.CYAN}{i + 1:2d}{Colors.RESET}| {line_content}")
-
-        # Calculate total lines to display (header + borders + content + status)
-        total_display_lines = 1 + 2 + len(lines_to_print) + 1  # 1 for header + 2 for borders + content + 1 for status
-
-        # For subsequent displays (after first), clear previous content by moving up
+        # For subsequent displays (after first), clear previous content using a more robust approach
         if self.previous_display_lines > 0:
-            # Move up to the beginning of the previous display and clear all lines
-            sys.stdout.write(f"\033[{self.previous_display_lines}A")  # Move cursor up to the top of previous display
-            sys.stdout.flush()
-            # Clear each line completely, ensuring proper positioning for next line
-            for i in range(self.previous_display_lines):
+            # Use a safer clearing approach: move to bottom of previous display, then clear upward
+            # This prevents cursor positioning issues during rapid updates
+            for _ in range(self.previous_display_lines):
+                sys.stdout.write("\033[1A")  # Move cursor up one line
                 sys.stdout.write("\033[2K")  # Clear the entire line
+                sys.stdout.write("\033[1G")  # Move cursor to beginning of line (column 1)
                 sys.stdout.flush()
-                if i < self.previous_display_lines - 1:  # For all but the last line, move to beginning of next line
-                    sys.stdout.write("\033[B\033[1G")  # Move cursor down to next line and to beginning of that line
-                    sys.stdout.flush()
-            # The cursor is now at the last cleared line. Move back up to the first line position to print new content
-            # We moved down (previous_display_lines - 1) times, so we need to move back up the same amount
-            # to get back to the position of the first line
-            if self.previous_display_lines > 1:
-                sys.stdout.write(f"\033[{self.previous_display_lines - 1}A")  # Move back up to the first line position
-                sys.stdout.flush()
-            # If previous_display_lines was 1, we don't need to move up since we're already at the right position
 
         # Print a header with instructions (no borders)
         effective_width = 80  # Fixed to 80 characters wide
@@ -92,8 +48,23 @@ class EditorDisplay:
         sys.stdout.flush()
 
         # Print all content lines (ALL of them as required)
-        for line in lines_to_print:
-            sys.stdout.write(f"{line}\n")
+        for i, line_content in enumerate(lines):
+            if i == current_line:
+                # Highlight current line by inverting the line number
+                # Apply inverted video to the character at cursor position
+                if current_col < len(line_content):
+                    # Split the line to apply reverse video to the character at cursor
+                    before_cursor = line_content[:current_col]
+                    cursor_char = line_content[current_col]
+                    after_cursor = line_content[current_col + 1 :]
+                    formatted_line = f"{before_cursor}{Colors.REVERSE}{cursor_char}{Colors.RESET}{after_cursor}"
+                else:
+                    # If cursor is at the end of the line, just append a space with reverse video
+                    formatted_line = f"{line_content}{Colors.REVERSE} {Colors.RESET}"
+
+                sys.stdout.write(f" {Colors.REVERSE}{i + 1:2d}{Colors.RESET}| {formatted_line}\n")
+            else:
+                sys.stdout.write(f" {Colors.CYAN}{i + 1:2d}{Colors.RESET}| {line_content}\n")
             sys.stdout.flush()
 
         # Create bottom border for the input area
@@ -125,20 +96,12 @@ class EditorDisplay:
         """Handle keyboard interrupt to show final output."""
         # Clear the previous editor content before showing final output
         if self.previous_display_lines > 0:
-            # Move up to the beginning of the previous display and clear all lines
-            sys.stdout.write(f"\033[{self.previous_display_lines}A")  # Move cursor up to the top of previous display
-            sys.stdout.flush()
-            # Clear each line completely
-            for i in range(self.previous_display_lines):
+            # Use the same safer clearing approach as in display_editor
+            for _ in range(self.previous_display_lines):
+                sys.stdout.write("\033[1A")  # Move cursor up one line
                 sys.stdout.write("\033[2K")  # Clear the entire line
-                sys.stdout.flush()
-                if i < self.previous_display_lines - 1:  # For all but the last line, move to beginning of next line
-                    sys.stdout.write("\033[B\033[1G")  # Move cursor down to next line and to beginning of that line
-                    sys.stdout.flush()
-            # The cursor is now at the last cleared line. Move back up to print new content
-            if self.previous_display_lines > 1:
-                sys.stdout.write(f"\033[{self.previous_display_lines - 1}A")  # Move back up to the first line position
+                sys.stdout.write("\033[1G")  # Move cursor to beginning of line (column 1)
                 sys.stdout.flush()
 
         # Use the utility function to display final output
-        display_final_output(lines, "❌ Exited")
+        display_final_output(lines, "❌ Message discarded")

@@ -1,21 +1,16 @@
 """Mode handler functions for main CLI entry point."""
 
-import shutil
-import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
-
-from loguru import logger
 
 from base.backend.utils.uuid_utils import uuid7
 from scripts.agents.audit import AuditEngine
 from scripts.agents.cli.config import AgentConfigPresets
 from scripts.agents.cli.exceptions import AgentError, AgentExecutionError
 from scripts.agents.cli.factory import get_agent_cli
-from scripts.agents.cli.hooks_utils import create_mcp_config_file, create_settings_file_from_hooks_config
 from scripts.agents.cli.result_utils import count_status_types
-from scripts.agents.config import get_config
+from scripts.agents.cli.timer_utils import wrap_text_in_box
 from scripts.agents.docs import DocsExecutor
 from scripts.agents.sync import SyncExecutor
 from scripts.agents.tasks import TaskExecutor
@@ -40,100 +35,46 @@ from scripts.agents.workflows.security_validators import (
 from scripts.agents.workflows.todo_validators import (
     TodoValidatorHook,
 )
+from scripts.cli_components.text_editor import TextEditor
 
 
-def mode_interactive(continue_session: bool = False, resume: str | bool | None = None, fork_session: bool = False) -> int:
-    """Interactive mode - Launch Claude Code with hooks.
+def mode_query(query: str) -> int:
+    """Non-interactive query mode - run agent with provided query string.
 
     Args:
-        continue_session: Continue the most recent conversation
-        resume: Resume a conversation (True for interactive selection, string for specific session ID)
-        fork_session: Create a new session ID when resuming
+        query: The query string to send to the agent
 
     Returns:
         Exit code (0=success, 1=failure)
     """
-    config = get_config()
+    # Format and display the user's input with borders and timestamp
 
-    # Load agent instruction from file
-    prompts_dir = config.root / config.get("prompts.dir")
-    agent_file = prompts_dir / config.get("prompts.agent")
-
-    instruction = agent_file.read_text()
-
-    # Inject current date
-    instruction = instruction.format(date=datetime.now().strftime("%Y-%m-%d %H:%M:%S %Z"))
-
-    # Create MCP config file from automation.yaml
-    mcp_config_file = create_mcp_config_file(config)
-    mcp_enabled = mcp_config_file is not None
-
-    # Create settings file with hooks
-    settings_file = create_settings_file_from_hooks_config(config)
-
-    # Debug: log settings file path
-    logger.info("created_settings_file", path=str(settings_file))
-
-    # Debug log file
-    debug_log = config.root / "claude-debug.log"
-    with debug_log.open("a") as f:
-        f.write(f"=== Claude session started at {datetime.now()} ===\n")
-
-    # Launch Claude Code
-    logger.info("session_start", mode="interactive", mcp_enabled=mcp_enabled)
+    wrap_text_in_box(query)
+    datetime.now().strftime("%H:%M:%S")
 
     try:
-        # Get Claude CLI command from config
-        claude_cmd = config.get("claude_cli.command", "claude")
+        # Get CLI instance
+        cli = get_agent_cli()
 
-        # Build command
-        cmd = [
-            claude_cmd,
-        ]
+        # Enable streaming mode with content capture in configuration, but disable hooks for query mode
+        session_id = uuid7()
+        config = AgentConfigPresets.worker(session_id=session_id)
+        config.enable_hooks = False  # Disable hooks for query mode to avoid quality violations
+        config.enable_streaming = True  # Enable streaming to show timer during processing
+        config.capture_content = True  # Enable content capture to format output in box
 
-        # Add resume/continue flags
-        if continue_session:
-            cmd.append("--continue")
-        elif resume:
-            if isinstance(resume, str):
-                # Specific session ID provided
-                cmd.extend(["--resume", resume])
-            else:
-                # Interactive selection
-                cmd.append("--resume")
+        # Run with streaming to capture content while showing timer
+        output, metadata = cli.run_print(
+            instruction=query,
+            agent_config=config,
+        )
 
-        # Add fork-session flag if requested
-        if fork_session:
-            cmd.append("--fork-session")
+        # Format and display the response with borders and timestamp
+        wrap_text_in_box(output)
 
-        # Add MCP config if enabled
-        if mcp_config_file:
-            cmd.extend(["--mcp-config", str(mcp_config_file)])
-
-        cmd.extend(["--settings", str(settings_file), "--", instruction])
-
-        # Debug: log the command being run
-        logger.info("launching_claude", command=" ".join(cmd[:5]) + " ...")
-
-        # Validate executable exists in PATH before running
-        if cmd and cmd[0]:
-            executable = shutil.which(cmd[0])
-            if not executable:
-                logger.error("claude_command_not_found", command=cmd[0])
-                return 1
-            # Replace with full path to validated executable
-            cmd[0] = executable
-
-        # Redirect stderr to debug log
-        # S603: cmd[0] validated via shutil.which() above, replacing with full path to executable
-        with debug_log.open("a") as log_file:
-            subprocess.run(cmd, check=False, stderr=log_file)  # noqa: S603
         return 0
-    finally:
-        settings_file.unlink(missing_ok=True)
-        if mcp_config_file:
-            mcp_config_file.unlink(missing_ok=True)
-        logger.info("session_end")
+    except Exception:
+        return 1
 
 
 def mode_print(instruction_path: str) -> int:
@@ -372,3 +313,52 @@ def mode_docs(directory_path: str, root_dir: str | None = None, parallel: bool =
                 pass
 
     return 1 if (failed > 0 or timeout > 0) else 0
+
+
+def mode_interactive_editor() -> int:
+    """Interactive editor mode - opens text editor first, Ctrl+S sends to agent.
+
+    Args:
+        None
+
+    Returns:
+        Exit code (0=success, 1=failure)
+    """
+
+    # Launch text editor and get content
+    editor = TextEditor()
+    content = editor.run()
+
+    if content is None:  # User cancelled with Ctrl+C
+        return 0  # Exit quietly
+
+    # If content is empty, exit gracefully
+    if not content.strip():
+        return 0  # Exit quietly
+
+    # The user's input and timestamp have already been displayed by the text editor via display_final_output
+    # So we don't need to print anything more here
+
+    try:
+        # Get CLI instance
+        cli = get_agent_cli()
+
+        # Enable streaming mode with content capture in configuration, but disable hooks for editor mode
+        session_id = uuid7()
+        config = AgentConfigPresets.worker(session_id=session_id)
+        config.enable_hooks = False  # Disable hooks for interactive editor mode to avoid quality violations
+        config.enable_streaming = True  # Enable streaming to show timer during processing
+        config.capture_content = True  # Enable content capture to format output in box
+
+        # Run with streaming to capture content while showing timer
+        output, metadata = cli.run_print(
+            instruction=content,
+            agent_config=config,
+        )
+
+        # Format and display the response with borders and timestamp
+        wrap_text_in_box(output)
+
+        return 0
+    except Exception:
+        return 1

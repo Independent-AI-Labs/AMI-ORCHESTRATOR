@@ -5,12 +5,17 @@ from __future__ import annotations
 import subprocess
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from scripts.agents.cli.config import AgentConfig
 
 from base.backend.utils.uuid_utils import uuid7
-from scripts.agents.cli.config import AgentConfig
 from scripts.agents.cli.streaming import (
     execute_streaming,
+)
+from scripts.agents.cli.streaming_loops import (
+    run_streaming_loop_with_display,
 )
 from scripts.agents.cli.streaming_utils import load_instruction_with_replacements
 from scripts.agents.config import get_config
@@ -102,7 +107,7 @@ class CLIProvider(ABC):
         cwd: Path | None,
         agent_config: AgentConfig,
         stdin_data: str | None = None,
-        audit_log_path: Path | None = None,  # noqa: ARG002
+        audit_log_path: Path | None = None,
     ) -> tuple[str, dict[str, Any] | None]:
         """Execute CLI command with timeout handling.
 
@@ -119,13 +124,26 @@ class CLIProvider(ABC):
         Raises:
             AgentError: If execution fails or times out
         """
+        # audit_log_path is accepted for interface compatibility but not used in base implementation
+        _ = audit_log_path  # Mark as intentionally unused
+
         # Build the command
         cmd = self._build_command(instruction, cwd, agent_config)
 
         # Use streaming execution for better timeout handling
         # Note: audit_log_path is accepted but not currently used by execute_streaming
         config = get_config()
-        return execute_streaming(cmd=cmd, stdin_data=stdin_data, cwd=cwd, agent_config=agent_config, config=config)
+
+        # If streaming mode is enabled, provide a callback to enable real-time display
+        parse_stream_callback = None
+        if agent_config.enable_streaming:
+            # Create a closure that captures self to access the _parse_stream_message method
+            def streaming_callback(process: subprocess.Popen[str], cmd: list[str], agent_config_param: Any) -> tuple[str, dict[str, Any]]:
+                return run_streaming_loop_with_display(process, cmd, agent_config_param, self, capture_content=agent_config_param.capture_content)
+
+            parse_stream_callback = streaming_callback
+
+        return execute_streaming(cmd=cmd, stdin_data=stdin_data, cwd=cwd, agent_config=agent_config, config=config, parse_stream_callback=parse_stream_callback)
 
     def run_interactive(
         self,
@@ -194,8 +212,10 @@ class CLIProvider(ABC):
             # Security restriction: Path should only be passed as instruction_file parameter
             raise ValueError("Path objects should be passed as instruction_file parameter, not instruction parameter")
         else:
-            # instruction is a string
-            instruction_content = instruction  # type: ignore
+            # instruction is a string (not None since first condition handled instruction_file case)
+            if instruction is None:
+                raise ValueError("instruction cannot be None when instruction_file is not provided")
+            instruction_content = instruction
 
         config = agent_config or self._get_default_config()
         return self._execute_with_timeout(instruction_content, cwd, config, stdin_data=stdin, audit_log_path=audit_log_path)

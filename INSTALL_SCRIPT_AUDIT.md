@@ -48,11 +48,10 @@ The install script (`@install`) bootstraps the AMI Orchestrator development envi
 - Creates symlinks in `.boot-linux/bin/` for `node`, `npm`, `npx`
 
 ### 7. Node.js Agents Installation
-- Builds Qwen CLI from source in `./cli-agents/qwen-code`
 - Installs Node.js CLI agents to `.venv/node_modules`:
-  - `@anthropic-ai/claude-code@2.0.10`
-  - `@google/gemini-cli@0.11.3`
-  - `@qwen-code/qwen-code`
+  - `@anthropic-ai/claude-code@2.0.58`
+  - `@google/gemini-cli@0.19.1`
+  - `@qwen-code/qwen-code@0.3.0`
 
 ### 8. Testing
 - Runs tests using `base/scripts/run_tests.py`

@@ -5,22 +5,38 @@ exec "$(dirname "$0")/ami-run" "$0" "$@"
 
 """Find and migrate metadata artifacts."""
 
-import contextlib  # noqa: E402
-import json  # noqa: E402
-import shutil  # noqa: E402
-import subprocess  # noqa: E402
-import sys  # noqa: E402
-from pathlib import Path  # noqa: E402
-from typing import TYPE_CHECKING, Literal  # noqa: E402
+import contextlib
+import json
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, Literal
+
+import yaml
 
 if TYPE_CHECKING:
     from files.backend.mcp.filesys.utils.metadata_config import resolve_artifact_path
 
-from files.backend.mcp.filesys.utils.metadata_config import get_metadata_mappings  # noqa: E402
+from files.backend.mcp.filesys.utils.metadata_config import get_metadata_mappings
 
 MIN_ARG_COUNT = 2  # Minimum number of arguments required for the script
 
 ArtifactType = Literal["progress", "feedback", "meta"]
+
+
+def load_modules() -> list[str]:
+    """Load modules from YAML configuration."""
+    repo_root = _ensure_repo_on_path()
+    config_file = repo_root / "config" / "modules.yaml"
+    if config_file.exists():
+        with config_file.open() as f:
+            config: dict[str, Any] = yaml.safe_load(f)
+        # Use extended_modules as find_metadata needs the backend module too
+        modules = config.get("extended_modules", [])
+        return modules if isinstance(modules, list) else []
+    # Default to hardcoded list if config doesn't exist
+    return ["base", "compliance", "backend", "browser", "domains", "files", "nodes", "streams", "ux"]
 
 
 def _ensure_repo_on_path() -> Path:
@@ -43,7 +59,7 @@ def discover_artifacts() -> dict[str, dict[str, list[Path]]]:
     artifacts = {}
 
     # Known module directories
-    modules = ["base", "compliance", "backend", "browser", "domains", "files", "nodes", "streams", "ux"]
+    modules = load_modules()
 
     for module in modules:
         module_path = Path(module)
@@ -84,7 +100,7 @@ def init_mappings(artifacts: dict[str, dict[str, list[Path]]], default_root: str
                 git_executable = shutil.which("git")
                 if git_executable:
                     with contextlib.suppress(subprocess.CalledProcessError):
-                        subprocess.run([git_executable, "init"], cwd=meta_path, check=True, capture_output=True)  # noqa: S603
+                        subprocess.run([git_executable, "init"], cwd=meta_path, check=True, capture_output=True)
 
         mappings.append({"module": module, "metadataPath": str(meta_path), "isActive": True})
 

@@ -18,7 +18,7 @@ A minimal, non-intrusive text input component for the terminal that maintains sh
 - Uses top and bottom borders with content in between (┌─...─┐, content, └─...─┘)
 - Short, concise information about available shortcuts
 - Should be minimal and not take up excessive space
-- Example: `┌ Arrow Keys: navigate | Enter: new line | BS: edit | Ctrl+D: save ┐`
+- Example: `┌ Arrow Keys: navigate | Enter: new line | BS: edit | Ctrl+S: send ┐`
 
 #### 2.2 Expandable Text Editor
 - Line-numbered text editor area with optional navigation indicators
@@ -46,10 +46,10 @@ When the user exits the prompt (save or cancel), the terminal should display:
 - Horizontal border at the bottom (└─...─┘)
 
 #### 3.4 Timestamp and Status
-- Timestamp in the format: `YYYY-MM-DD HH:MM:SS`
-- Status indicator with emoji: 
-  - ✅ Saved (when Ctrl+D pressed)
-  - ❌ Cancelled (when Ctrl+C pressed)
+- Timestamp in the format: `HH:MM:SS` (24-hour format)
+- Status indicator with emoji:
+  - ✅ Sent to agent (when Ctrl+S pressed)
+  - ❌ Message discarded (when Ctrl+C pressed)
 
 ## Implementation Notes
 
@@ -70,7 +70,7 @@ When the user exits the prompt (save or cancel), the terminal should display:
 - Arrow keys (↑↓←→): Navigate between characters/lines
 - Enter: Start new line
 - Backspace: Delete character before cursor
-- Ctrl+D: Save and exit
+- Ctrl+S: Send to agent and exit
 - Ctrl+C: Cancel and exit
 - Ctrl+W: Delete word (optional)
 - Ctrl+U: Delete line (optional)

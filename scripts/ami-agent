@@ -6,178 +6,82 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(dirname "$SCRIPT_DIR")"
 
-# Load required CLI versions from .env (safe parsing, no sourcing)
-CLAUDE_REQUIRED_VERSION="2.0.10"
-GEMINI_REQUIRED_VERSION="0.11.3"
-if [ -f "$ROOT_DIR/.env" ]; then
-    while IFS='=' read -r key value; do
-        # Skip comments and empty lines
-        [[ "$key" =~ ^#.*$ ]] && continue
-        [[ -z "$key" ]] && continue
+# Check for version argument
+if [[ "$*" == *"-v"* ]] || [[ "$*" == *"--version"* ]]; then
+    # Only do basic existence checks for version display
+    export DISABLE_AUTOUPDATER=1
 
-        if [ "$key" = "CLAUDE_CLI_VERSION" ]; then
-            CLAUDE_REQUIRED_VERSION="$value"
-        elif [ "$key" = "GEMINI_CLI_VERSION" ]; then
-            GEMINI_REQUIRED_VERSION="$value"
-        fi
-    done < "$ROOT_DIR/.env"
-fi
+    # Enforce venv-only Claude CLI (no system alternative)
+    CLAUDE_BIN="$ROOT_DIR/.venv/node_modules/.bin/claude"
 
-# Always disable Claude CLI auto-updates by default
-export DISABLE_AUTOUPDATER=1
-
-# Enforce venv-only Claude CLI (no system alternative)
-CLAUDE_BIN="$ROOT_DIR/.venv/node_modules/.bin/claude"
-
-# FAIL if Claude CLI is not present - install must be properly run
-if [ ! -x "$CLAUDE_BIN" ]; then
-    echo "Error: Claude CLI not found at $CLAUDE_BIN" >&2
-    echo "Run: ./install to install Node.js CLI agents properly" >&2
-    exit 1
-fi
-
-# Check Claude CLI version
-check_claude_version() {
-    local claude_path="$1"
-
-    if [ ! -x "$claude_path" ]; then
-        return 1
-    fi
-
-    local current_version
-    current_version=$("$claude_path" --version 2>/dev/null | awk '{print $1}')
-
-    if [ "$current_version" != "$CLAUDE_REQUIRED_VERSION" ]; then
-        return 2
-    fi
-
-    return 0
-}
-
-# Verify version matches requirement
-if ! check_claude_version "$CLAUDE_BIN"; then
-    ret=$?
-    if [ $ret -eq 2 ]; then
-        current=$("$CLAUDE_BIN" --version 2>/dev/null | awk '{print $1}')
-        echo "Error: Claude CLI version mismatch. Required: $CLAUDE_REQUIRED_VERSION, Found: $current" >&2
-        echo "Run: ./install to install correct version" >&2
-        exit 1
-    else
-        echo "Error: Claude CLI check failed" >&2
+    # FAIL if Claude CLI is not present - install must be properly run
+    if [ ! -x "$CLAUDE_BIN" ]; then
+        echo "Error: Claude CLI not found at $CLAUDE_BIN" >&2
+        echo "Run: ./install to install Node.js CLI agents properly" >&2
         exit 1
     fi
-fi
 
-# Set Claude configuration to disable updates
-if [ -x "$CLAUDE_BIN" ]; then
-    "$CLAUDE_BIN" config set -g autoUpdates disabled 2>/dev/null || true
-fi
+    # Just display version without checking interoperability
+    echo "Claude CLI Version: $($CLAUDE_BIN --version 2>/dev/null || echo "Unable to determine")"
 
-# === Gemini CLI Bootstrap ===
-
-# Enforce venv-only Gemini CLI (no system alternative)
-GEMINI_BIN="$ROOT_DIR/.venv/node_modules/.bin/gemini"
-
-# FAIL if Gemini CLI is not present - install must be properly run
-if [ ! -x "$GEMINI_BIN" ]; then
-    echo "Error: Gemini CLI not found at $GEMINI_BIN" >&2
-    echo "Run: ./install to install Node.js CLI agents properly" >&2
-    exit 1
-fi
-
-# Check Gemini CLI version
-check_gemini_version() {
-    local gemini_path="$1"
-
-    if [ ! -x "$gemini_path" ]; then
-        return 1
+    # Set Claude configuration to disable updates
+    if [ -x "$CLAUDE_BIN" ]; then
+        "$CLAUDE_BIN" config set -g autoUpdates disabled 2>/dev/null || true
     fi
 
-    local current_version
-    current_version=$("$gemini_path" --version 2>/dev/null | grep -oP '^\d+\.\d+\.\d+')
+    # === Gemini CLI Bootstrap ===
 
-    if [ "$current_version" != "$GEMINI_REQUIRED_VERSION" ]; then
-        return 2
-    fi
+    # Enforce venv-only Gemini CLI (no system alternative)
+    GEMINI_BIN="$ROOT_DIR/.venv/node_modules/.bin/gemini"
 
-    return 0
-}
-
-# Verify version matches requirement
-if ! check_gemini_version "$GEMINI_BIN"; then
-    ret=$?
-    if [ $ret -eq 2 ]; then
-        current=$("$GEMINI_BIN" --version 2>/dev/null | grep -oP '^\d+\.\d+\.\d+')
-        echo "Error: Gemini CLI version mismatch. Required: $GEMINI_REQUIRED_VERSION, Found: $current" >&2
-        echo "Run: ./install to install correct version" >&2
-        exit 1
-    else
-        echo "Error: Gemini CLI check failed" >&2
+    # FAIL if Gemini CLI is not present - install must be properly run
+    if [ ! -x "$GEMINI_BIN" ]; then
+        echo "Error: Gemini CLI not found at $GEMINI_BIN" >&2
+        echo "Run: ./install to install Node.js CLI agents properly" >&2
         exit 1
     fi
-fi
 
-# === gcloud CLI Bootstrap ===
+    # Just display version without checking interoperability
+    echo "Gemini CLI Version: $($GEMINI_BIN --version 2>/dev/null || echo "Unable to determine")"
 
-# Find gcloud binary (local or system)
-find_gcloud() {
-    # Check local installation first
-    local local_gcloud="$ROOT_DIR/.gcloud/google-cloud-sdk/bin/gcloud"
-    if [ -x "$local_gcloud" ]; then
-        echo "$local_gcloud"
-        return 0
+    # Configure Gemini CLI to use "Login with Google" free tier OAuth
+    export GOOGLE_GENAI_USE_GCA=true
+
+    # Validate auth configuration
+    if [ "${GOOGLE_GENAI_USE_GCA}" != "true" ]; then
+        echo "Error: GOOGLE_GENAI_USE_GCA must be set to 'true'" >&2
+        exit 1
     fi
 
-    # Check system PATH
-    if command -v gcloud >/dev/null 2>&1; then
-        command -v gcloud
-        return 0
+    # Set default location (optional, not required for free tier but safe to have)
+    if [ -z "${GOOGLE_CLOUD_LOCATION:-}" ]; then
+        export GOOGLE_CLOUD_LOCATION="us-central1"
+    fi
+else
+    # Normal operation - just check if CLAUDE_BIN exists, don't run version check
+    CLAUDE_BIN="$ROOT_DIR/.venv/node_modules/.bin/claude"
+    if [ ! -x "$CLAUDE_BIN" ]; then
+        echo "Error: Claude CLI not found at $CLAUDE_BIN" >&2
+        echo "Run: ./install to install Node.js CLI agents properly" >&2
+        exit 1
     fi
 
-    return 1
-}
-
-# Check if Gemini CLI OAuth credentials exist
-has_gemini_credentials() {
-    # Check for cached OAuth credentials from "Login with Google" free tier
-    local oauth_creds="$HOME/.gemini/oauth_creds.json"
-    [ -f "$oauth_creds" ]
-}
-
-# Ensure Gemini CLI authentication is set up - FAIL if not authenticated
-ensure_gemini_auth() {
-    # Check if already authenticated
-    if has_gemini_credentials; then
-        return 0
+    # Set Claude configuration to disable updates (without version check)
+    if [ -x "$CLAUDE_BIN" ]; then
+        "$CLAUDE_BIN" config set -g autoUpdates disabled 2>/dev/null || true
     fi
 
-    # Need to authenticate - FAIL instead of prompting
-    echo "Error: Gemini CLI OAuth credentials not found" >&2
-    echo "Run: gemini (then select 'Login with Google' in browser) to authenticate first" >&2
-    return 1
-}
+    # Gemini binary check (without version check)
+    GEMINI_BIN="$ROOT_DIR/.venv/node_modules/.bin/gemini"
+    if [ ! -x "$GEMINI_BIN" ]; then
+        echo "Error: Gemini CLI not found at $GEMINI_BIN" >&2
+        echo "Run: ./install to install Node.js CLI agents properly" >&2
+        exit 1
+    fi
 
-# Check Gemini CLI auth (only if using Gemini provider)
-if ! ensure_gemini_auth; then
-    echo "Error: Failed to set up Gemini CLI authentication" >&2
-    echo "Please run 'gemini' to authenticate, then try again" >&2
-    exit 1
-fi
-
-# Configure Gemini CLI to use "Login with Google" free tier OAuth
-# See: https://github.com/google-gemini/gemini-cli/blob/main/docs/get-started/authentication.md
-# Free tier: 60 requests/min, 1,000 requests/day, no project ID required
-export GOOGLE_GENAI_USE_GCA=true
-
-# Validate auth configuration
-if [ "${GOOGLE_GENAI_USE_GCA}" != "true" ]; then
-    echo "Error: GOOGLE_GENAI_USE_GCA must be set to 'true'" >&2
-    exit 1
-fi
-
-# Set default location (optional, not required for free tier but safe to have)
-if [ -z "${GOOGLE_CLOUD_LOCATION:-}" ]; then
-    export GOOGLE_CLOUD_LOCATION="us-central1"
+    # Set up basic environment without full authentication check
+    export DISABLE_AUTOUPDATER=1
+    export GOOGLE_GENAI_USE_GCA=true
 fi
 
 # Force root venv for scripts/agents/cli/main.py - it requires root dependencies

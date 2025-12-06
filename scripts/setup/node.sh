@@ -81,48 +81,6 @@ setup_node_env() {
     return 0
 }
 
-# Build Qwen CLI from source
-build_qwen() {
-    local qwen_dir="./cli-agents/qwen-code"
-    if [ -d "$qwen_dir" ]; then
-        log_info "Building Qwen CLI from source..."
-        # Get the project root directory before changing directories
-        local project_root
-        project_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../" && pwd)"
-
-        # Make sure we have node and npm available, using nodeenv if needed
-        if ! check_node; then
-            log_info "Node.js or npm not found, installing via nodeenv..."
-            install_nodeenv || {
-                log_error "Failed to install nodeenv"
-                return 1
-            }
-            setup_node_env || {
-                log_error "Failed to set up node environment"
-                return 1
-            }
-        else
-            # Even if node/npm exist, ensure we're using an isolated environment
-            setup_node_env || {
-                log_error "Failed to set up node environment"
-                return 1
-            }
-        fi
-        (
-            cd "$qwen_dir"
-            # Use the npm from .boot-linux/node-env directly using the project root
-            "$project_root/.boot-linux/node-env/bin/npm" run build
-        ) || {
-            log_error "Qwen build failed"
-            return 1
-        }
-        log_info "✓ Qwen CLI built successfully"
-    else
-        log_info "Qwen source directory not found, skipping build"
-    fi
-    return 0
-}
-
 # Install Node.js CLI agents
 install_node_agents() {
     local cli_agents_dir="./cli-agents"
@@ -150,11 +108,6 @@ install_node_agents() {
         }
     fi
 
-    # Build Qwen first
-    build_qwen || {
-        log_warning "Qwen build failed, but continuing..."
-    }
-
     # Install agents using npm - they will go into the existing .venv environment
     log_info "Installing Node.js CLI agents to .venv/node_modules..."
 
@@ -162,7 +115,7 @@ install_node_agents() {
     # Using the npm from .boot-linux/node-env directly
     # Use --no-save to prevent creating package.json in .venv and ensure clean local installation
     # Use --ignore-scripts to avoid running postinstall scripts that might create unwanted node_modules
-    "$project_root/.boot-linux/node-env/bin/npm" install --prefix "$PWD/.venv" --no-save --ignore-scripts @anthropic-ai/claude-code@2.0.10 @google/gemini-cli@0.11.3 @qwen-code/qwen-code || {
+    "$project_root/.boot-linux/node-env/bin/npm" install --prefix "$PWD/.venv" --no-save --ignore-scripts @anthropic-ai/claude-code@2.0.58 @google/gemini-cli@0.19.1 @qwen-code/qwen-code@0.3.0 || {
         log_error "Node.js agents installation failed"
         return 1
     }

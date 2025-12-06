@@ -2,6 +2,8 @@
 
 from typing import Any
 
+from scripts.agents.cli.provider_type import ProviderType as CLIProvider
+
 
 class AgentConfig:
     """Configuration for an agent execution.
@@ -15,20 +17,24 @@ class AgentConfig:
     def __init__(
         self,
         model: str,
-        session_id: str,  # Claude Code session ID for execution tracking
+        session_id: str,  # Session ID for execution tracking
+        provider: CLIProvider = CLIProvider.CLAUDE,  # AI provider (default Claude for backward compatibility)
         allowed_tools: list[str] | None = None,  # None = all tools allowed
         enable_hooks: bool = True,
         enable_streaming: bool | None = False,  # Enable --resume and --output-format stream-json
         timeout: int | None = 180,  # None = no timeout (interactive)
         mcp_servers: dict[str, Any] | None = None,
+        capture_content: bool = False,  # When True, content is captured instead of printed directly
     ):
         self.model = model
         self.session_id = session_id
+        self.provider = provider
         self.allowed_tools = allowed_tools
         self.enable_hooks = enable_hooks
         self.enable_streaming = enable_streaming
         self.timeout = timeout
         self.mcp_servers = mcp_servers
+        self.capture_content = capture_content
 
 
 class AgentConfigPresets:

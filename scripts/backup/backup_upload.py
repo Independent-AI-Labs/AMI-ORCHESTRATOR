@@ -30,6 +30,11 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth import impersonated_credentials
 import google.auth
+from google.auth.credentials import Credentials as GoogleAuthCredentials
+from google.oauth2.credentials import Credentials as OAuth2Credentials
+from google.oauth2.service_account import Credentials as ServiceAccountCredentials
+from google.auth.impersonated_credentials import Credentials as ImpersonatedCredentials
+from google.auth.transport.requests import Request as GoogleRequest
 
 def _parse_upload_result(stdout: str) -> dict[str, Any]:
     """Parse upload result from subprocess stdout.
@@ -62,7 +67,7 @@ def _parse_upload_result(stdout: str) -> dict[str, Any]:
     return upload_result
 
 
-def get_credentials(config: BackupConfig) -> Any:  # Using Any since we don't have proper Google auth types
+def get_credentials(config: BackupConfig) -> GoogleAuthCredentials:  # Return type is GoogleAuthCredentials which covers all our auth types
     """Get credentials based on configuration method.
 
     Args:
@@ -76,11 +81,14 @@ def get_credentials(config: BackupConfig) -> Any:  # Using Any since we don't ha
     """
     if config.auth_method == "impersonation":
         try:
-            
+
             # Get source credentials (user credentials from gcloud)
-            auth_result = google.auth.default()
-            source_creds = auth_result[0]
-            project_id = auth_result[1]
+            from google.auth.credentials import Credentials as GoogleCredentials
+
+            # Get source credentials - for now, we'll call directly but handle the error appropriately
+            auth_result: tuple[GoogleAuthCredentials, Optional[str]] = google.auth.default()
+            source_creds: GoogleCredentials = auth_result[0]
+            project_id: Optional[str] = auth_result[1]
             logger.debug(f"Got source credentials for project: {project_id}")
             logger.debug(f"Source credentials type: {type(source_creds)}")
             logger.debug(f"Source credentials valid: {source_creds.valid}")
@@ -95,9 +103,16 @@ def get_credentials(config: BackupConfig) -> Any:  # Using Any since we don't ha
                 else:
                     # If invalid, we need to get non-impersonated source credentials
                     logger.error("Invalid impersonated source credentials, authentication may fail")
-            
+
             # Impersonate the service account
-            credentials: Any = impersonated_credentials.Credentials(
+            from google.auth.impersonated_credentials import Credentials as ImpersonatedCredentials
+
+            # Validate service account email is provided
+            if not config.service_account_email:
+                raise UploadError("Service account email is required for impersonation auth method")
+
+            # Create impersonated credentials with proper error handling
+            credentials: ImpersonatedCredentials = impersonated_credentials.Credentials(
                 source_credentials=source_creds,
                 target_principal=config.service_account_email,
                 target_scopes=["https://www.googleapis.com/auth/drive"],
@@ -108,7 +123,9 @@ def get_credentials(config: BackupConfig) -> Any:  # Using Any since we don't ha
             logger.debug(f"Impersonated credentials type: {type(credentials)}")
             
             # Explicitly refresh to test if impersonation works
-            impersonation_request_obj: Any = Request()
+            from google.auth.transport.requests import Request as GoogleRequest
+
+            impersonation_request_obj: GoogleRequest = Request()
             credentials.refresh(impersonation_request_obj)
             logger.debug("Successfully refreshed impersonated credentials")
             
@@ -122,9 +139,18 @@ def get_credentials(config: BackupConfig) -> Any:  # Using Any since we don't ha
     elif config.auth_method == "key":
         try:
             from google.oauth2 import service_account
+            from google.oauth2.service_account import Credentials as ServiceAccountCredentials
 
-            key_credentials: Any = service_account.Credentials.from_service_account_file(
-                config.credentials_file,
+            # Validate credentials file exists
+            if not config.credentials_file:
+                raise UploadError("Credentials file path is required for key auth method")
+
+            credentials_file_path = Path(config.credentials_file)
+            if not credentials_file_path.exists():
+                raise UploadError(f"Credentials file does not exist: {credentials_file_path}")
+
+            key_credentials: ServiceAccountCredentials = service_account.Credentials.from_service_account_file(
+                credentials_file_path,
                 scopes=["https://www.googleapis.com/auth/drive"]
             )
             return key_credentials
@@ -149,7 +175,7 @@ def get_credentials(config: BackupConfig) -> Any:  # Using Any since we don't ha
             if not creds or not creds.valid:
                 if creds and creds.expired and creds.refresh_token:
                     # Refresh the token
-                    oauth_request_obj: Any = Request()
+                    oauth_request_obj: GoogleRequest = Request()
                     creds.refresh(oauth_request_obj)
                 else:
                     # Check if credentials.json exists for the OAuth flow
@@ -162,7 +188,8 @@ def get_credentials(config: BackupConfig) -> Any:  # Using Any since we don't ha
                         )
 
                     # Run the OAuth flow to get new credentials
-                    flow: Any = InstalledAppFlow.from_client_secrets_file(
+                    from google_auth_oauthlib.flow import Flow as OAuthFlow
+                    flow: OAuthFlow = InstalledAppFlow.from_client_secrets_file(
                         str(credentials_json_path),
                         scopes
                     )
@@ -196,7 +223,7 @@ def get_credentials(config: BackupConfig) -> Any:  # Using Any since we don't ha
             if not creds or not creds.valid:
                 if creds and creds.expired and creds.refresh_token:
                     # Refresh the token
-                    user_app_request_obj: Any = Request()
+                    user_app_request_obj: GoogleRequest = Request()
                     creds.refresh(user_app_request_obj)
                 else:
                     # For user_app method, use embedded application credentials

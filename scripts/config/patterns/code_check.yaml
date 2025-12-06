@@ -1,0 +1,235 @@
+# Code Check Configuration
+# Used by code_check.py to determine which files are exempt from noqa/type:ignore checks
+#
+# This file contains all the exempt files for the code quality checks
+
+version: "1.0.0"
+
+# Files exempt from noqa checks - use standard_imports pattern requiring E402 suppressions
+# OR have legitimate suppressions (naming conventions, test fixtures, complexity, etc.)
+exempt_files:
+  # Base module - standard_imports pattern (E402, PLC0415)
+  - "base/scripts/run_tests.py"
+  - "base/scripts/run_dataops_fastmcp.py"
+  - "base/scripts/run_mcp.py"
+  - "base/scripts/run_ssh_fastmcp.py"
+  - "base/scripts/run_secrets_broker.py"
+  - "base/scripts/check_storage.py"
+  - "base/scripts/quality/banned_words.py"
+  - "base/scripts/quality/code_check.py"
+  - "base/scripts/quality/check_config_exclusions.py"
+  - "base/scripts/quality/empty_inits.py"
+  - "base/scripts/quality/fix_relative_imports.py"
+  - "base/scripts/quality/serial_hooks.py"
+  - "base/scripts/quality/coauthored_commits.py"
+  - "base/scripts/meta/propagate.py"
+  - "base/scripts/meta/cleanup.py"
+  - "base/backend/config/loader.py"
+  - "base/backend/workers/uv_process_pool.py"
+  - "base/tests/conftest.py"
+  - "base/module_setup.py"
+  # Root-level entrypoint scripts with unavoidable import ordering requirements
+  # scripts/run_tests.py: PLC0415 deferred import violation
+  #   - Must import ensure_module_venv() AFTER orchestrator root is on sys.path
+  #   - Cannot fix: runner_bootstrap requires base module to be importable
+  #   - Architectural constraint: Bootstrap sequence requires deferred import
+  #   - Alternative rejected: Moving import to top would break before sys.path setup
+  #   - Removal: When test runner no longer needs venv bootstrapping
+  - "scripts/run_tests.py"
+  # scripts/automation/agent_main.py: Multiple E402 violations (5 imports after path setup)
+  #   - Must import AgentConfigPresets, AuditEngine, get_config, hooks, get_logger AFTER dual sys.path setup
+  #   - Cannot fix: Imports depend on both base/ and scripts/ being on sys.path
+  #   - Architectural constraint: CLI entrypoint requires orchestrator root discovery first
+  #   - Alternative rejected: Top-level imports fail before path manipulation
+  #   - Removal: When automation package structure eliminates cross-root dependencies
+  - "scripts/automation/agent_main.py"
+  # Root-level test files with intentional noqa/type:ignore in test fixtures
+  # tests/integration/test_consolidated_patterns.py: Intentional violations in test fixtures
+  #   - Test fixtures contain code WITH violations (noqa, type:ignore) to verify audit detection
+  #   - Cannot fix: Test purpose IS to have violations for audit engine to catch
+  #   - Architectural constraint: Integration tests require realistic violation examples
+  #   - Alternative rejected: Testing/faking loses real-world validation value
+  #   - Removal: Never (core test infrastructure validating quality enforcement)
+  - "tests/integration/test_consolidated_patterns.py"
+  # tests/test_automation_hooks.py: Intentional violations in test fixtures
+  #   - Test fixtures contain code WITH violations (noqa, type:ignore) to verify hook detection
+  #   - Cannot fix: Test purpose IS to have violations for hooks to catch
+  #   - Architectural constraint: Hook tests require realistic violation examples
+  #   - Alternative rejected: Testing/faking loses real-world validation value
+  #   - Removal: Never (core test infrastructure validating hook enforcement)
+  - "tests/test_automation_hooks.py"
+  # Module setup files with standard_imports pattern requiring E402/type:ignore
+  - "compliance/module_setup.py"
+  - "domains/module_setup.py"
+  - "files/module_setup.py"
+  - "nodes/module_setup.py"
+  - "streams/module_setup.py"
+  - "ux/module_setup.py"
+  # Nodes module - standard_imports pattern (E402, PLC0415, N806)
+  - "nodes/tests/conftest.py"
+  - "nodes/scripts/launch_services.py"
+  - "nodes/scripts/setup_service.py"
+  # Nodes module - validated URL schemes (S310 with scheme validation at lines 65-68)
+  - "nodes/backend/launcher/health.py"
+  # Nodes module - inherited stdlib method signatures (N802, A003)
+  - "nodes/tests/test_health.py"
+  # Files module - standard_imports pattern
+  - "files/scripts/run_filesys.py"
+  - "files/scripts/run_filesys_fastmcp.py"
+  # Base module - SQL implementations with parameterized queries (S608 legitimate)
+  - "base/backend/dataops/implementations/sql/postgresql_create.py"
+  - "base/backend/dataops/implementations/sql/postgresql_read.py"
+  - "base/backend/dataops/implementations/sql/postgresql_update.py"
+  - "base/backend/dataops/implementations/sql/postgresql_delete.py"
+  - "base/backend/dataops/implementations/vec/pgvector_create.py"
+  - "base/backend/dataops/implementations/vec/pgvector_read.py"
+  - "base/backend/dataops/implementations/vec/pgvector_update.py"
+  - "base/backend/dataops/implementations/vec/pgvector_delete.py"
+  - "base/backend/dataops/implementations/vec/pgvector_dao.py"
+  - "base/backend/dataops/implementations/vec/pgvector_vector.py"
+  - "base/backend/dataops/implementations/graph/dgraph_delete.py"
+  - "base/backend/dataops/implementations/graph/dgraph_update.py"
+  # Base module - OpenBao/vault implementations (S310 controlled urllib)
+  - "base/backend/dataops/implementations/vault/openbao_dao.py"
+  - "base/backend/services/secrets_broker/openbao_client.py"
+  - "base/backend/dataops/secrets/client.py"
+  - "base/backend/dataops/secrets/adapter.py"
+  # Base module - Auth adapters (S105/S106 false positives, BLE001 intentional, ARG002 interface)
+  - "base/backend/opsec/auth/provider_adapters.py"
+  - "base/backend/opsec/auth/auth_service.py"
+  # Base module - SSH tools (S507 documented tradeoff)
+  - "base/backend/mcp/ssh/tools/ssh_execute.py"
+  - "base/backend/mcp/ssh/tools/ssh_transfer.py"
+  # Base module - Embedding service (PLW0603 singleton)
+  - "base/backend/dataops/implementations/embedding_service.py"
+  # Base module - LLM providers
+  - "base/backend/llms/providers/google_code_assist.py"
+  # Base module - test fixtures with hardcoded test passwords (S105, S106)
+  - "base/tests/test_dataops_decorators.py"
+  - "base/tests/test_secrets_client_http_backend.py"
+  - "base/tests/integration/test_dataops_fastmcp_server.py"
+  - "base/tests/integration/test_dgraph_dao.py"
+  - "base/tests/integration/test_dataops_multi_storage.py"
+  - "base/tests/integration/auth/test_provider_adapters_integration.py"
+  - "base/tests/unit/auth/test_provider_adapters.py"
+  - "base/tests/unit/test_storage_validator.py"
+  - "base/tests/unit/test_rest_dao.py"
+  - "base/backend/opsec/oauth/oauth_config.py"
+  - "base/backend/opsec/oauth/browser/browser_launcher.py"
+  # Base module - legitimate suppressions for specific patterns
+  - "base/backend/workers/base.py"
+  - "base/backend/utils/runner_bootstrap.py"
+  - "base/tests/worker_test_helpers.py"
+  - "base/backend/dataops/core/dao.py"
+  # Base module - optional tooling with untyped dependencies
+  - "base/backend/dataops/acquisition/download_youtube_transcript.py"
+  - "base/backend/dataops/core/unified_crud.py"
+  - "base/backend/dataops/services/decorators.py"
+  # Base module - enum values not passwords (S105 false positives)
+  - "base/backend/dataops/models/security.py"
+  - "base/backend/dataops/models/types.py"
+  - "base/backend/dataops/models/user.py"
+  # Base module - circular import avoidance (PLC0415 necessary)
+  - "base/backend/dataops/models/base_model.py"
+  # Browser module - standard_imports pattern
+  - "browser/tests/conftest.py"
+  - "browser/backend/core/browser/options.py"
+  - "browser/backend/core/security/antidetect.py"
+  - "browser/backend/core/browser/tab_manager.py"
+  - "browser/backend/core/security/script_validator.py"
+  - "browser/backend/services/property_injection.py"
+  - "browser/scripts/run_chrome.py"
+  - "browser/scripts/run_tests.py"
+  - "browser/backend/core/security/tab_injector.py"
+  - "browser/backend/mcp/chrome/chrome_server.py"
+  - "browser/backend/core/management/manager.py"
+  - "browser/backend/core/management/browser_worker_pool.py"
+  - "browser/backend/mcp/chrome/response.py"
+  - "browser/backend/models/browser_properties.py"
+  - "browser/backend/utils/config.py"
+  - "browser/backend/core/browser/properties_manager.py"
+  # Browser module - selenium/CDP naming conventions (N812, N815)
+  - "browser/backend/facade/input/mouse.py"
+  - "browser/backend/facade/input/keyboard.py"
+  - "browser/backend/facade/input/forms.py"
+  - "browser/backend/facade/navigation/waiter.py"
+  - "browser/backend/facade/devtools/config.py"
+  - "browser/backend/mcp/chrome/tools/extraction_tools.py"
+  # Browser module - test fixtures with hardcoded passwords (S105)
+  - "browser/tests/fixtures/test_server.py"
+  - "browser/tests/fixtures/threaded_server.py"
+  - "browser/tests/integration/navigation/test_browser_integration.py"
+  # Browser module - test files with intentional type:ignore for invalid args (arg-type)
+  - "browser/tests/unit/test_profile_facade.py"
+  # Browser module - dynamic imports in setup (PLC0415)
+  - "browser/module_setup.py"
+  # Browser module - MCP facade tools with many action parameters (PLR0913, PLR0911, C901)
+  # These are unified facade functions that dispatch to multiple sub-operations
+  # Refactoring would create API explosion or reduce clarity
+  - "browser/backend/mcp/chrome/tools/facade/extraction.py"
+  - "browser/backend/mcp/chrome/tools/facade/interaction.py"
+  - "browser/backend/mcp/chrome/tools/facade/navigation.py"
+  - "browser/backend/mcp/chrome/tools/facade/react.py"
+  - "browser/backend/mcp/chrome/tools/facade/storage.py"
+  # Browser module - platform-specific download functions (C901, S310)
+  # Inherently complex due to cross-platform OS/architecture handling
+  # S310: validated downloads from Google Chrome official servers
+  - "browser/scripts/setup_chrome.py"
+  # Browser module - test fixtures with side effects (ARG001)
+  # Fixtures needed for setup but return value intentionally unused
+  - "browser/tests/conftest.py"
+  - "browser/tests/integration/profile/test_profile_manager_initialization.py"
+  - "browser/tests/unit/test_profile_default.py"
+  - "browser/tests/unit/test_session_https_profile.py"
+  # Browser module - comprehensive integration tests (C901)
+  # Complex tests validating multiple features together
+  - "browser/tests/integration/pool/test_antidetection.py"
+  # Marketing module - entrypoint files requiring E402/PLC0415 (standard_imports pattern)
+  - "domains/marketing/module_setup.py"
+  - "domains/marketing/scripts/run_research_mcp.py"
+  - "domains/marketing/scripts/run_tests.py"
+  # Marketing module - test doubles with dynamic imports (E402, type: ignore)
+  - "domains/marketing/tests/server/test_research_server.py"
+  # Scripts with validated subprocess calls (S603) using shutil.which() for security
+  # scripts/find_metadata.py: S603 violations with proper validation using shutil.which()
+  #   - git_executable validated via shutil.which() before subprocess.run
+  #   - Security-first approach: executable validated before execution
+  #   - Cannot fix: Security validation requires this pattern
+  #   - Alternative rejected: Running unvalidated executables is unsafe
+  #   - Removal: When ruff recognizes this security validation pattern
+  - "scripts/find_metadata.py"
+  # scripts/audit_shebangs.py: S603 violations with proper validation using shutil.which()
+  #   - git_cmd validated via shutil.which() before subprocess.run
+  #   - Security-first approach: executable validated before execution
+  #   - Cannot fix: Security validation requires this pattern
+  #   - Alternative rejected: Running unvalidated executables is unsafe
+  #   - Removal: When ruff recognizes this security validation pattern
+  - "scripts/audit_shebangs.py"
+  # scripts/export_git_history.py: S603 violations with proper validation using shutil.which()
+  #   - git executable validated via shutil.which() before subprocess.run
+  #   - Security-first approach: executable validated before execution
+  #   - Cannot fix: Security validation requires this pattern
+  #   - Alternative rejected: Running unvalidated executables is unsafe
+  #   - Removal: When ruff recognizes this security validation pattern
+  - "scripts/export_git_history.py"
+  # scripts/automation/tasks.py: S603 violations with proper validation using shutil.which()
+  #   - chattr_exec and sudo_exec validated via shutil.which() before subprocess calls
+  #   - Security-first approach: executables validated before execution
+  #   - Cannot fix: Security validation requires this pattern
+  #   - Alternative rejected: Running unvalidated executables is unsafe
+  #   - Removal: When ruff recognizes this security validation pattern
+  - "scripts/automation/tasks.py"
+  # scripts/automation/hooks.py: ARG001 violations for signal handler function signatures
+  #   - Function signature required by signal module but parameters are intentionally unused
+  #   - Cannot fix: External API requires these parameters regardless of usage
+  #   - Alternative rejected: Would break signal handling functionality
+  #   - Removal: When ruff recognizes intentional unused parameters in callback signatures
+  - "scripts/automation/hooks.py"
+  # scripts/automation/agent_cli.py: S603 and PLW1509 violations with proper validation
+  #   - cmd[0] validated via shutil.which() before subprocess.Popen
+  #   - preexec_fn documented as safe with start_new_session=True for privilege dropping
+  #   - Security-first approach: executable validated and privilege dropping implemented safely
+  #   - Cannot fix: Security features require these patterns
+  #   - Alternative rejected: Running unvalidated executables or skipping privilege dropping is unsafe
+  #   - Removal: When ruff recognizes these security validation patterns
+  - "scripts/automation/agent_cli.py"

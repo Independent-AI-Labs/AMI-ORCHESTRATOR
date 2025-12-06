@@ -9,6 +9,12 @@ import tty
 
 # ASCII control character codes
 ESC = 27  # Escape character (arrow keys prefix)
+
+# Bracketed paste mode sequences
+BRACKETED_PASTE_START = "\033[200~"
+BRACKETED_PASTE_END = "\033[201~"
+BRACKETED_PASTE_ENABLE = "\033[?2004h"
+BRACKETED_PASTE_DISABLE = "\033[?2004l"
 BRACKET = 91  # '[' character (ANSI sequence prefix)
 UP_ARROW = 65  # Up arrow key sequence
 DOWN_ARROW = 66  # Down arrow key sequence
@@ -17,6 +23,7 @@ LEFT_ARROW = 68  # Left arrow key sequence
 ONE = 49  # '1' character (for Ctrl+arrow sequences)
 SEMICOLON = 59  # ';' character (for Ctrl+arrow sequences)
 FIVE = 53  # '5' character (Ctrl modifier for arrow keys)
+CTRL_H_CODE = 8  # Ctrl+H (often sent by Ctrl+Backspace in some terminals)
 CTRL_C = 3  # Ctrl+C (interrupt)
 CTRL_S = 19  # Ctrl+S (send to agent)
 BACKSPACE = 127  # Backspace key
@@ -91,9 +98,59 @@ def _handle_escape_sequence() -> str | None:
 def _handle_ansi_sequence() -> str:
     """Handle ANSI escape sequences for arrow keys and special combinations."""
     ch3, ord3 = get_char_with_ordinals()
+
+    # Check for bracketed paste sequences first
+    paste_result = _check_paste_sequences(ord3)
+    if paste_result != "ESC_NOT_HANDLED":
+        return paste_result
+
+    # Handle arrow keys and special sequences
+    return _handle_arrow_keys(ord3)
+
+
+def _check_paste_sequences(ord3: int) -> str:
+    """Check for bracketed paste sequences and return appropriate result."""
+    # Check for bracketed paste sequences: ESC[200~ (start) and ESC[201~ (end)
+    if ord3 == ord("2"):  # Check for '2' - could be bracketed paste
+        return _check_bracketed_paste_sequence()
+    # Alternative bracketed paste sequences: ESC0~ (start) and ESC01~ (end) - some terminals
+    if ord3 == ord("0"):
+        return _check_alternative_paste_sequence()
+    return "ESC_NOT_HANDLED"
+
+
+def _check_bracketed_paste_sequence() -> str:
+    """Check for bracketed paste sequence ESC[200~ (start) and ESC[201~ (end)."""
+    ch4, ord4 = get_char_with_ordinals()
+    if ord4 == ord("0"):
+        ch5, ord5 = get_char_with_ordinals()
+        if ord5 == ord("0"):
+            ch6, ord6 = get_char_with_ordinals()
+            if ord6 == ord("~"):  # ESC[200~ - paste start
+                return "PASTE_START"
+        elif ord5 == ord("1"):
+            ch6, ord6 = get_char_with_ordinals()
+            if ord6 == ord("~"):  # ESC[201~ - paste end
+                return "PASTE_END"
+    return "ESC_NOT_HANDLED"
+
+
+def _check_alternative_paste_sequence() -> str:
+    """Check for alternative paste sequences like ESC0~ and ESC01~."""
+    ch4, ord4 = get_char_with_ordinals()
+    if ord4 == ord("~"):  # ESC0~ - alternative paste start
+        return "PASTE_START_ALT"
+    if ord4 == ord("1"):
+        ch5, ord5 = get_char_with_ordinals()
+        if ord5 == ord("~"):  # ESC01~ - alternative paste end
+            return "PASTE_END_ALT"
+    return "ESC_NOT_HANDLED"
+
+
+def _handle_arrow_keys(ord3: int) -> str:
+    """Handle arrow keys and other special sequences."""
     result = "ESC_NOT_HANDLED"  # Default return value
 
-    # Arrow key sequences: ESC[A (up), ESC[B (down), ESC[C (right), ESC[D (left)
     if ord3 == UP_ARROW:  # Up arrow
         result = "UP"
     elif ord3 == DOWN_ARROW:  # Down arrow
@@ -149,6 +206,8 @@ def _handle_control_characters(ord1: int) -> str | None:
         result = "HOME"
     elif ord1 == CTRL_W:  # Ctrl+W (delete word)
         result = "DELETE_WORD"
+    elif ord1 == CTRL_H_CODE:  # Ctrl+H (often sent by Ctrl+Backspace in some terminals)
+        result = "BACKSPACE_WORD"  # Delete word like Ctrl+Backspace
 
     return result
 
@@ -176,7 +235,7 @@ def read_key_sequence() -> str | int | None:
     # Filter out other control characters to prevent them from appearing in content
     # Control characters are typically 0-31 and 127, we've already handled the useful ones
     # So we'll return a special code for unhandled control characters to skip them
-    if 0 <= ord1 <= CONTROL_MAX and ord1 not in [CTRL_C, TAB, ENTER_LF, ENTER_CR, CTRL_S, CTRL_U, CTRL_W, ESC]:  # Skip handled control chars
+    if 0 <= ord1 <= CONTROL_MAX and ord1 not in [CTRL_C, TAB, ENTER_LF, ENTER_CR, CTRL_S, CTRL_U, CTRL_W, ESC, CTRL_H_CODE]:  # Skip handled control chars
         return None  # Skip unhandled control characters
     return ch1
 

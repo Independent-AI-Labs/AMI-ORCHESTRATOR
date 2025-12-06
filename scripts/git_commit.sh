@@ -321,7 +321,7 @@ if [ -n "$MAX_LINE_FILES" ]; then
     echo "✗ Files with more than 512 lines detected:"
     echo "$MAX_LINE_FILES"
     echo ""
-    echo "Consider splitting large files into smaller modules."
+    echo "Consider splitting large files into smaller modules FOLLOWING PROPER DESIGN PATTERNS AND IDENTIFYING RE-USABLE CODE WITHOUT OVERENGINEERING!!!"
     exit 1
 fi
 echo "✓ All files have reasonable line counts"

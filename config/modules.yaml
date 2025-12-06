@@ -1,0 +1,25 @@
+# Module configuration for AMI Orchestrator
+# This file defines the various modules within the orchestrator system
+
+# Main project modules - core components of the AMI Orchestrator
+main_modules:
+  - base
+  - browser
+  - compliance
+  - domains
+  - files
+  - nodes
+  - streams
+  - ux
+
+# Extended modules including backend
+extended_modules:
+  - base
+  - compliance
+  - backend
+  - browser
+  - domains
+  - files
+  - nodes
+  - streams
+  - ux

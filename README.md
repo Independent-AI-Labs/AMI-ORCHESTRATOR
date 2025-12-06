@@ -118,7 +118,7 @@ AMI-ORCHESTRATOR architecture implements compliance controls for regulated indus
 ### ⚡ ami-agent: Workflow Automation CLI
 
 ```bash
-ami-agent                       # Interactive AI agent with full MCP toolkit
+ami-agent --print <instruction> # Non-interactive AI agent with full MCP toolkit
 ami-agent --audit base/         # Parallel code quality analysis across modules
 ami-agent --tasks tasks/        # Execute complex multi-step workflows
 ami-agent --docs docs/          # Intelligent documentation maintenance
@@ -190,8 +190,8 @@ ami-agent --docs docs/ --root-dir .
 # Safe git operations with compliance checks
 ami-agent --sync base --user-instruction "Add SSO authentication"
 
-# Interactive AI agent with access to full infrastructure
-ami-agent (--interactive set by default)
+# AI agent with access to full infrastructure (non-interactive modes only)
+ami-agent --help
 
 # Run comprehensive test suite across all modules
 ./scripts/ami-run scripts/run_tests.py
@@ -250,7 +250,7 @@ ami-agent --help                                 # Check CLI is installed
 
 ### 🔌 MCP Servers
 
-MCP servers expose infrastructure operations via structured protocol. Launch individually or use `ami-agent --interactive` to auto-load.
+MCP servers expose infrastructure operations via structured protocol. Launch individually.
 
 ```bash
 # Fleet management - SSH into any machine, run commands, collect outputs
