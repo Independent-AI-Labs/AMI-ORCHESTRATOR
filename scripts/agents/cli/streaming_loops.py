@@ -319,8 +319,8 @@ def _process_raw_line(line: str, display_context: dict[str, Any]) -> None:
     display_context["full_output"] += line + "\n"
 
 
-def _handle_display_cleanup(timer: TimerDisplay) -> None:
+def _handle_display_cleanup(timer: TimerDisplay | None) -> None:
     """Handle cleanup of display elements."""
-    # Stop and clear the timer display when done (only if still running)
-    if timer.is_running:  # Only stop if it's still running
+    # Stop and clear the timer display when done (only if still running and timer is not None)
+    if timer is not None and timer.is_running:  # Only stop if it's still running
         timer.stop()

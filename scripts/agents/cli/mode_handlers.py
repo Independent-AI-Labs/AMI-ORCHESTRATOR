@@ -73,6 +73,11 @@ def mode_query(query: str) -> int:
         # and displays the "Received at" message
 
         return 0
+    except KeyboardInterrupt:
+        # User cancelled with Ctrl+C
+        sys.stdout.write(f"🤖 Received at {datetime.now().strftime('%H:%M:%S')}\n")
+        sys.stdout.flush()
+        return 0
     except Exception:
         # Even if there's an error, try to display a completion message
         sys.stdout.write(f"🤖 Received at {datetime.now().strftime('%H:%M:%S')}\n")
@@ -328,15 +333,19 @@ def mode_interactive_editor() -> int:
         Exit code (0=success, 1=failure)
     """
 
-    # Launch text editor and get content
-    editor = TextEditor()
-    content = editor.run()
+    try:
+        # Launch text editor and get content
+        editor = TextEditor()
+        content = editor.run()
 
-    if content is None:  # User cancelled with Ctrl+C
-        return 0  # Exit quietly
+        if content is None:  # User cancelled with Ctrl+C
+            return 0  # Exit quietly
 
-    # If content is empty, exit gracefully
-    if not content.strip():
+        # If content is empty, exit gracefully
+        if not content.strip():
+            return 0  # Exit quietly
+    except KeyboardInterrupt:
+        # User cancelled with Ctrl+C
         return 0  # Exit quietly
 
     # The user's input and timestamp have already been displayed by the text editor via display_final_output

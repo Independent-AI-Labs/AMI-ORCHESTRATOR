@@ -1,5 +1,6 @@
 """Comprehensive tests for remaining edge cases and error conditions in ami-agent interactive mode."""
 
+import sys
 import time
 from unittest.mock import Mock, patch
 
@@ -8,7 +9,7 @@ import pytest
 from scripts.agents.cli.claude_cli import ClaudeAgentCLI
 from scripts.agents.cli.config import AgentConfig, AgentConfigPresets
 from scripts.agents.cli.config_service import ConfigService
-from scripts.agents.cli.exceptions import AgentTimeoutError
+from scripts.agents.cli.exceptions import AgentError, AgentTimeoutError
 from scripts.agents.cli.factory import get_agent_cli
 from scripts.agents.cli.mode_handlers import (
     mode_audit,
@@ -25,6 +26,7 @@ from scripts.agents.cli.streaming_loops import (
     _handle_timeout,
     _process_line_with_provider,
     _process_raw_line,
+    run_streaming_loop_with_display,
 )
 from scripts.agents.cli.timer_utils import TimerDisplay, wrap_text_in_box
 
@@ -101,13 +103,14 @@ class TestModeHandlerErrorConditions:
         result = mode_print("/nonexistent/path.txt")
         assert result == 1  # Should return error code
 
+    @patch("sys.stdin.read", return_value="")  # Mock stdin to avoid issues in test environment
     @patch("scripts.agents.cli.mode_handlers.validate_path_and_return_code")
     @patch("scripts.agents.cli.mode_handlers.get_agent_cli")
-    def test_mode_print_cli_error(self, mock_get_cli, mock_validate):
+    def test_mode_print_cli_error(self, mock_get_cli, mock_validate, mock_stdin_read):
         """Test print mode when CLI call fails."""
         mock_validate.return_value = 0  # Valid path
         mock_cli = Mock()
-        mock_cli.run_print.side_effect = Exception("CLI error")
+        mock_cli.run_print.side_effect = AgentError("CLI error")
         mock_get_cli.return_value = mock_cli
 
         result = mode_print("/valid/path.txt")
@@ -144,10 +147,20 @@ class TestConfigurationErrorConditions:
         # Note: This depends on how the code handles invalid providers
         # The factory should handle this properly
 
-    def test_config_service_file_not_found(self):
+    @patch("scripts.agents.cli.config_service.yaml.safe_load")
+    @patch("builtins.open")
+    def test_config_service_file_not_found(self, mock_open, mock_yaml_load):
         """Test config service when config file doesn't exist."""
-        # This test may need to mock file system to simulate missing file
-        with patch("pathlib.Path.exists", return_value=False), pytest.raises(FileNotFoundError):
+        # Make file opening raise an error to simulate missing file
+        mock_open.side_effect = FileNotFoundError("Config file not found")
+        mock_yaml_load.side_effect = FileNotFoundError("Config file not found")
+
+        # Reset the singleton instance to force re-initialization
+
+        ConfigService._instance = None
+        ConfigService._config_data = None
+
+        with pytest.raises(FileNotFoundError):
             ConfigService()  # Should fail when config file is not found
 
     def test_config_presets_none_session_id(self):
@@ -210,8 +223,8 @@ class TestStreamingErrorConditions:
 
             # This will eventually timeout based on the timeout logic
             with pytest.raises(AgentTimeoutError):
-                # Use a function that will trigger the timeout handling
-                pass  # We'll test this differently below
+                # Call the function that should timeout
+                run_streaming_loop_with_display(mock_process, ["test", "cmd"], mock_config, MockProvider())
 
     def test_handle_timeout_no_config(self):
         """Test timeout handling with None config."""
@@ -316,7 +329,7 @@ class TestTextWrappingEdgeCases:
         assert result.startswith("┌")
         assert result.endswith("┘")
         # Should have at least top and bottom borders
-        lines = result.split("\\n")
+        lines = result.split("\n")
         assert len(lines) >= 2
 
     def test_wrap_text_in_box_whitespace_only(self):
@@ -329,7 +342,7 @@ class TestTextWrappingEdgeCases:
         """Test wrapping a very long line."""
         long_line = "A" * 500  # Much longer than 76 chars
         result = wrap_text_in_box(long_line)
-        lines = result.split("\\n")
+        lines = result.split("\n")
         # Should be wrapped into multiple content lines
         content_lines = [line for line in lines if line.startswith("  ")]
         assert len(content_lines) > 1
@@ -338,7 +351,7 @@ class TestTextWrappingEdgeCases:
         """Test wrapping single character."""
         result = wrap_text_in_box("X")
         assert "X" in result
-        lines = result.split("\\n")
+        lines = result.split("\n")
         assert len(lines) == 3  # Top border, content, bottom border
 
 
@@ -373,14 +386,24 @@ class TestSyncModeErrorConditions:
         assert result == 1  # Should return error code
 
     @patch("scripts.agents.cli.mode_handlers.validate_path_and_return_code")
-    def test_mode_sync_no_git_directory(self, mock_validate):
+    @patch("scripts.agents.cli.mode_handlers.Path")
+    def test_mode_sync_no_git_directory(self, mock_path_class, mock_validate):
         """Test sync mode when directory is not a git repository."""
         mock_validate.return_value = 0  # Valid path
 
-        # Test with a path that doesn't have .git
-        with patch("pathlib.Path.exists", side_effect=lambda p: str(p) != "/valid/path/.git"):
-            result = mode_sync("/valid/path")
-            assert result == 1  # Should return error code if no .git directory
+        # Create mock path objects to simulate the .git check
+        mock_module_path = Mock()
+        mock_git_path = Mock()
+
+        # Setup the mock path properly including the truediv operation (for / operator)
+        mock_module_path.__truediv__ = Mock(return_value=mock_git_path)
+        mock_git_path.exists.return_value = False  # .git does not exist
+
+        # Make sure Path constructor returns our mock module path
+        mock_path_class.return_value = mock_module_path
+
+        result = mode_sync("/valid/path")
+        assert result == 1  # Should return error code if no .git directory
 
 
 class TestDocsModeErrorConditions:
@@ -463,19 +486,22 @@ class TestComprehensiveErrorScenarios:
         mock_text_editor.return_value = mock_editor
 
         mock_cli = Mock()
-        mock_cli.run_print.return_value = ("Response", {})
+
+        # Make the CLI run_print method trigger stdout write error
+        def mock_run_print(instruction, agent_config):  # noqa: ARG001
+            # This will trigger when run_print is called and eventually tries to write to stdout
+            sys.stdout.write("test")  # This will trigger the mocked function
+            return ("Response", {})
+
+        mock_cli.run_print.side_effect = mock_run_print
         mock_get_cli.return_value = mock_cli
 
         # Make stdout write raise an error (simulating broken pipe, etc.)
-        original_write = mock_stdout_write.side_effect
         mock_stdout_write.side_effect = BrokenPipeError("Broken pipe")
 
-        # Should handle stdout error gracefully
+        # Should handle stdout error gracefully and return error code
         result = mode_interactive_editor()
         assert result == 1  # Error due to broken pipe
-
-        # Restore original
-        mock_stdout_write.side_effect = original_write
 
 
 if __name__ == "__main__":

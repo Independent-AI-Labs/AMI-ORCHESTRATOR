@@ -19,24 +19,24 @@ class TestColors:
 
     def test_colors_constants(self):
         """Test that all color constants have correct ANSI values."""
-        assert Colors.RESET == "\\033[0m"
-        assert Colors.BOLD == "\\033[1m"
-        assert Colors.REVERSE == "\\033[7m"
-        assert Colors.BLACK == "\\033[30m"
-        assert Colors.RED == "\\033[31m"
-        assert Colors.GREEN == "\\033[32m"
-        assert Colors.YELLOW == "\\033[33m"
-        assert Colors.BLUE == "\\033[34m"
-        assert Colors.MAGENTA == "\\033[35m"
-        assert Colors.CYAN == "\\033[36m"
-        assert Colors.WHITE == "\\033[37m"
-        assert Colors.BG_RED == "\\033[41m"
-        assert Colors.BG_GREEN == "\\033[42m"
-        assert Colors.BG_YELLOW == "\\033[43m"
-        assert Colors.BG_BLUE == "\\033[44m"
-        assert Colors.BG_MAGENTA == "\\033[45m"
-        assert Colors.BG_CYAN == "\\033[46m"
-        assert Colors.BG_WHITE == "\\033[47m"
+        assert Colors.RESET == "\033[0m"
+        assert Colors.BOLD == "\033[1m"
+        assert Colors.REVERSE == "\033[7m"
+        assert Colors.BLACK == "\033[30m"
+        assert Colors.RED == "\033[31m"
+        assert Colors.GREEN == "\033[32m"
+        assert Colors.YELLOW == "\033[33m"
+        assert Colors.BLUE == "\033[34m"
+        assert Colors.MAGENTA == "\033[35m"
+        assert Colors.CYAN == "\033[36m"
+        assert Colors.WHITE == "\033[37m"
+        assert Colors.BG_RED == "\033[41m"
+        assert Colors.BG_GREEN == "\033[42m"
+        assert Colors.BG_YELLOW == "\033[43m"
+        assert Colors.BG_BLUE == "\033[44m"
+        assert Colors.BG_MAGENTA == "\033[45m"
+        assert Colors.BG_CYAN == "\033[46m"
+        assert Colors.BG_WHITE == "\033[47m"
 
 
 class TestBracketedPasteConstants:
@@ -44,10 +44,10 @@ class TestBracketedPasteConstants:
 
     def test_bracketed_paste_constants(self):
         """Test bracketed paste mode constants."""
-        assert BRACKETED_PASTE_START == "\\033[200~"
-        assert BRACKETED_PASTE_END == "\\033[201~"
-        assert BRACKETED_PASTE_ENABLE == "\\033[?2004h"
-        assert BRACKETED_PASTE_DISABLE == "\\033[?2004l"
+        assert BRACKETED_PASTE_START == "\033[200~"
+        assert BRACKETED_PASTE_END == "\033[201~"
+        assert BRACKETED_PASTE_ENABLE == "\033[?2004h"
+        assert BRACKETED_PASTE_DISABLE == "\033[?2004l"
 
 
 class TestDisplayFinalOutput:

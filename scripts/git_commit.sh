@@ -4,6 +4,8 @@
 #        git_commit.sh <module-path> [--fix] [--dry-run] <commit-message>
 #        git_commit.sh [--fix] [--dry-run] <module-path> -F <file>
 #        git_commit.sh <module-path> [--fix] [--dry-run] -F <file>
+#        git_commit.sh [--fix] [--dry-run] <module-path> -m <commit-message>
+#        git_commit.sh <module-path> [--fix] [--dry-run] -m <commit-message>
 #        git_commit.sh [--fix] [--dry-run] <module-path> --amend
 #        git_commit.sh <module-path> [--fix] [--dry-run] --amend
 #        git_commit.sh [--fix] [--dry-run] <module-path> --amend <commit-message>
@@ -17,6 +19,8 @@ if [ $# -lt 1 ]; then
     echo "       $0 <module-path> [--fix] [--dry-run] <commit-message>"
     echo "       $0 [--fix] [--dry-run] <module-path> -F <file>"
     echo "       $0 <module-path> [--fix] [--dry-run] -F <file>"
+    echo "       $0 [--fix] [--dry-run] <module-path> -m <commit-message>"
+    echo "       $0 <module-path> [--fix] [--dry-run] -m <commit-message>"
     echo "       $0 [--fix] [--dry-run] <module-path> --amend"
     echo "       $0 <module-path> [--fix] [--dry-run] --amend"
     echo "       $0 [--fix] [--dry-run] <module-path> --amend <commit-message>"
@@ -25,6 +29,7 @@ if [ $# -lt 1 ]; then
     echo "Options:"
     echo "  --fix       Run auto-fixes (ruff --fix --unsafe-fixes) before committing"
     echo "  --dry-run   Run all checks without creating commit"
+    echo "  -m          Specify commit message (same as git commit -m)"
     echo ""
     echo "Examples:"
     echo "  $0 . \"fix: update root\""
@@ -32,6 +37,7 @@ if [ $# -lt 1 ]; then
     echo "  $0 . --fix \"fix: update root with auto-fixes\""
     echo "  $0 --dry-run . \"test commit\""
     echo "  $0 . --dry-run \"test commit\""
+    echo "  $0 . -m \"fix: update root\""
     echo "  $0 . -F /tmp/commit_msg.txt"
     echo "  $0 . --amend"
     echo "  $0 . --amend \"fix: corrected message\""
@@ -59,7 +65,7 @@ is_flag() {
 # Function to check if an argument is a special flag that takes an argument
 is_special_flag() {
     case "$1" in
-        -F|--amend)
+        -F|--amend|-m)
             return 0
             ;;
         *)
@@ -80,7 +86,7 @@ while [ $# -gt 0 ]; do
             DRY_RUN=true
             shift
             ;;
-        -F|--amend)
+        -F|--amend|-m)
             # These flags take arguments, so we need to handle them specially
             TEMP_ARGS+=("$1")
             shift
@@ -94,7 +100,7 @@ while [ $# -gt 0 ]; do
             exit 1
             ;;
         *)
-            # First non-flag argument that's not -F or --amend should be module path
+            # First non-flag argument that's not -F, --amend, or -m should be module path
             if [ -z "$MODULE_PATH" ]; then
                 MODULE_PATH="$1"
                 shift
@@ -113,9 +119,10 @@ if [ -z "$MODULE_PATH" ]; then
     exit 1
 fi
 
-# Process the remaining arguments to parse commit message, -F, or --amend
+# Process the remaining arguments to parse commit message, -F, -m, or --amend
 USE_AMEND=false
 USE_FILE=false
+USE_M_FLAG=false
 COMMIT_FILE=""
 COMMIT_MSG=""
 AMEND_MESSAGE=""
@@ -146,8 +153,17 @@ if [ ${#TEMP_ARGS[@]} -gt 0 ]; then
             fi
             USE_FILE=true
             i=$((i + 1))
+        elif [ "$arg" = "-m" ]; then
+            if [ $((i+1)) -ge ${#TEMP_ARGS[@]} ]; then
+                echo "Error: -m flag requires a commit message"
+                exit 1
+            fi
+            i=$((i + 1))
+            COMMIT_MSG="${TEMP_ARGS[$i]}"
+            USE_M_FLAG=true
+            i=$((i + 1))
         else
-            # This is part of the commit message
+            # This is part of the commit message (when not using -m, -F or --amend)
             if [ -n "$COMMIT_MSG" ]; then
                 COMMIT_MSG="$COMMIT_MSG $arg"
             else
@@ -159,7 +175,7 @@ if [ ${#TEMP_ARGS[@]} -gt 0 ]; then
 fi
 
 # Validate that we have the required arguments
-if [ "$USE_FILE" = false ] && [ "$USE_AMEND" = false ]; then
+if [ "$USE_FILE" = false ] && [ "$USE_AMEND" = false ] && [ "$USE_M_FLAG" = false ]; then
     if [ -z "$COMMIT_MSG" ]; then
         echo "Error: Commit message required"
         exit 1
@@ -168,6 +184,16 @@ fi
 
 if [ "$USE_FILE" = true ] && [ "$USE_AMEND" = true ]; then
     echo "Error: Cannot use both -F and --amend flags"
+    exit 1
+fi
+
+if [ "$USE_M_FLAG" = true ] && [ "$USE_FILE" = true ]; then
+    echo "Error: Cannot use both -m and -F flags"
+    exit 1
+fi
+
+if [ "$USE_M_FLAG" = true ] && [ "$USE_AMEND" = true ]; then
+    echo "Error: Cannot use both -m and --amend flags"
     exit 1
 fi
 

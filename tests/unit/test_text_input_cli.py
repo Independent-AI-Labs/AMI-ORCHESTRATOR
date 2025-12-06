@@ -64,12 +64,10 @@ class TestTextInputCLI:
         mock_text_editor.assert_called_once_with(long_text)
         assert result == long_text + " edited"
 
-    @patch("sys.argv")
+    @patch("sys.argv", ["text_input_cli.py", "arg1", "arg2"])
     @patch("scripts.cli_components.text_input_cli.create_text_editor")
-    def test_main_with_command_line_args(self, mock_create_editor, mock_argv):
+    def test_main_with_command_line_args(self, mock_create_editor):
         """Test main function with command line arguments."""
-        mock_argv.__getitem__ = lambda _, idx: {0: "text_input_cli.py", 1: "arg1", 2: "arg2"}.get(idx, "")
-        mock_argv.__len__ = lambda _: 3
         mock_create_editor.return_value = "Test result"
 
         main()
@@ -90,12 +88,10 @@ class TestTextInputCLI:
         # Should call with empty string when no additional args
         mock_create_editor.assert_called_once_with("")
 
-    @patch("sys.argv")
+    @patch("sys.argv", ["text_input_cli.py", "single_arg"])
     @patch("scripts.cli_components.text_input_cli.create_text_editor")
-    def test_main_with_single_arg(self, mock_create_editor, mock_argv):
+    def test_main_with_single_arg(self, mock_create_editor):
         """Test main function with single command line argument."""
-        mock_argv.__getitem__ = lambda _, idx: {0: "text_input_cli.py", 1: "single_arg"}.get(idx, "")
-        mock_argv.__len__ = lambda _: 2
         mock_create_editor.return_value = "Result"
 
         main()
