@@ -1,18 +1,26 @@
 #!/usr/bin/env bash
 # Safe git commit wrapper - stages all changes before committing
 # Usage: git_commit.sh [--fix] [--dry-run] <module-path> <commit-message>
+#        git_commit.sh <module-path> [--fix] [--dry-run] <commit-message>
 #        git_commit.sh [--fix] [--dry-run] <module-path> -F <file>
+#        git_commit.sh <module-path> [--fix] [--dry-run] -F <file>
 #        git_commit.sh [--fix] [--dry-run] <module-path> --amend
+#        git_commit.sh <module-path> [--fix] [--dry-run] --amend
 #        git_commit.sh [--fix] [--dry-run] <module-path> --amend <commit-message>
+#        git_commit.sh <module-path> [--fix] [--dry-run] --amend <commit-message>
 
 set -euo pipefail
 
 if [ $# -lt 1 ]; then
     echo "Error: Module path required"
     echo "Usage: $0 [--fix] [--dry-run] <module-path> <commit-message>"
+    echo "       $0 <module-path> [--fix] [--dry-run] <commit-message>"
     echo "       $0 [--fix] [--dry-run] <module-path> -F <file>"
+    echo "       $0 <module-path> [--fix] [--dry-run] -F <file>"
     echo "       $0 [--fix] [--dry-run] <module-path> --amend"
+    echo "       $0 <module-path> [--fix] [--dry-run] --amend"
     echo "       $0 [--fix] [--dry-run] <module-path> --amend <commit-message>"
+    echo "       $0 <module-path> [--fix] [--dry-run] --amend <commit-message>"
     echo ""
     echo "Options:"
     echo "  --fix       Run auto-fixes (ruff --fix --unsafe-fixes) before committing"
@@ -21,7 +29,9 @@ if [ $# -lt 1 ]; then
     echo "Examples:"
     echo "  $0 . \"fix: update root\""
     echo "  $0 --fix . \"fix: update root with auto-fixes\""
+    echo "  $0 . --fix \"fix: update root with auto-fixes\""
     echo "  $0 --dry-run . \"test commit\""
+    echo "  $0 . --dry-run \"test commit\""
     echo "  $0 . -F /tmp/commit_msg.txt"
     echo "  $0 . --amend"
     echo "  $0 . --amend \"fix: corrected message\""
@@ -29,10 +39,38 @@ if [ $# -lt 1 ]; then
     exit 1
 fi
 
-# Parse flags
+# Parse arguments with flags in any position
 RUN_AUTOFIXES=false
 DRY_RUN=false
-while [[ "$1" == --* ]]; do
+MODULE_PATH=""
+
+# Function to check if an argument is a recognized flag
+is_flag() {
+    case "$1" in
+        --fix|--dry-run)
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+# Function to check if an argument is a special flag that takes an argument
+is_special_flag() {
+    case "$1" in
+        -F|--amend)
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+# Reorganize arguments to handle flags in any position
+TEMP_ARGS=()
+while [ $# -gt 0 ]; do
     case "$1" in
         --fix)
             RUN_AUTOFIXES=true
@@ -42,44 +80,95 @@ while [[ "$1" == --* ]]; do
             DRY_RUN=true
             shift
             ;;
-        *)
+        -F|--amend)
+            # These flags take arguments, so we need to handle them specially
+            TEMP_ARGS+=("$1")
+            shift
+            if [ $# -gt 0 ]; then
+                TEMP_ARGS+=("$1")
+                shift
+            fi
+            ;;
+        -*)
             echo "Error: Unknown option: $1"
             exit 1
+            ;;
+        *)
+            # First non-flag argument that's not -F or --amend should be module path
+            if [ -z "$MODULE_PATH" ]; then
+                MODULE_PATH="$1"
+                shift
+            else
+                # Everything else is part of the commit message or special flags
+                TEMP_ARGS+=("$1")
+                shift
+            fi
             ;;
     esac
 done
 
-MODULE_PATH="$1"
-shift
-
-# Parse commit message argument
-USE_AMEND=false
-AMEND_MESSAGE=""
-if [ $# -eq 0 ]; then
-    echo "Error: Commit message or --amend flag required"
+# Check if module path was provided
+if [ -z "$MODULE_PATH" ]; then
+    echo "Error: Module path required"
     exit 1
-elif [ "$1" = "--amend" ]; then
-    USE_AMEND=true
-    USE_FILE=false
-    shift
-    # Check if there's a message after --amend
-    if [ $# -gt 0 ]; then
-        AMEND_MESSAGE="$1"
-    fi
-elif [ "$1" = "-F" ]; then
-    if [ $# -lt 2 ]; then
-        echo "Error: -F flag requires file path"
+fi
+
+# Process the remaining arguments to parse commit message, -F, or --amend
+USE_AMEND=false
+USE_FILE=false
+COMMIT_FILE=""
+COMMIT_MSG=""
+AMEND_MESSAGE=""
+
+# Process the temporary arguments
+if [ ${#TEMP_ARGS[@]} -gt 0 ]; then
+    i=0
+    while [ $i -lt ${#TEMP_ARGS[@]} ]; do
+        arg="${TEMP_ARGS[$i]}"
+        if [ "$arg" = "--amend" ]; then
+            USE_AMEND=true
+            ((i++))
+            # Check if there's a message after --amend
+            if [ $i -lt ${#TEMP_ARGS[@]} ]; then
+                AMEND_MESSAGE="${TEMP_ARGS[$i]}"
+                ((i++))
+            fi
+        elif [ "$arg" = "-F" ]; then
+            if [ $((i+1)) -ge ${#TEMP_ARGS[@]} ]; then
+                echo "Error: -F flag requires file path"
+                exit 1
+            fi
+            i=$((i + 1))
+            COMMIT_FILE="${TEMP_ARGS[$i]}"
+            if [ ! -f "$COMMIT_FILE" ]; then
+                echo "Error: Commit message file does not exist: $COMMIT_FILE"
+                exit 1
+            fi
+            USE_FILE=true
+            i=$((i + 1))
+        else
+            # This is part of the commit message
+            if [ -n "$COMMIT_MSG" ]; then
+                COMMIT_MSG="$COMMIT_MSG $arg"
+            else
+                COMMIT_MSG="$arg"
+            fi
+            ((i++))
+        fi
+    done
+fi
+
+# Validate that we have the required arguments
+if [ "$USE_FILE" = false ] && [ "$USE_AMEND" = false ]; then
+    if [ -z "$COMMIT_MSG" ]; then
+        echo "Error: Commit message required"
         exit 1
     fi
-    COMMIT_FILE="$2"
-    if [ ! -f "$COMMIT_FILE" ]; then
-        echo "Error: Commit message file does not exist: $COMMIT_FILE"
-        exit 1
-    fi
-    USE_FILE=true
-else
-    COMMIT_MSG="$1"
-    USE_FILE=false
+fi
+
+if [ "$USE_FILE" = true ] && [ "$USE_AMEND" = true ]; then
+    echo "Error: Cannot use both -F and --amend flags"
+    exit 1
 fi
 
 # Resolve to absolute path

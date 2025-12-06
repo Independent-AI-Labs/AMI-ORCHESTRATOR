@@ -56,19 +56,21 @@ class ConfigService:
 
     def get_provider_command(self, provider: ProviderType) -> str:
         """Get the command for a specific provider."""
-        # Map provider to default command
-        provider_to_command = {ProviderType.CLAUDE: "ami-claude", ProviderType.QWEN: "ami-qwen", ProviderType.GEMINI: "ami-gemini"}
-
-        # Get the default command, defaulting to Claude if provider not found
-        default_cmd = provider_to_command.get(provider, "ami-claude")
-
-        # Replace {root} template with actual root path
+        # Map provider to the actual executable path
         current_file = Path(__file__).resolve()
         try:
             root = next(p for p in current_file.parents if (p / "base").exists())
         except StopIteration:
             raise FileNotFoundError("Could not find orchestrator root with 'base' directory") from None
-        return default_cmd.format(root=str(root))
+
+        provider_to_command = {
+            ProviderType.CLAUDE: f"{root}/.venv/node_modules/.bin/claude",
+            ProviderType.QWEN: f"{root}/.venv/node_modules/.bin/qwen",
+            ProviderType.GEMINI: f"{root}/.venv/node_modules/.bin/gemini",
+        }
+
+        # Get the actual command path, defaulting to Claude if provider not found
+        return provider_to_command.get(provider, f"{root}/.venv/node_modules/.bin/claude")
 
     def get_provider_default_model(self, provider: ProviderType) -> str:
         """Get the default model for a specific provider."""

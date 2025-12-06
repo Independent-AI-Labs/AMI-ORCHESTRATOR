@@ -47,10 +47,10 @@ def mode_query(query: str) -> int:
     Returns:
         Exit code (0=success, 1=failure)
     """
-    # Format and display the user's input with borders and timestamp
-
-    wrap_text_in_box(query)
-    datetime.now().strftime("%H:%M:%S")
+    # Format and display the user's input with borders and "Sent" message
+    sys.stdout.write(wrap_text_in_box(query) + "\n")
+    sys.stdout.write(f"✅ Sent to agent at {datetime.now().strftime('%H:%M:%S')}\n")
+    sys.stdout.flush()
 
     try:
         # Get CLI instance
@@ -61,7 +61,7 @@ def mode_query(query: str) -> int:
         config = AgentConfigPresets.worker(session_id=session_id)
         config.enable_hooks = False  # Disable hooks for query mode to avoid quality violations
         config.enable_streaming = True  # Enable streaming to show timer during processing
-        config.capture_content = True  # Enable content capture to format output in box
+        config.capture_content = False  # Disable content capture to allow streaming display
 
         # Run with streaming to capture content while showing timer
         output, metadata = cli.run_print(
@@ -69,11 +69,14 @@ def mode_query(query: str) -> int:
             agent_config=config,
         )
 
-        # Format and display the response with borders and timestamp
-        wrap_text_in_box(output)
+        # The response will be handled by the streaming loop which formats it in a box
+        # and displays the "Received at" message
 
         return 0
     except Exception:
+        # Even if there's an error, try to display a completion message
+        sys.stdout.write(f"🤖 Received at {datetime.now().strftime('%H:%M:%S')}\n")
+        sys.stdout.flush()
         return 1
 
 
@@ -348,7 +351,7 @@ def mode_interactive_editor() -> int:
         config = AgentConfigPresets.worker(session_id=session_id)
         config.enable_hooks = False  # Disable hooks for interactive editor mode to avoid quality violations
         config.enable_streaming = True  # Enable streaming to show timer during processing
-        config.capture_content = True  # Enable content capture to format output in box
+        config.capture_content = False  # Disable content capture to allow streaming display
 
         # Run with streaming to capture content while showing timer
         output, metadata = cli.run_print(
@@ -356,9 +359,12 @@ def mode_interactive_editor() -> int:
             agent_config=config,
         )
 
-        # Format and display the response with borders and timestamp
-        wrap_text_in_box(output)
+        # The response will be handled by the streaming loop which formats it in a box
+        # and displays the "Received at" message
 
         return 0
-    except Exception:
+    except Exception as e:
+        # Print error for debugging
+        sys.stderr.write(f"Error calling agent: {str(e)}\n")
+        sys.stderr.flush()
         return 1

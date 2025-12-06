@@ -1,6 +1,7 @@
 """Streaming loop-related utility functions."""
 
 import subprocess
+import sys
 import textwrap
 import time
 from typing import Any, Protocol
@@ -131,6 +132,8 @@ def run_streaming_loop_with_display(
         "box_displayed": False,
         "last_print_ended_with_newline": False,
         "capture_content": capture_content,  # Add flag to control output behavior
+        "response_box_started": False,  # Track if response box top border has been displayed
+        "response_box_ended": False,  # Track if response box bottom border has been displayed
     }
 
     # Start the timer display
@@ -149,8 +152,21 @@ def run_streaming_loop_with_display(
         if isinstance(timer_display, TimerDisplay):
             _handle_display_cleanup(timer_display)
 
-    # NOTE: Removed session completion messages for cleaner output
-    # Only display the actual agent responses, no session management messages
+        # Close response box if it was opened but not yet closed
+        if (
+            not display_context.get("capture_content", False)
+            and display_context.get("response_box_started", False)
+            and not display_context.get("response_box_ended", False)
+        ):
+            sys.stdout.write("└" + "─" * 78 + "┘\n")  # Bottom border
+            sys.stdout.flush()
+            display_context["response_box_ended"] = True
+
+    # Add completion message after processing is done
+    if not display_context.get("capture_content", False):
+        # Display "Received at" message after processing completes
+        sys.stdout.write(f"🤖 Received at {time.strftime('%H:%M:%S')}\n")
+        sys.stdout.flush()
 
     metadata = {
         "session_id": display_context["session_id"],
@@ -214,22 +230,32 @@ def _process_line_with_provider(
 
     # Process the chunk
     if chunk_text:
-        if not display_context["content_started"]:  # First piece of content
+        if not display_context["content_started"]:  # First piece of actual response content
             if not display_context.get("capture_content", False):
                 display_context["timer"].stop()  # Stop timer to clear its display if we're displaying content
             # Mark that content has started
             display_context["content_started"] = True
             display_context["box_displayed"] = True
-
-        # Add word wrapping to 80 characters total (76 for content + 4 for indentation/borders)
-        # Split the chunk by newlines first, then wrap each line to proper width
-        processed_lines = _process_chunk_text(chunk_text)
+            # Display response box top border if we're showing content
+            if not display_context.get("capture_content", False):
+                # Print the top border of the response box
+                sys.stdout.write("┌" + "─" * 78 + "┐\n")  # Top border with 80 chars total
+                sys.stdout.flush()
+            display_context["response_box_started"] = True
 
         # Only print if not in capture mode
         if not display_context.get("capture_content", False):
-            # Actually display the output
-            for _processed_line in processed_lines:
-                pass
+            # Add word wrapping to 76 characters for content area (80 total - 4 for borders/indentation)
+            # Split the chunk by newlines first, then wrap each line to proper width
+            processed_lines = _process_chunk_text(chunk_text)
+
+            # Actually display the output with the same format as input (2-space indentation, no side borders)
+            for _i, processed_line in enumerate(processed_lines):
+                # Just use the processed line as is (it already has 2-space indentation)
+                # Remove the original indentation to avoid double-indenting
+                content = processed_line[2:] if processed_line.startswith("  ") else processed_line
+                sys.stdout.write(f"  {content}\n")
+                sys.stdout.flush()
 
         # Track if this chunk ends with a newline
         display_context["last_print_ended_with_newline"] = chunk_text.endswith("\n")
@@ -272,21 +298,22 @@ def _process_raw_line(line: str, display_context: dict[str, Any]) -> None:
 
     # Add word wrapping to TOTAL_WIDTH characters total (CONTENT_WIDTH for content + 4 for indentation/borders)
     if len(line) <= CONTENT_WIDTH:  # Content width is 76 chars (80 total - 4 for borders/indentation)
-        "  " + line
         # Only print if not in capture mode
         if not display_context.get("capture_content", False):
-            pass  # Print the indented line
+            sys.stdout.write("  " + line + "\n")
+            sys.stdout.flush()
         display_context["last_print_ended_with_newline"] = True
     else:
         # Wrap the line to CONTENT_WIDTH characters, then add indentation
         wrapped = textwrap.fill(line, width=CONTENT_WIDTH).split("\n")
         for idx, wrap_line in enumerate(wrapped):
-            "  " + wrap_line
             # Only print if not in capture mode
             if not display_context.get("capture_content", False):
-                pass  # Print each wrapped line
+                sys.stdout.write("  " + wrap_line + "\n")
+                sys.stdout.flush()
             if idx < len(wrapped) - 1 and not display_context.get("capture_content", False):  # For all but the last wrapped line
-                pass  # Add newline between wrapped lines
+                sys.stdout.write("\n")  # Add newline between wrapped lines
+                sys.stdout.flush()
         # If there were multiple wrapped lines, the last print ended with newline
         display_context["last_print_ended_with_newline"] = True
     display_context["full_output"] += line + "\n"
