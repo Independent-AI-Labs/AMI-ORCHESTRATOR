@@ -4,9 +4,10 @@
 # This file contains all patterns that should be banned from the codebase
 # including both simple words and regex patterns for complex detection
 
-version: "1.0.0"
+version: "2.0.0"
 
-banned_words:
+# Global banned words that apply to all directories
+global_banned_words:
   # General banned words
   - "fallback"
   - "falling"
@@ -35,11 +36,9 @@ banned_words:
   - '.__dict__'
   - 'vars(?!\()'  # vars not followed by parentheses (to allow vars())
   - "—"  # em-dash
-  - "@pytest.mark.skipif"
-  - "reason=\".*not implemented yet\""
-  - "reason='.*not implemented yet'"
   - ": Any"
   - "/home/"
+  - "importlib"
 
   # UUID version bans - only uuid7 allowed
   - "uuid.uuid1("
@@ -68,6 +67,32 @@ banned_words:
   # - "list[dict[str, list["
   # - "tuple[.+, .+, .+, .+]"  # tuple with 4+ comma-separated elements
 
+# Directory-specific banned patterns
+directory_specific_banned_words:
+  # Skip-related patterns that should only apply to test directories
+  tests:
+    - "skip"
+    - "@pytest.mark.skipif"
+    - "@pytest.mark.skip"
+    - "pytest.skip("
+    - "pytest.skip"
+    - "skip_test"
+    - "skip_test("
+    - "if.*skip.*:"
+    - "if.*skip.*return"
+    - "conditional.*skip"
+    - "condition.*skip"
+    - "skip.*condition"
+    - "reason=\".*not implemented yet\""
+    - "reason='.*not implemented yet'"
+    - "reason=\".*skip.*"
+    - "reason='.*skip.*"
+    - "return.*#.*skip"
+    - "pass.*#.*skip"
+    - "#.*skip.*test"
+    - "#.*test.*skip"
+
+# General filename patterns (applies globally)
 banned_filename_patterns:
   - "_v1"
   - "_v2"
@@ -99,6 +124,7 @@ ignored_files:
   - "base/backend/quality/scanner.py"
   - "scripts/config/patterns/scanner.yaml"  # Scanner configuration with structural ignore patterns
   - "base/tests/integration/test_config_enforcement.py"
+  - "launcher/.runtime/managed_processes.json"
   - "ux/cms/public/js/lib/highlight-engine/index.js"
   - "ux/scripts/quality/banned_words.py"
   # Quality infrastructure files that validate ignore patterns
@@ -132,9 +158,9 @@ ignored_files:
   - "files/AGENTS.md"
   - "files/CLAUDE.md"
   - "files/claude-agent.sh"
-  - "nodes/AGENTS.md"
-  - "nodes/CLAUDE.md"
-  - "nodes/claude-agent.sh"
+  - "launcher/AGENTS.md"
+  - "launcher/CLAUDE.md"
+  - "launcher/claude-agent.sh"
   - "streams/AGENTS.md"
   - "streams/CLAUDE.md"
   - "streams/claude-agent.sh"
@@ -213,3 +239,9 @@ ignored_files:
   # Commit message file that discusses code changes
   - "base/COMMIT_MSG.txt"  # Commit message discussing ignore and lazy patterns in code
   - "COMMIT_MSG.txt"  # Root-level commit message discussing ignore and lazy patterns in code
+  # New quality config files that legitimately use ignore-related terms
+  - "base/backend/quality/config.py"
+  - "base/REPORT-FALLBACKS.md"
+  # Files with legitimate Ghostscript parameters and auto-generated content
+  - "files/backend/generators/pdf_resizer.py"  # Ghostscript compatibility parameter
+  - "files/ami_files.egg-info/PKG-INFO"  # Auto-generated package info with em-dash

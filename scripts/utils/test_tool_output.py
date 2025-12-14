@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 """:'
-exec "$(dirname "$0")/ami-run" "$0" "$@"
+exec "$(dirname "$0")/../ami-run" "$0" "$@"
 """
 
 from __future__ import annotations

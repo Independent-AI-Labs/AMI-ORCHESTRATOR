@@ -74,6 +74,27 @@ is_special_flag() {
     esac
 }
 
+# Function to find nearest .venv by walking up from target directory - NO FALLBACKS
+find_venv_for_target() {
+    local target_dir="${1:-$ORCHESTRATOR_ROOT}"
+    local search_dir="$target_dir"
+
+    # If target is a file, get its directory
+    if [ -f "$target_dir" ]; then
+        search_dir="$(dirname "$target_dir")"
+    fi
+
+    while [ "$search_dir" != "/" ]; do
+        if [ -d "$search_dir/.venv" ]; then
+            echo "$search_dir/.venv"
+            return 0
+        fi
+        search_dir="$(dirname "$search_dir")"
+    done
+
+    return 1
+}
+
 # Reorganize arguments to handle flags in any position
 TEMP_ARGS=()
 while [ $# -gt 0 ]; do
@@ -206,19 +227,61 @@ fi
 MODULE_ROOT="$(cd "$MODULE_PATH" && pwd)"
 
 # Determine if this is orchestrator root or submodule
-if [ -f "$MODULE_ROOT/.git" ]; then
-    # Submodule - find orchestrator root
-    CURRENT_DIR="$MODULE_ROOT"
-    while [ -f "$CURRENT_DIR/.git" ]; do
-        CURRENT_DIR="$(cd "$CURRENT_DIR/.." && pwd)"
-        if [ "$CURRENT_DIR" = "/" ]; then
-            echo "Error: Could not find orchestrator root"
-            exit 1
+# Check if the module path itself has a .git indicator (file or directory)
+if [ -e "$MODULE_ROOT/.git" ]; then
+    # This directory is a git repository, but could be:
+    # 1. The orchestrator root (if .git is a directory)
+    # 2. A submodule reference (if .git is a file)
+    # 3. A nested git repo inside a submodule (if .git is a directory)
+    #
+    # To find the orchestrator root, we need to walk up the tree, but we need to know when to stop.
+    # We stop when we find a .git directory (not file) that is not part of another submodule structure.
+    # For now, let's revert to the original logic but make it more specific to submodule detection.
+
+    # First, check if this is a submodule reference (i.e., .git is a file with submodule reference content)
+    if [ -f "$MODULE_ROOT/.git" ]; then
+        # This is a submodule reference file, find the actual orchestrator root
+        CURRENT_DIR="$MODULE_ROOT"
+        while [ -f "$CURRENT_DIR/.git" ]; do
+            # This is a submodule reference, move up
+            CURRENT_DIR="$(cd "$CURRENT_DIR/.." && pwd)"
+            if [ "$CURRENT_DIR" = "/" ]; then
+                echo "Error: Could not find orchestrator root"
+                exit 1
+            fi
+            # If we've moved up and now find a .git directory, we're at the main repo
+            if [ -d "$CURRENT_DIR/.git" ]; then
+                break
+            fi
+        done
+        ORCHESTRATOR_ROOT="$CURRENT_DIR"
+    else
+        # The .git is a directory, so it's a full git repo
+        # Check if it's a nested git repo inside a parent that also has .git as a file
+        # First, go up one level to check the parent
+        PARENT_DIR="$(dirname "$MODULE_ROOT")"
+        if [ -f "$PARENT_DIR/.git" ]; then
+            # The parent is a submodule reference, so the parent of the parent should be the orchestrator root
+            CURRENT_DIR="$PARENT_DIR"
+            while [ -f "$CURRENT_DIR/.git" ]; do
+                CURRENT_DIR="$(cd "$CURRENT_DIR/.." && pwd)"
+                if [ "$CURRENT_DIR" = "/" ]; then
+                    echo "Error: Could not find orchestrator root"
+                    exit 1
+                fi
+                # If we find a directory .git, we're at a main repo
+                if [ -d "$CURRENT_DIR/.git" ]; then
+                    break
+                fi
+            done
+            ORCHESTRATOR_ROOT="$CURRENT_DIR"
+        else
+            # This is either the orchestrator root or a standalone git repo
+            ORCHESTRATOR_ROOT="$MODULE_ROOT"
         fi
-    done
-    ORCHESTRATOR_ROOT="$CURRENT_DIR"
+    fi
 else
-    # Orchestrator root
+    # Not a git repository at all
     ORCHESTRATOR_ROOT="$MODULE_ROOT"
 fi
 
@@ -247,28 +310,8 @@ if [ "$RUN_AUTOFIXES" = true ]; then
         RUFF_CONFIG="${ORCHESTRATOR_ROOT}/base/ruff.toml"
     fi
 
-    # Find nearest .venv by walking up from target directory - NO FALLBACKS
-    find_venv_for_target() {
-        local target_dir="${1:-$ORCHESTRATOR_ROOT}"
-        local search_dir="$target_dir"
-
-        # If target is a file, get its directory
-        if [ -f "$target_dir" ]; then
-            search_dir="$(dirname "$target_dir")"
-        fi
-
-        while [ "$search_dir" != "/" ]; do
-            if [ -d "$search_dir/.venv" ]; then
-                echo "$search_dir/.venv"
-                return 0
-            fi
-            search_dir="$(dirname "$search_dir")"
-        done
-
-        return 1
-    }
-
     # Find nearest .venv for the current context - NO FALLBACKS
+    # (NEAREST_VENV_DIR is already set globally for quality checks, but we set it here too for autofixes)
     if ! NEAREST_VENV_DIR="$(find_venv_for_target "$MODULE_ROOT" 2>/dev/null)"; then
         echo "Error: No .venv found in hierarchy from $MODULE_ROOT to root" >&2
         exit 1
@@ -288,11 +331,11 @@ if [ "$RUN_AUTOFIXES" = true ]; then
         AUTOFIX_TARGETS="."
     fi
 
-    echo "Running ruff format on $AUTOFIX_TARGETS..."
-    "$RUFF_BIN" format --no-cache --config "$RUFF_CONFIG" --exclude ".gcloud" --exclude ".boot-linux" $AUTOFIX_TARGETS || true
-
     echo "Running ruff check --fix --unsafe-fixes on $AUTOFIX_TARGETS..."
     "$RUFF_BIN" check --no-cache --config "$RUFF_CONFIG" --fix --unsafe-fixes --exclude ".gcloud" --exclude ".boot-linux" $AUTOFIX_TARGETS || true
+
+    echo "Running ruff format on $AUTOFIX_TARGETS..."
+    "$RUFF_BIN" format --no-cache --config "$RUFF_CONFIG" --exclude ".gcloud" --exclude ".boot-linux" $AUTOFIX_TARGETS || true
 
     echo "✓ Auto-fixes complete"
 
@@ -347,6 +390,13 @@ if [ "$DRY_RUN" = false ]; then
                 # Re-stage any changes made by the script
                 git add -A
                 echo "✓ Relative imports converted to absolute imports"
+
+                # Run ruff format and check --fix again to ensure proper import order after conversion
+                echo "Re-running ruff format and check --fix to re-sort imports after relative-to-absolute conversion..."
+                "$RUFF_BIN" check --no-cache --config "$RUFF_CONFIG" --fix --unsafe-fixes --exclude ".gcloud" --exclude ".boot-linux" $AUTOFIX_TARGETS || true
+                "$RUFF_BIN" format --no-cache --config "$RUFF_CONFIG" --exclude ".gcloud" --exclude ".boot-linux" $AUTOFIX_TARGETS || true
+                git add -A  # Re-stage changes from the additional formatting
+                echo "✓ Imports re-sorted after relative import conversion"
             fi
         else
             echo "ℹ Relative imports fixer not found, skipping"
@@ -382,15 +432,23 @@ else
     RUFF_CONFIG="${ORCHESTRATOR_ROOT}/base/ruff.toml"
 fi
 
-RUFF_BIN="${ORCHESTRATOR_ROOT}/.venv/bin/ruff"
-if [ ! -f "$RUFF_BIN" ]; then
-    RUFF_BIN="${MODULE_ROOT}/.venv/bin/ruff"
+# Find nearest .venv for the current context - NO FALLBACKS
+# Only run this if NEAREST_VENV_DIR hasn't been set already (e.g., when RUN_AUTOFIXES is false)
+if [ -z "${NEAREST_VENV_DIR+x}" ]; then
+    if ! NEAREST_VENV_DIR="$(find_venv_for_target "$MODULE_ROOT" 2>/dev/null)"; then
+        echo "Error: No .venv found in hierarchy from $MODULE_ROOT to root" >&2
+        exit 1
+    fi
 fi
 
-PYTHON_BIN="${ORCHESTRATOR_ROOT}/.venv/bin/python"
-if [ ! -f "$PYTHON_BIN" ]; then
-    PYTHON_BIN="${MODULE_ROOT}/.venv/bin/python"
+RUFF_BIN="${NEAREST_VENV_DIR}/bin/ruff"
+
+if [ ! -f "$RUFF_BIN" ]; then
+    echo "Error: ruff not found in nearest .venv at $RUFF_BIN"
+    exit 1
 fi
+
+PYTHON_BIN="${NEAREST_VENV_DIR}/bin/python"
 if [ ! -f "$PYTHON_BIN" ]; then
     PYTHON_BIN="python3"
 fi
@@ -403,11 +461,22 @@ echo "========================================"
 # Merge conflict markers
 echo ""
 echo "Checking for merge conflict markers..."
-CONFLICT_FILES=$(git diff --cached --name-only --diff-filter=ACM | while read file; do
-    if [ -f "$file" ] && grep -qE '^(<<<<<<<|=======|>>>>>>>) ' "$file"; then
-        echo "$file"
-    fi
-done)
+CONFLICT_FILES=""
+if [ "$IS_ROOT" = true ]; then
+    # For orchestrator root, check all staged files
+    while IFS= read -r file; do
+        if [ -n "$file" ] && [ -f "$file" ] && grep -qE '^(<<<<<<<|=======|>>>>>>>)[[:space:]]' "$file" 2>/dev/null; then
+            CONFLICT_FILES="$CONFLICT_FILES$file"$'\n'
+        fi
+    done < <(git diff --cached --name-only --diff-filter=ACM)
+else
+    # For submodules, check only files within the submodule directory
+    while IFS= read -r file; do
+        if [ -n "$file" ] && [ -f "$file" ] && grep -qE '^(<<<<<<<|=======|>>>>>>>)[[:space:]]' "$file" 2>/dev/null; then
+            CONFLICT_FILES="$CONFLICT_FILES$file"$'\n'
+        fi
+    done < <(git diff --cached --name-only --diff-filter=ACM | grep "^${MODULE_ARG}/")
+fi
 if [ -n "$CONFLICT_FILES" ]; then
     echo "✗ Merge conflict markers found:"
     echo "$CONFLICT_FILES"
@@ -419,9 +488,17 @@ echo "✓ No merge conflicts"
 echo ""
 echo "Checking for files with too many lines..."
 # Use mapfile to properly read file names with special characters
-mapfile -t py_files < <(git diff --cached --name-only --diff-filter=ACM | grep '\.py$' | grep -v '^\.boot-linux/')
+# Check Python, shell, JavaScript, and TypeScript files that are in the target module directory
+if [ "$IS_ROOT" = true ]; then
+    # For orchestrator root, check all staged files
+    mapfile -t files_to_check < <(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(py|sh|js|ts)$' | grep -v '^\.boot-linux/')
+else
+    # For submodules, check only files within the submodule directory
+    # MODULE_ARG contains the relative path from orchestrator root to module (e.g., "browser")
+    mapfile -t files_to_check < <(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(py|sh|js|ts)$' | grep -v '^\.boot-linux/' | grep "^${MODULE_ARG}/")
+fi
 MAX_LINE_FILES=""
-for file in "${py_files[@]}"; do
+for file in "${files_to_check[@]}"; do
     if [ -n "$file" ] && [ -f "$file" ]; then
         # Check if it's a text file and count lines
         if file --mime-type "$file" 2>/dev/null | grep -q 'text/'; then
@@ -546,7 +623,13 @@ echo "✓ Mypy check passed"
 # YAML validation
 echo ""
 echo "Checking YAML files..."
-YAML_FILES=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(ya?ml)$' || true)
+if [ "$IS_ROOT" = true ]; then
+    # For orchestrator root, check all staged YAML files
+    YAML_FILES=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(ya?ml)$' || true)
+else
+    # For submodules, check only YAML files within the submodule directory
+    YAML_FILES=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(ya?ml)$' | grep "^${MODULE_ARG}/" || true)
+fi
 if [ -n "$YAML_FILES" ]; then
     for file in $YAML_FILES; do
         if ! python3 -c "import yaml; yaml.safe_load(open('$file'))" 2>/dev/null; then
@@ -563,7 +646,13 @@ fi
 echo ""
 echo "Checking for large files..."
 # Use mapfile to properly read file names with special characters
-mapfile -t all_files < <(git diff --cached --name-only --diff-filter=ACM | grep -v '^\.boot-linux/')
+if [ "$IS_ROOT" = true ]; then
+    # For orchestrator root, check all staged files
+    mapfile -t all_files < <(git diff --cached --name-only --diff-filter=ACM | grep -v '^\.boot-linux/')
+else
+    # For submodules, check only files within the submodule directory
+    mapfile -t all_files < <(git diff --cached --name-only --diff-filter=ACM | grep -v '^\.boot-linux/' | grep "^${MODULE_ARG}/")
+fi
 LARGE_FILES=""
 for file in "${all_files[@]}"; do
     if [ -n "$file" ] && [ -f "$file" ]; then
@@ -591,7 +680,13 @@ echo "✓ No large files"
 echo ""
 echo "Checking for debug statements..."
 # Use mapfile to properly read file names with special characters
-mapfile -t debug_py_files < <(git diff --cached --name-only --diff-filter=ACM | grep '\.py$' | grep -v '^\.boot-linux/')
+if [ "$IS_ROOT" = true ]; then
+    # For orchestrator root, check all staged Python files
+    mapfile -t debug_py_files < <(git diff --cached --name-only --diff-filter=ACM | grep '\.py$' | grep -v '^\.boot-linux/')
+else
+    # For submodules, check only Python files within the submodule directory
+    mapfile -t debug_py_files < <(git diff --cached --name-only --diff-filter=ACM | grep '\.py$' | grep -v '^\.boot-linux/' | grep "^${MODULE_ARG}/")
+fi
 DEBUG_FILES=""
 for file in "${debug_py_files[@]}"; do
     if [ -n "$file" ] && [ -f "$file" ] && grep -qE '(^|[^a-zA-Z0-9_])(pdb|ipdb|pudb|debugpy|breakpoint)\.(set_trace|runcall)\(' "$file"; then

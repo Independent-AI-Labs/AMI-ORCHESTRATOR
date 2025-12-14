@@ -6,18 +6,24 @@ AMI-ORCHESTRATOR uses `uv` for fast, reliable Python dependency management acros
 
 ## Quick Start
 
-Most users should use the automated module setup:
+Most users should use the standard Makefile orchestration:
 
 ```bash
 # Automatic setup - bootstraps toolchain + creates venvs + installs dependencies
-python module_setup.py
+make setup-all
 ```
 
 This internally handles:
-1. Checking for `uv` installation
+1. Delegating to per-module `Makefiles`
 2. Installing Python 3.12 via `uv python install 3.12`
 3. Creating per-module virtual environments
-4. Syncing dependencies from `pyproject.toml`
+4. Syncing dependencies via `uv` or `npm` as appropriate
+
+To setup a specific module:
+```bash
+make setup-base
+make setup-cms
+```
 
 ## Manual Bootstrap (Advanced)
 
@@ -89,17 +95,17 @@ Each submodule (`base/`, `browser/`, `files/`, etc.) maintains its own:
 
 ### How Modules Bootstrap Themselves
 
-Entry point: `module_setup.py` (exists in root + each module)
+Entry point: `Makefile` (exists in root + each module)
 
-```python
-# Simplified flow from module_setup.py:24-223
-check_uv()                    # Verify uv available
-ensure_uv_python("3.12")      # Install Python 3.12 if missing
-ensure_venv(module_root)      # Create .venv with python 3.12
-sync_dependencies()           # Run: uv sync --dev
-install_precommit()           # Install git hooks
-setup_child_submodules()      # Recursively setup children
+```makefile
+# Simplified flow from a typical module Makefile
+setup:
+    @echo "Syncing dependencies..."
+    uv python install 3.12
+    uv sync --dev
 ```
+
+Previously, this was handled by `module_setup.py` scripts, which are being deprecated in favor of standard Makefiles for better interoperability and transparency.
 
 ## Offline / Air-Gapped Environments
 
@@ -189,6 +195,6 @@ uv sync --dev
 ## References
 
 - Bootstrap implementation: `base/scripts/meta/bootstrap_toolchain.py`
-- Module setup: `module_setup.py` (root + each module)
+- Module setup: `Makefile` (root + each module)
 - Environment utilities: `base/scripts/env/venv.py`, `base/scripts/env/paths.py`
 - uv documentation: https://docs.astral.sh/uv/

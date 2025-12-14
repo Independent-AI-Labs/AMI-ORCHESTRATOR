@@ -155,13 +155,21 @@ class TestConfigurationErrorConditions:
         mock_open.side_effect = FileNotFoundError("Config file not found")
         mock_yaml_load.side_effect = FileNotFoundError("Config file not found")
 
-        # Reset the singleton instance to force re-initialization
+        # Store original values to restore after test
+        original_instance = ConfigService._instance
+        original_config_data = ConfigService._config_data
 
-        ConfigService._instance = None
-        ConfigService._config_data = None
+        try:
+            # Reset the singleton instance to force re-initialization
+            ConfigService._instance = None
+            ConfigService._config_data = None
 
-        with pytest.raises(FileNotFoundError):
-            ConfigService()  # Should fail when config file is not found
+            with pytest.raises(FileNotFoundError):
+                ConfigService()  # Should fail when config file is not found
+        finally:
+            # Restore original values to prevent affecting other tests
+            ConfigService._instance = original_instance
+            ConfigService._config_data = original_config_data
 
     def test_config_presets_none_session_id(self):
         """Test config presets with None session ID."""
@@ -219,7 +227,11 @@ class TestStreamingErrorConditions:
 
         # Test with a process that never returns data - should timeout
         with patch("scripts.agents.cli.streaming_loops.read_streaming_line") as mock_read:
+            # Make read_streaming_line return timeout continuously to trigger the timeout logic
             mock_read.return_value = (None, True)  # No data, timeout
+            mock_process.stdout = Mock()
+            mock_process.stdout.fileno = Mock(return_value=123)  # Mock file descriptor
+            mock_process.poll = Mock(return_value=None)  # Process still running
 
             # This will eventually timeout based on the timeout logic
             with pytest.raises(AgentTimeoutError):

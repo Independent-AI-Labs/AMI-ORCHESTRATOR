@@ -8,12 +8,9 @@
     "postinstall": "node scripts/postinstall.js"
   },
   "dependencies": {
-    "@anthropic-ai/claude-code": "^2.0.58",
-    "@google/gemini-cli": "^0.19.1",
-    "@qwen-code/qwen-code": "^0.3.0"
-  },
-  "devDependencies": {
-    "nodeenv": "^1.9.1"
+    "@anthropic-ai/claude-code": "2.0.60",
+    "@google/gemini-cli": "0.19.4",
+    "@qwen-code/qwen-code": "0.4.0"
   },
   "repository": {
     "type": "git",

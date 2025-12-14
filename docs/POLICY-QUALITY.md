@@ -2,10 +2,10 @@
 
 ## Non-negotiables
 
-- **Centralised path/import control** (migration in progress): only runner scripts (`run_*`, `scripts/run_tests.py`) and `module_setup.py` may mutate `sys.path`. New scripts and updated scripts must use Base `scripts/env/paths.py` helpers (`setup_imports`, `find_orchestrator_root`, `find_module_root`) instead of custom path discovery logic.
+- **Centralised path/import control**: Scripts should avoid manual `sys.path` manipulation. Use the provided runner scripts (`ami-run`) which handle environment context.
 - **Single toolchain**: Python 3.12 via `uv` across every module. No mixed runtimes.
 - **Lint/type targets**: `ruff` targets `py312` and `mypy` is pinned to `python_version = 3.12` (root and module-level configs already updated).
-- **Setup scripts**: rely on stdlib `logging` and defer third-party imports until after dependencies are installed.
+- **Setup scripts**: Use standard `Makefile` targets (`setup`, `test`, `clean`) for all build orchestration.
 
 ## Configuration Hygiene
 
@@ -20,7 +20,7 @@
 
 ## Security & SCM Expectations
 
-- Use `git submodule update --init --recursive` (handled by `module_setup.py`) instead of manual pulls inside submodules.
+- Use `make setup-all` (or `make setup-<module>`) to initialize submodules. Manual `git submodule update` calls inside scripts are discouraged.
 - `.gitmodules` defaults to SSH; document HTTPS alternate commands for CI in module onboarding guides.
 - Ensure `.gitignore` excludes PDFs and other compliance artefacts generated from source standards (already enforced globally).
 

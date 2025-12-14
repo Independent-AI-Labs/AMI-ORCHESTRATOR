@@ -66,6 +66,8 @@ setup_node_env() {
     log_info "Creating Node.js environment in $venv_dir (ensuring isolated environment)..."
     # Create fresh node environment to ensure isolation
     if [ -d "$venv_dir" ]; then
+        log_warning "⚠️  Found existing node environment at $venv_dir"
+        # Check if user wants to overwrite
         log_info "Removing existing node environment to ensure clean isolation..."
         rm -rf "$venv_dir"
     fi
@@ -83,8 +85,6 @@ setup_node_env() {
 
 # Install Node.js CLI agents
 install_node_agents() {
-    local cli_agents_dir="./cli-agents"
-
     # Get the project root directory before any potential directory changes
     local project_root
     project_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../" && pwd)"
@@ -108,17 +108,32 @@ install_node_agents() {
         }
     fi
 
-    # Install agents using npm - they will go into the existing .venv environment
-    log_info "Installing Node.js CLI agents to .venv/node_modules..."
+    # Install agents using npm from the scripts/package.json - they will go into the existing .venv environment
+    log_info "Installing Node.js CLI agents to .venv/node_modules from scripts/package.json..."
 
-    # Install packages to the .venv directory using prefix
-    # Using the npm from .boot-linux/node-env directly
+    # Change to the scripts directory and install packages to the .venv directory using prefix
     # Use --no-save to prevent creating package.json in .venv and ensure clean local installation
     # Use --ignore-scripts to avoid running postinstall scripts that might create unwanted node_modules
-    "$project_root/.boot-linux/node-env/bin/npm" install --prefix "$PWD/.venv" --no-save --ignore-scripts @anthropic-ai/claude-code@2.0.58 @google/gemini-cli@0.19.1 @qwen-code/qwen-code@0.3.0 || {
-        log_error "Node.js agents installation failed"
+    # Use --force to ensure latest compatible versions according to package.json
+    # Install production dependencies only (skip devDependencies)
+    if [ ! -f "$project_root/scripts/package.json" ]; then
+        log_error "scripts/package.json not found, cannot install Node.js agents"
         return 1
-    }
+    fi
+
+    # Remove existing node_modules to ensure clean installation with latest compatible versions
+    if [ -d "$project_root/.venv/node_modules" ]; then
+        log_info "Removing existing node_modules to ensure clean installation..."
+        rm -rf "$project_root/.venv/node_modules"
+    fi
+
+    # Copy the package.json to .venv to ensure npm reads dependencies from it
+    cp "$project_root/scripts/package.json" "$project_root/.venv/package.json"
+    # Run npm install in .venv directory to install dependencies specified in package.json
+    cd "$project_root/.venv" && "$project_root/.boot-linux/node-env/bin/npm" install --no-save --ignore-scripts --force --production
+    # Remove the temporary package.json after installation
+    rm -f "$project_root/.venv/package.json"
+    cd "$project_root"  # Return to original directory
 
     log_info "✓ Node.js CLI agents installed successfully to .venv/node_modules"
     return 0

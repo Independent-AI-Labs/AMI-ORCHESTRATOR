@@ -1,0 +1,5 @@
+# Procfile.cms - CMS Profile
+# Run with: honcho start -f Procfile.cms
+
+data-stack: docker-compose -f docker-compose.data.yml up
+cms: cd ux/cms && NODE_ENV=development npm run dev

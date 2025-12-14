@@ -161,9 +161,9 @@ def _restart_git_ssh_server():
     except Exception:
         # Try the subprocess method as a fallback
         try:
-            subprocess.run(["scripts/ami-run", "nodes/scripts/setup_service.py", "profile", "stop", "git-server"], check=True, capture_output=True, timeout=30)
+            subprocess.run(["scripts/ami-run", "launcher/scripts/setup_service.py", "profile", "stop", "git-server"], check=True, capture_output=True, timeout=30)
             time.sleep(2)  # Allow time for server to stop completely
-            subprocess.run(["scripts/ami-run", "nodes/scripts/setup_service.py", "profile", "start", "git-server"], check=True, capture_output=True, timeout=30)
+            subprocess.run(["scripts/ami-run", "launcher/scripts/setup_service.py", "profile", "start", "git-server"], check=True, capture_output=True, timeout=30)
             time.sleep(5)  # Allow time for server to start completely
 
             # Verify that the service is actually running and responsive

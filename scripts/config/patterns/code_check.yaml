@@ -28,6 +28,7 @@ exempt_files:
   - "base/backend/workers/uv_process_pool.py"
   - "base/tests/conftest.py"
   - "base/module_setup.py"
+  - "base/backend/quality/scanner.py"
   # Root-level entrypoint scripts with unavoidable import ordering requirements
   # scripts/run_tests.py: PLC0415 deferred import violation
   #   - Must import ensure_module_venv() AFTER orchestrator root is on sys.path
@@ -62,17 +63,17 @@ exempt_files:
   - "compliance/module_setup.py"
   - "domains/module_setup.py"
   - "files/module_setup.py"
-  - "nodes/module_setup.py"
+  - "launcher/module_setup.py"
   - "streams/module_setup.py"
   - "ux/module_setup.py"
-  # Nodes module - standard_imports pattern (E402, PLC0415, N806)
-  - "nodes/tests/conftest.py"
-  - "nodes/scripts/launch_services.py"
-  - "nodes/scripts/setup_service.py"
-  # Nodes module - validated URL schemes (S310 with scheme validation at lines 65-68)
-  - "nodes/backend/launcher/health.py"
-  # Nodes module - inherited stdlib method signatures (N802, A003)
-  - "nodes/tests/test_health.py"
+  # Launcher module - standard_imports pattern (E402, PLC0415, N806)
+  - "launcher/tests/conftest.py"
+  - "launcher/scripts/launch_services.py"
+  - "launcher/scripts/setup_service.py"
+  # Launcher module - validated URL schemes (S310 with scheme validation at lines 65-68)
+  - "launcher/backend/launcher/health.py"
+  # Launcher module - inherited stdlib method signatures (N802, A003)
+  - "launcher/tests/test_health.py"
   # Files module - standard_imports pattern
   - "files/scripts/run_filesys.py"
   - "files/scripts/run_filesys_fastmcp.py"
@@ -233,3 +234,24 @@ exempt_files:
   #   - Alternative rejected: Running unvalidated executables or skipping privilege dropping is unsafe
   #   - Removal: When ruff recognizes these security validation patterns
   - "scripts/automation/agent_cli.py"
+  # Files module - standard_imports pattern (E402)
+  - "files/scripts/run_idp.py"
+  # Files module - Git subprocess with validated executable path (S603, S607)
+  - "files/backend/mcp/idp/tools/git_tools.py"
+
+  # Files module - standard_imports pattern (E402)
+  - "files/scripts/run_idp_fastmcp.py"
+  # Launcher module - standard_imports pattern and legitimate security validations
+  - "launcher/scripts/install_systemd.py"
+  - "launcher/scripts/run_ssh_fastmcp.py"
+  - "launcher/scripts/monitoring_server.py"
+  - "launcher/scripts/init_synapse_config.py"
+  - "launcher/backend/services/health.py"
+  - "launcher/backend/git/git_server/repo_ops.py"
+  - "launcher/backend/services/adapters/local.py"
+  - "launcher/backend/services/adapters/docker_compose.py"
+  - "launcher/backend/services/adapters/docker_run.py"
+  - "launcher/backend/mcp/deploy/response.py"
+  - "launcher/backend/mcp/deploy/deploy_server.py"
+  - "launcher/backend/mcp/ssh/tools/ssh_transfer.py"
+  - "launcher/backend/mcp/ssh/tools/ssh_execute.py"

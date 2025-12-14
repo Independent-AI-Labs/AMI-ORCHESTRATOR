@@ -16,19 +16,39 @@ Intent: Define a single, tight, and robust setup contract that keeps import/path
 - Execute each module's `module_setup.py` via Python (modules handle their own venv setup internally).
 - Do not create a root venv and do not import module code.
 
-## Module Responsibilities
+## 2. Environment Provisioning
 
-- Provide `python.ver` with the required minor version (e.g., `3.12`).
-- Provide `pyproject.toml` with dependencies under `[project.dependencies]` and `[tool.uv.dev-dependencies]`.
-- Optional: Maintain parallel `requirements.txt` for backward compatibility (not used by module_setup.py).
-- Provide `module_setup.py` that uses Base's consolidated environment utilities:
-  - Import from `base.scripts.env.paths` (for `setup_imports`, path discovery functions).
-  - Import from `base.scripts.env.venv` (for `ensure_venv`, `get_venv_python`).
-  - Create `.venv` via `ensure_venv(module_root, python_version="3.12")`.
-  - Sync dependencies via `uv sync --dev` (reads pyproject.toml).
-  - Install native git hooks from `/base/scripts/hooks/` to module's `.git/hooks/`.
-  - Recursively setup direct child submodules.
-- Entrypoints (`run_*`, `run_tests`) perform all `sys.path` setup using centralized path helpers; application packages must not modify `sys.path`.
+Each module must handle its own environment setup via a standard `Makefile`.
+
+**Responsibilities:**
+- Create a virtual environment (`.venv`) using Python 3.12.
+- Install dependencies from `pyproject.toml` (or `package.json` for JS modules).
+- Expose a `setup` target.
+
+### Setup Mechanism (Makefile)
+
+- Execute each module's setup via `make setup` (run from the module root).
+- The Root Makefile orchestrates this via `make setup-all`.
+
+**Required Makefile Targets:**
+- `setup`: The primary entry point. Must ensure the environment is ready for development.
+- `clean`: Should remove artifacts like `.venv` and `node_modules`.
+- `test`: Should run the module's test suite.
+
+Example `Makefile`:
+```makefile
+.PHONY: setup test clean
+
+setup:
+	uv python install 3.12
+	uv sync --dev
+
+test:
+	uv run pytest -q
+
+clean:
+	rm -rf .venv
+```
 
 ## Base Module (Source of Truth)
 

@@ -2,11 +2,14 @@
 
 Scope: Track how well modules adhere to the setup contract, highlight remaining drift from Base patterns, and flag documentation required for compliance alignment.
 
-## Summary
+## 1. Environment
 
-- Root `module_setup.py` invokes every module's setup script (base, browser, files, domains, compliance, nodes, streams, ux) with stdlib logging only.
-- Base exposes authoritative environment helpers via `base/scripts/env/paths.py` and `base/scripts/env/venv.py`; modules import `setup_imports` and `ensure_venv` instead of duplicating path logic.
-- All modules follow the same consolidated setup pattern: bootstrap sys.path, import base utilities, check uv, ensure Python 3.12, sync dependencies via `uv sync --dev`, install git hooks from `base/scripts/hooks/`, then recursively setup child submodules.
+- Root `Makefile` orchestrates setup for every module (base, browser, files, domains, compliance, nodes, streams, ux).
+- **base** – `Makefile` syncs dependencies via `uv`. Verified ✅.
+- **nodes** – `Makefile` syncs dependencies and installs `honcho` for process management. Verified ✅.
+- **ux/cms** – `Makefile` runs `npm install` (deps + pdfjs-dist) and sets up assets. Verified ✅.
+- **browser** – `Makefile` follows standard pattern. Provisions Chrome when missing. Verified ✅.
+- Other modules follow standard `make setup` contract.
 
 ## Per-Module Observations
 

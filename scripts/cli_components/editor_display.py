@@ -19,6 +19,7 @@ class EditorDisplay:
 
     def display_editor(self, lines: list[str], current_line: int, current_col: int) -> None:
         """Display the current state of the editor."""
+
         # Calculate the total display lines before making changes
         total_display_lines = 1 + 2 + len(lines) + 1  # 1 for header + 2 for borders + content + 1 for status
 
@@ -52,14 +53,15 @@ class EditorDisplay:
             if i == current_line:
                 # Highlight current line by inverting the line number
                 # Apply inverted video to the character at cursor position
-                if current_col < len(line_content):
-                    # Split the line to apply reverse video to the character at cursor
+                if -len(line_content) <= current_col < len(line_content):
+                    # Split the line to apply reverse video to the character at cursor position
+                    # This handles both positive and valid negative indexing (e.g., -1 for last char)
                     before_cursor = line_content[:current_col]
                     cursor_char = line_content[current_col]
                     after_cursor = line_content[current_col + 1 :]
                     formatted_line = f"{before_cursor}{Colors.REVERSE}{cursor_char}{Colors.RESET}{after_cursor}"
                 else:
-                    # If cursor is at the end of the line, just append a space with reverse video
+                    # If cursor position is invalid (too negative or beyond line length), just append a space with reverse video
                     formatted_line = f"{line_content}{Colors.REVERSE} {Colors.RESET}"
 
                 sys.stdout.write(f" {Colors.REVERSE}{i + 1:2d}{Colors.RESET}| {formatted_line}\n")

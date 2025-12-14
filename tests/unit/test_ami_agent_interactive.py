@@ -1,7 +1,6 @@
 """Unit tests for ami-agent interactive mode functionality."""
 
 import time
-from pathlib import Path
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
@@ -62,43 +61,58 @@ class TestAgentConfigPresets:
 class TestConfigService:
     """Test configuration service functionality."""
 
-    @patch("scripts.agents.cli.config_service.Path")
-    def test_get_provider_command(self, mock_path):
+    def test_get_provider_command(self):
         """Test get_provider_command returns correct paths."""
-        # Mock the file hierarchy traversal
+        from unittest.mock import patch
+
+
+        # Reset the singleton instance to ensure clean state
+        ConfigService._instance = None
+        ConfigService._config_data = None
+
+        # Create separate mock objects for the base paths that get checked
+        mock_root_base = MagicMock()
+        mock_root_base.exists.return_value = True  # This should return True to be selected
+
+        mock_other_base = MagicMock()
+        mock_other_base.exists.return_value = False  # This should return False
+
+        # Create parent path mocks
+        mock_root = MagicMock()
+        mock_other = MagicMock()
+
+        # Set up the division operations
+        mock_root.__truediv__ = MagicMock(return_value=mock_root_base)
+        mock_other.__truediv__ = MagicMock(return_value=mock_other_base)
+
+        # Create the file mock
         mock_file = MagicMock()
-        mock_file.parents = ["/fake/root", "/fake"]
-
-        def mock_parents_side_effect():
-            return [Path("/fake/root"), Path("/fake")]
-
         mock_file.resolve.return_value = mock_file
-        mock_file.__truediv__ = lambda self, other: Path(str(self) + "/fake/root") if other != "base" else Path("/fake/root")
+        mock_file.parents = [mock_root, mock_other]  # First parent has base, second doesn't
 
-        mock_path.return_value = mock_file
-        mock_path.return_value.resolve.return_value = mock_file
-        mock_path.return_value.__truediv__ = lambda self, other: Path(str(self) + "/fake/base") if other == "base" else Path(str(self) + "/" + other)
-        mock_path.return_value.parents = [Path("/fake/root"), Path("/fake")]
+        # String representation for path construction - need to take 'self' parameter
+        mock_root.__str__ = lambda self: "/mock/root"
 
-        # Mock the Path constructor to return a proper path
-        with (
-            patch.object(mock_file, "parents", [Path("/fake/root"), Path("/fake")]),
-            patch.object(Path, "resolve", return_value=Path("/fake/root")),
-            patch.object(Path, "parents", new_callable=lambda: [Path("/fake/root"), Path("/fake")]),
-            patch.object(Path, "__truediv__", lambda self, other: Path(str(self) + "/base") if other == "base" else Path(str(self) + "/" + other)),
-        ):
-            # Test Claude provider
-            config_service = ConfigService()
-            claude_cmd = config_service.get_provider_command(ProviderType.CLAUDE)
-            assert claude_cmd == "/fake/root/.venv/node_modules/.bin/claude"
+        with patch("scripts.agents.cli.config_service.Path") as path_mock:
+            # Configure the path mock to return our mock file when called
+            path_mock.return_value = mock_file
 
-            # Test Qwen provider
-            qwen_cmd = config_service.get_provider_command(ProviderType.QWEN)
-            assert qwen_cmd == "/fake/root/.venv/node_modules/.bin/qwen"
+            # Mock yaml loading
+            with patch("scripts.agents.cli.config_service.yaml.safe_load") as mock_yaml:
+                mock_yaml.return_value = {"test": "data"}
 
-            # Test Gemini provider
-            gemini_cmd = config_service.get_provider_command(ProviderType.GEMINI)
-            assert gemini_cmd == "/fake/root/.venv/node_modules/.bin/gemini"
+                # Create config service instance
+                config_service = ConfigService()
+
+                # Test provider commands
+                claude_cmd = config_service.get_provider_command(ProviderType.CLAUDE)
+                assert claude_cmd == "/mock/root/.venv/node_modules/.bin/claude"
+
+                qwen_cmd = config_service.get_provider_command(ProviderType.QWEN)
+                assert qwen_cmd == "/mock/root/.venv/node_modules/.bin/qwen"
+
+                gemini_cmd = config_service.get_provider_command(ProviderType.GEMINI)
+                assert gemini_cmd == "/mock/root/.venv/node_modules/.bin/gemini"
 
 
 class TestFactory:
@@ -132,7 +146,8 @@ class TestTimerUtils:
         result = wrap_text_in_box("Hello world")
         lines = result.split("\n")
         assert lines[0].startswith("┌") and lines[0].endswith("┐")
-        assert lines[1].strip() == "  Hello world     "
+        # The actual content after stripping should just be the original text
+        assert lines[1].strip() == "Hello world"
         assert lines[2].startswith("└") and lines[2].endswith("┘")
 
     def test_wrap_text_in_box_multiline(self):
@@ -272,10 +287,14 @@ class TestStreamingLoops:
 
     def test_run_streaming_loop_with_display(self):
         """Test basic streaming loop with display."""
-        # Create mock process
+
+        # Create mock process that immediately exits to prevent timeout
         mock_process = Mock()
-        mock_process.poll.return_value = 0  # Process finished
-        mock_process.stdout.readline.return_value = None
+        mock_process.poll.return_value = 0  # Process finished immediately
+        mock_stdout = Mock()
+        mock_stdout.fileno.return_value = 123  # Return a valid file descriptor
+        mock_process.stdout = mock_stdout
+        mock_process.stdout.readline.return_value = None  # No more data to read
 
         mock_cmd = ["test", "cmd"]
         mock_config = Mock()
@@ -287,7 +306,7 @@ class TestStreamingLoops:
             def _parse_stream_message(self, line, cmd, line_count, agent_config):
                 return "", None
 
-        # Execute the function
+        # Execute the function - process exits immediately, so no timeout occurs
         output, metadata = run_streaming_loop_with_display(mock_process, mock_cmd, mock_config, MockProvider())
 
         # Should return empty output and metadata

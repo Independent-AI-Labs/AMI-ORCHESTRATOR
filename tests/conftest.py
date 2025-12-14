@@ -21,7 +21,7 @@ collect_ignore_glob = [
     "*/compliance/tests/*",
     "*/domains/tests/*",
     "*/files/tests/*",
-    "*/nodes/tests/*",
+    "*/launcher/tests/*",
     "*/streams/tests/*",
     "*/ux/tests/*",
 ]

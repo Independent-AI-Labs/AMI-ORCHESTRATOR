@@ -85,15 +85,11 @@ setup_child_submodules() {
             local child_name=$(basename "$child_dir")
             # Skip hidden directories
             if [[ "$child_name" != .* ]]; then
-                local child_setup_py="$child_dir/module_setup.py"
-                local child_setup_sh="$child_dir/module-setup"
-                if [ -f "$child_setup_py" ]; then
-                    children_with_setup[$child_count]="$child_dir:module_setup.py"
-                    ((child_count++))
-                elif [ -f "$child_setup_sh" ]; then
-                    children_with_setup[$child_count]="$child_dir:module-setup"
-                    ((child_count++))
-                fi
+            # Check for Makefile
+            if [ -f "$child_dir/Makefile" ]; then
+                children_with_setup[$child_count]="$child_dir:Makefile"
+                child_count=$((child_count + 1))
+            fi
             fi
         fi
     done < "$temp_file"
@@ -115,37 +111,19 @@ setup_child_submodules() {
         local child_path="${child_entry%%:*}"
         local child_setup_type="${child_entry#*:}"
         local child_name=$(basename "$child_path")
-        local child_setup="$child_path/$child_setup_type"
 
         log_info ""
         log_info "Running setup for $child_name..."
 
-        if [ "$child_setup_type" = "module_setup.py" ]; then
-            # For Python setup files, run with bootstrapped Python from within the child directory
-            local python_cmd
-            if [ -n "${PYTHON_CMD:-}" ] && [ -x "$PYTHON_CMD" ]; then
-                python_cmd="$PYTHON_CMD"
-            elif [ -x "$PWD/.boot-linux/bin/python" ]; then
-                python_cmd="$PWD/.boot-linux/bin/python"
-            else
-                log_error "No bootstrapped Python available. Run bootstrap first."
-                return 1
-            fi
-
-            if cd "$child_path" && chmod +x "$child_setup_type" && "$python_cmd" "$child_setup_type"; then
+        if [ "$child_setup_type" = "Makefile" ]; then
+            if (cd "$child_path" && make setup); then
                 log_info "✓ $child_name setup complete"
             else
                 log_warning "Setup for $child_name failed with code $?"
                 return 1
             fi
         else
-            # For bash setup files, run from within the child directory
-            # Use just the filename since we're in the directory
-            if cd "$child_path" && bash "$child_setup_type"; then
-                log_info "✓ $child_name setup complete"
-            else
-                log_warning "Setup for $child_name failed with code $?"
-            fi
+            log_warning "Unknown setup type for $child_name: $child_setup_type"
         fi
     done
 }
@@ -228,16 +206,16 @@ setup_module() {
 run_submodule_setup() {
     log_info "Running module setup for all submodules..."
 
-    # Find all modules with module_setup.py files
+    # Find all modules with Makefile files
     local modules=()
     for dir in */; do
-        if [[ -d "$dir" && -f "$dir/module_setup.py" ]]; then
+        if [[ -d "$dir" && -f "$dir/Makefile" ]]; then
             modules+=("$dir")
         fi
     done
 
     if [ ${#modules[@]} -eq 0 ]; then
-        log_info "No submodules with module_setup.py found"
+        log_info "No submodules with Makefile found"
         return 0
     fi
 
@@ -246,9 +224,9 @@ run_submodule_setup() {
     for module in "${modules[@]}"; do
         local module_name="${module%/}"
         log_info "Setting up submodule: $module_name"
-        if [ -f "$module_name/module_setup.py" ]; then
-            # Use ami-run to execute the module setup
-            if ./scripts/ami-run "$module_name/module_setup.py"; then
+        if [ -f "$module_name/Makefile" ]; then
+            # Use make to execute the module setup
+            if (cd "$module_name" && make setup); then
                 log_success "Submodule $module_name setup complete"
             else
                 log_error "Submodule $module_name setup failed"

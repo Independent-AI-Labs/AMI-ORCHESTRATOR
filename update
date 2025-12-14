@@ -1,0 +1,307 @@
+#!/usr/bin/env bash
+
+set -euo pipefail  # Exit on error, undefined vars, and pipe failures
+
+# AMI Orchestrator updater - safely updates the development environment
+# This script handles safe update tasks that don't require user confirmation:
+# 1. Safely update git submodules only if no uncommitted changes exist
+# 2. Install/refresh Node.js CLI agents
+# 3. Update Python dependencies via uv
+# 4. Run tests to verify the environment
+
+# Source setup scripts
+source "./scripts/setup/common.sh"
+source "./scripts/setup/node.sh"
+source "./scripts/setup/test.sh"
+source "./scripts/setup/submodule.sh"
+
+# Logging function for success messages
+log_success() {
+    echo "✓ $1" >&2
+}
+
+# Check if git submodule is in a safe state for update
+# Safe means: no uncommitted changes, untracked files, and if detached HEAD,
+# it should be in line with the expected commit from the parent repo
+is_submodule_safe_for_update() {
+    local submodule_path="$1"
+    local git_cmd
+    if [ -n "${GIT_CMD:-}" ] && [ -x "$GIT_CMD" ]; then
+        git_cmd="$GIT_CMD"
+    elif [ -x "$PWD/.boot-linux/bin/git" ]; then
+        git_cmd="$PWD/.boot-linux/bin/git"
+    else
+        git_cmd="git"
+    fi
+
+    if [ ! -d "$submodule_path/.git" ] && [ ! -f "$submodule_path/.git" ]; then
+        log_info "Submodule $submodule_path doesn't exist yet, safe to initialize"
+        return 0
+    fi
+
+    # Enter the submodule and check its status
+    local original_dir="$PWD"
+    cd "$submodule_path" || return 1
+
+    # Check for uncommitted changes
+    if ! "$git_cmd" diff-index --quiet HEAD -- 2>/dev/null; then
+        log_info "Submodule $submodule_path has uncommitted changes, not safe to update"
+        cd "$original_dir" || return 1
+        return 1
+    fi
+
+    # Check for untracked files
+    local untracked_files
+    untracked_files=$("$git_cmd" ls-files --others --exclude-standard 2>/dev/null)
+    if [ -n "$untracked_files" ]; then
+        log_info "Submodule $submodule_path has untracked files, not safe to update"
+        cd "$original_dir" || return 1
+        return 1
+    fi
+
+    cd "$original_dir" || return 1
+    return 0
+}
+
+# Check if detached HEAD in submodule is in line with the parent's recorded commit
+is_submodule_detached_head_in_line() {
+    local submodule_path="$1"
+    local git_cmd
+    if [ -n "${GIT_CMD:-}" ] && [ -x "$GIT_CMD" ]; then
+        git_cmd="$GIT_CMD"
+    elif [ -x "$PWD/.boot-linux/bin/git" ]; then
+        git_cmd="$PWD/.boot-linux/bin/git"
+    else
+        git_cmd="git"
+    fi
+
+    # Get the expected commit for the submodule from the parent repo
+    local expected_commit
+    expected_commit=$("$git_cmd" ls-tree HEAD "$submodule_path" 2>/dev/null | awk '{print $3}')
+
+    if [ -z "$expected_commit" ]; then
+        log_warning "Could not determine expected commit for submodule $submodule_path"
+        return 1
+    fi
+
+    # Enter the submodule and check current commit
+    local original_dir="$PWD"
+    cd "$submodule_path" || return 1
+
+    # Get current commit in submodule
+    local current_commit
+    current_commit=$("$git_cmd" rev-parse HEAD 2>/dev/null)
+
+    cd "$original_dir" || return 1
+
+    if [ "$current_commit" = "$expected_commit" ]; then
+        log_info "Submodule $submodule_path is in sync with parent repo pointer"
+        return 0
+    else
+        log_info "Submodule $submodule_path is not in sync with parent repo pointer ($current_commit vs $expected_commit)"
+        return 1
+    fi
+}
+
+# Safely update git submodules only if they're in a safe state
+safe_update_git_submodules() {
+    local git_cmd
+    if [ -n "${GIT_CMD:-}" ] && [ -x "$GIT_CMD" ]; then
+        git_cmd="$GIT_CMD"
+    elif [ -x "$PWD/.boot-linux/bin/git" ]; then
+        git_cmd="$PWD/.boot-linux/bin/git"
+    else
+        git_cmd="git"
+    fi
+
+    if [ ! -d ".git" ]; then
+        log_warning "No .git directory found; skipping submodule update."
+        return 0
+    fi
+
+    log_info "Checking submodules for safe update..."
+
+    # Get list of all submodules
+    local submodules
+    submodules=$("$git_cmd" config --file .gitmodules --get-regexp path | cut -d' ' -f2- 2>/dev/null) || true
+
+    if [ -z "$submodules" ]; then
+        log_info "No submodules found to update."
+        return 0
+    fi
+
+    local update_needed=0
+    local unsafe_submodules=0
+
+    for submodule in $submodules; do
+        log_info "Checking submodule: $submodule"
+
+        if ! is_submodule_safe_for_update "$submodule"; then
+            log_warning "Submodule $submodule is not safe to update (has uncommitted changes or untracked files), skipping..."
+            unsafe_submodules=1
+            continue
+        fi
+
+        if ! is_submodule_detached_head_in_line "$submodule"; then
+            # The submodule is not in the expected state, but if there are no changes,
+            # this just means we need to update it to the parent's expected commit
+            log_info "Submodule $submodule is not at expected commit, but is safe to update"
+            update_needed=1
+        else
+            log_info "Submodule $submodule is already at the expected commit"
+        fi
+    done
+
+    # Check if any update is needed
+    if [ $unsafe_submodules -eq 0 ]; then
+        if [ $update_needed -eq 1 ] || ! "$git_cmd" submodule foreach --quiet 'test -z "$($git_cmd diff --ignore-submodules=untracked)"' 2>/dev/null; then
+            log_info "Some submodules need updates, proceeding with safe git submodule update..."
+            if "$git_cmd" submodule update --init --recursive; then
+                log_success "✓ Submodules updated safely"
+                return 0
+            else
+                log_error "Failed to update submodules"
+                return 1
+            fi
+        else
+            log_info "All submodules are already up-to-date and safe"
+            return 0
+        fi
+    else
+        log_info "Some submodules are unsafe to update, performing sync only..."
+        # Just sync config without updating content if there are unsafe submodules
+        if "$git_cmd" submodule sync --recursive; then
+            log_success "✓ Submodules config synced"
+            return 0
+        else
+            log_error "Failed to sync submodules config"
+            return 1
+        fi
+    fi
+}
+
+# Main update function for Python dependencies using uv
+update_python_dependencies() {
+    log_info "Updating Python dependencies..."
+
+    if [ ! -f "pyproject.toml" ]; then
+        log_warning "pyproject.toml not found, skipping Python dependency update"
+        return 0
+    fi
+
+    # Check if uv is available
+    if ! check_uv; then
+        log_error "uv is not available, can't update Python dependencies"
+        return 1
+    fi
+
+    # Run uv sync to update dependencies
+    log_info "Syncing Python dependencies with uv..."
+    output=$("$UV_CMD" sync --dev 2>&1)
+    local exit_code=$?
+    echo "$output"
+
+    # Check for actual errors
+    if [ $exit_code -ne 0 ] && [ $exit_code -ne 1 ]; then
+        log_error "uv sync failed with code $exit_code:"
+        echo "$output" >&2
+        return 1
+    elif [[ "$output" == *"ERROR"* ]] || [[ "$output" == *"error"* ]]; then
+        log_error "uv sync reported errors:"
+        echo "$output" >&2
+        return 1
+    fi
+
+    log_success "✓ Python dependencies updated"
+    return 0
+}
+
+# Update Node.js dependencies (install only if needed)
+update_node_agents() {
+    # Check if node and npm are available
+    if ! check_node; then
+        log_info "Node.js or npm not found, installing via nodeenv..."
+        install_nodeenv || {
+            log_error "Failed to install nodeenv"
+            return 1
+        }
+        setup_node_env || {
+            log_error "Failed to set up node environment"
+            return 1
+        }
+    fi
+
+    # Update dependencies using npm from the scripts/package.json
+    log_info "Updating Node.js dependencies in .venv/node_modules..."
+
+    # Remove existing node_modules to ensure clean installation with latest compatible versions
+    if [ -d ".venv/node_modules" ]; then
+        log_info "Removing existing node_modules to ensure clean installation..."
+        rm -rf ".venv/node_modules"
+    fi
+
+    # Use --no-save to prevent creating package.json in .venv and ensure clean local installation
+    # Use --ignore-scripts to avoid running postinstall scripts that might create unwanted node_modules
+    # Use --force to ensure latest compatible versions according to package.json
+    # Install production dependencies only (skip devDependencies)
+    if [ -f "scripts/package.json" ]; then
+        # First copy the scripts package.json to .venv temporarily so npm can read dependencies from it
+        cp "scripts/package.json" ".venv/package.json"
+        # Run npm install in .venv directory to install dependencies specified in package.json
+        cd ".venv" && "../.boot-linux/node-env/bin/npm" install --no-save --ignore-scripts --force --production
+        # Remove the temporary package.json after installation
+        rm -f ".venv/package.json"
+        cd ..  # Return to original directory
+    fi
+
+    log_success "✓ Node.js dependencies updated successfully"
+    return 0
+}
+
+# Main update flow
+main() {
+    log_info "============================================================"
+    log_info "AMI Orchestrator Update"
+    log_info "============================================================"
+    log_info ""
+
+    # Step 1: Safely update git submodules
+    log_info "Step 1: Updating git submodules safely..."
+    if ! safe_update_git_submodules; then
+        log_error "Failed to safely update submodules"
+        exit 1
+    fi
+    log_info ""
+
+    # Step 2: Update Python dependencies
+    log_info "Step 2: Updating Python dependencies..."
+    if ! update_python_dependencies; then
+        log_error "Failed to update Python dependencies"
+        exit 1
+    fi
+    log_info ""
+
+    # Step 3: Update Node.js agents
+    log_info "Step 3: Updating Node.js CLI agents..."
+    if ! update_node_agents; then
+        log_error "Failed to update Node.js CLI agents"
+        exit 1
+    fi
+    log_info ""
+
+    # Step 4: Run tests to verify the environment
+    log_info "Step 4: Running tests to verify environment..."
+    if ! run_tests; then
+        log_error "Tests failed after update"
+        exit 1
+    fi
+    
+    log_info ""
+    log_success "All updates completed successfully!"
+    log_info "Your AMI Orchestrator environment is now up to date."
+
+    exit 0
+}
+
+# Run main function
+main

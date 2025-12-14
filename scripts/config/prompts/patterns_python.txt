@@ -295,18 +295,31 @@
   ```
 - **Required fix**:
   ```python
-  from base.backend.workers.git_command import GitCommandWorker
   from base.backend.workers.system_command import SystemCommandWorker
 
-  git_worker = GitCommandWorker()
-  git_worker.init_bare_repo(path)
+  # Git operations should be handled directly via subprocess or git libraries instead of wrappers
+  import subprocess
+  import shutil
+
+  def run_git_command(args: list[str], cwd: str | None = None) -> dict[str, str | int | bool]:
+      git_path = shutil.which("git")
+      if git_path is None:
+          raise RuntimeError("git is not installed or not in PATH")
+      cmd = [git_path] + args
+      result = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True)
+      return {
+          "stdout": result.stdout,
+          "stderr": result.stderr,
+          "returncode": result.returncode,
+          "success": result.returncode == 0
+      }
 
   system_worker = SystemCommandWorker()
   system_worker.run_systemctl("status", "service")
   ```
-- **IMPORTANT**: All subprocess execution MUST go through /base worker classes
-- **ALLOWED**: Only in base/backend/workers/*.py worker implementations themselves
-- **Correct approach**: Use GitCommandWorker for git operations, SystemCommandWorker for system commands (systemctl, loginctl, ssh-keygen, etc.); workers use FileSubprocessSync and shutil.which() for security; executable resolution at initialization
+- **IMPORTANT**: All subprocess execution SHOULD go through /base worker classes for system operations
+- **ALLOWED**: Direct subprocess calls for specific operations like git that don't need wrapper classes
+- **Correct approach**: Use SystemCommandWorker for system commands (systemctl, loginctl, ssh-keygen, etc.); avoid creating unnecessary wrapper classes around standard tools; prefer direct subprocess or library usage for simple operations like git
 
 **Subprocess Partial Path**: `subprocess.run(["git", ...])`, `subprocess.run(["systemctl", ...])`  (S603/S607)
 - **Example VIOLATION**:

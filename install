@@ -106,19 +106,83 @@ bootstrap_podman_only() {
 }
 
 
+# Confirm destructive action with user
+confirm_action() {
+    local action="$1"
+    local target="$2"
+
+    log_warning "⚠️  POTENTIALLY DESTRUCTIVE OPERATION: $action"
+    log_warning "   Target: $target"
+    log_warning "   This operation cannot be undone."
+    log_info "Continue? (y/N): "
+
+    read -r response
+    if [[ ! "$response" =~ ^[Yy]$ ]]; then
+        log_info "Operation cancelled by user."
+        return 1
+    fi
+
+    return 0
+}
+
+# Check if directory has uncommitted changes
+has_uncommitted_changes() {
+    local dir="$1"
+    if [ -d "$dir/.git" ]; then
+        # Check for uncommitted changes in the directory
+        if ! git -C "$dir" diff-index --quiet HEAD --; then
+            return 0  # Has uncommitted changes
+        else
+            # Check for untracked files
+            if [ -n "$(git -C "$dir" ls-files --others --exclude-standard)" ]; then
+                return 0  # Has untracked files
+            fi
+        fi
+    fi
+    return 1  # No uncommitted changes
+}
+
 # Recreate flow - delete .venv AND .boot-linux, bootstrap node/podman, proceed with regular flow
 recreate_flow() {
     log_info "Starting recreate flow..."
 
-    # 1. Delete .venv
+    # 1. Check and delete .venv
     if [ -d ".venv" ]; then
+        log_warning "⚠️  Found existing .venv directory"
+
+        # Check for uncommitted changes (though .venv should typically be ignored)
+        if has_uncommitted_changes ".venv"; then
+            log_warning "⚠️  .venv directory has uncommitted changes!"
+            if ! confirm_action "DELETE .venv directory (with potential uncommitted changes)" ".venv"; then
+                return 1
+            fi
+        else
+            if ! confirm_action "DELETE .venv directory" ".venv"; then
+                return 1
+            fi
+        fi
+
         log_info "Removing existing .venv..."
         rm -rf .venv
         log_success "Removed .venv"
     fi
 
-    # 2. Delete .boot-linux
+    # 2. Check and delete .boot-linux
     if [ -d ".boot-linux" ]; then
+        log_warning "⚠️  Found existing .boot-linux directory"
+
+        # Check if .boot-linux has any important content
+        if [ -n "$(ls -A .boot-linux 2>/dev/null)" ]; then
+            log_warning "⚠️  .boot-linux directory contains files!"
+            if ! confirm_action "DELETE .boot-linux directory (with all contents)" ".boot-linux"; then
+                return 1
+            fi
+        else
+            if ! confirm_action "DELETE empty .boot-linux directory" ".boot-linux"; then
+                return 1
+            fi
+        fi
+
         log_info "Removing existing .boot-linux..."
         rm -rf .boot-linux
         log_success "Removed .boot-linux"
@@ -170,14 +234,14 @@ regular_flow() {
     log_info "Installing Node.js CLI agents..."
     log_info "============================================================"
 
-    if [ -d "./cli-agents" ]; then
+    # Check if scripts/package.json exists to install Node.js agents
+    if [ -f "./scripts/package.json" ]; then
         if ! install_node_agents; then
             log_error "Node.js CLI agents installation failed - aborting installation"
             return 1
         fi
-
     else
-        log_error "cli-agents directory not found, Node.js agents installation required - aborting installation"
+        log_error "scripts/package.json not found, Node.js agents installation required - aborting installation"
         return 1
     fi
 
@@ -216,15 +280,13 @@ regular_flow() {
     log_info "Tests passed - environment ready!"
     log_info "============================================================"
 
-    # 6. ONLY THEN RUN module_setup.py FOR ALL SUBMODULES!!!
-    log_info ""
-    log_info "============================================================"
-    log_info "Running module setup for submodules..."
-    log_info "============================================================"
-
-    if ! run_submodule_setup; then
-        log_error "Submodule setup failed"
-        return 1
+    # 6. ONLY THEN RUN make setup-all FOR ALL SUBMODULES!!!
+    if [ -f "Makefile" ]; then
+        log_info "Running make setup-all..."
+        make setup-all
+    else
+        log_error "Makefile not found in root!"
+        exit 1
     fi
 
     log_info ""

@@ -10,6 +10,8 @@ dependencies = [
     "packaging>=25.0",
     "google-auth-oauthlib==1.2.0",
     "prompt-toolkit>=3.0.52",
+    "aiohttp==3.12.15",
+    "cryptography==46.0.1",
 ]
 
 [dependency-groups]

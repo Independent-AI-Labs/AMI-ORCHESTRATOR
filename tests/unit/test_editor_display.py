@@ -21,7 +21,8 @@ class TestEditorDisplay:
         display.display_editor(lines, 0, 0)
 
         # Should write header, borders, content lines, and status
-        calls = [call[0][0] for call in mock_write.call_args_list if call]
+        # Extract the first argument of each call to sys.stdout.write
+        calls = [call[0][0] for call in mock_write.call_args_list]
 
         # Check that we have borders
         border_calls = [call for call in calls if "┌" in call or "└" in call or "│" in call]
@@ -42,7 +43,7 @@ class TestEditorDisplay:
         lines = ["Single line"]
         display.display_editor(lines, 0, 0)
 
-        calls = [call[0][0] for call in mock_write.call_args_list if call]
+        calls = [call[0][0] for call in mock_write.call_args_list]
 
         assert any("┌" in call for call in calls)  # Top border
         assert any("└" in call for call in calls)  # Bottom border
@@ -57,7 +58,7 @@ class TestEditorDisplay:
         lines = [""]
         display.display_editor(lines, 0, 0)
 
-        calls = [call[0][0] for call in mock_write.call_args_list if call]
+        calls = [call[0][0] for call in mock_write.call_args_list]
 
         # Should still display borders and at least one line
         assert any("┌" in call for call in calls)  # Top border
@@ -72,7 +73,7 @@ class TestEditorDisplay:
         lines = ["Hello", "Test"]
         display.display_editor(lines, 1, 2)  # Cursor on line 1, col 2
 
-        calls = [call[0][0] for call in mock_write.call_args_list if call]
+        calls = [call[0][0] for call in mock_write.call_args_list]
 
         # Content should be displayed
         assert any("Hello" in call for call in calls)
@@ -88,7 +89,7 @@ class TestEditorDisplay:
         lines = [long_line]
         display.display_editor(lines, 0, 50)
 
-        calls = [call[0][0] for call in mock_write.call_args_list if call]
+        calls = [call[0][0] for call in mock_write.call_args_list]
 
         # Should handle long lines
         assert any("┌" in call for call in calls)
@@ -103,7 +104,7 @@ class TestEditorDisplay:
         lines = ["Line 1", "Line 2", "Line 3", "Line 4"]
         display.display_editor(lines, 2, 3)  # Cursor on line 2, col 3
 
-        calls = [call[0][0] for call in mock_write.call_args_list if call]
+        calls = [call[0][0] for call in mock_write.call_args_list]
 
         for _i, line in enumerate(lines):
             assert any(line in call for call in calls)
@@ -120,7 +121,7 @@ class TestEditorDisplay:
         display.handle_keyboard_interrupt(lines)
 
         # Should clear previous display and handle interrupt properly
-        calls = [call[0][0] for call in mock_write.call_args_list if call]
+        calls = [call[0][0] for call in mock_write.call_args_list]
         # The function should write escape sequences to clear lines
         assert any("\\033[1A" in call for call in calls) or len(calls) > 0
 
@@ -143,7 +144,7 @@ class TestEditorDisplay:
         lines = ["Test line"]
         display.display_editor(lines, 0, len("Test line"))  # Cursor at end
 
-        calls = [call[0][0] for call in mock_write.call_args_list if call]
+        calls = [call[0][0] for call in mock_write.call_args_list]
 
         assert any("Test line" in call for call in calls)
 
@@ -156,7 +157,7 @@ class TestEditorDisplay:
         lines = ["Test line"]
         display.display_editor(lines, 0, 0)  # Cursor at beginning
 
-        calls = [call[0][0] for call in mock_write.call_args_list if call]
+        calls = [call[0][0] for call in mock_write.call_args_list]
 
         assert any("Test line" in call for call in calls)
 
@@ -169,7 +170,7 @@ class TestEditorDisplay:
         lines = ["Test@#$%", "Hello & World"]
         display.display_editor(lines, 0, 2)
 
-        calls = [call[0][0] for call in mock_write.call_args_list if call]
+        calls = [call[0][0] for call in mock_write.call_args_list]
 
         for line in lines:
             assert any(line in call for call in calls)
@@ -188,7 +189,7 @@ class TestEditorDisplayEdgeCases:
         # Convert None to string for display
         display.display_editor([str(None)], 0, 0)
 
-        calls = [call[0][0] for call in mock_write.call_args_list if call]
+        calls = [call[0][0] for call in mock_write.call_args_list]
 
         assert any("None" in call for call in calls)
 
@@ -201,7 +202,7 @@ class TestEditorDisplayEdgeCases:
         many_lines = [f"Line {i}" for i in range(50)]
         display.display_editor(many_lines, 25, 5)  # Middle line, middle column
 
-        calls = [call[0][0] for call in mock_write.call_args_list if call]
+        calls = [call[0][0] for call in mock_write.call_args_list]
 
         # Should handle multiple lines without error
         assert len([call for call in calls if "Line" in call]) >= len(many_lines)
@@ -215,7 +216,7 @@ class TestEditorDisplayEdgeCases:
         lines = ["Hello 世界", "Test αβγ"]
         display.display_editor(lines, 0, 2)
 
-        [call[0][0] for call in mock_write.call_args_list if call]
+        [call[0][0] for call in mock_write.call_args_list]
 
         # Should handle unicode without error
         for _line in lines:

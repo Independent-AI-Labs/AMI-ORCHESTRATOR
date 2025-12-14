@@ -58,6 +58,56 @@ _to_https() {
     fi
 }
 
+# Check for uncommitted changes in submodules
+check_submodule_changes() {
+    local git_cmd="$1"
+    log_info "Checking for uncommitted changes in submodules..."
+
+    # Get list of all submodules
+    local submodules
+    submodules=$("$git_cmd" submodule foreach --quiet 'echo $path' 2>/dev/null) || true
+
+    local has_changes=0
+    for submodule in $submodules; do
+        if [ -d "$submodule/.git" ]; then
+            # Check for uncommitted changes in submodule
+            if ! "$git_cmd" -C "$submodule" diff-index --quiet HEAD --; then
+                log_warning "⚠️  Submodule $submodule has uncommitted changes!"
+                has_changes=1
+            fi
+
+            # Check for untracked files in submodule
+            local untracked
+            untracked=$("$git_cmd" -C "$submodule" ls-files --others --exclude-standard)
+            if [ -n "$untracked" ]; then
+                log_warning "⚠️  Submodule $submodule has untracked files:"
+                echo "$untracked" | head -5 | while read -r file; do
+                    if [ -n "$file" ]; then
+                        log_warning "   - $submodule/$file"
+                    fi
+                done
+                if [ "$(echo "$untracked" | wc -l)" -gt 5 ]; then
+                    log_warning "   ... and more"
+                fi
+                has_changes=1
+            fi
+        fi
+    done
+
+    if [ $has_changes -eq 1 ]; then
+        log_warning "⚠️  WARNING: Uncommitted changes detected in submodules!"
+        log_info "This operation may overwrite uncommitted changes."
+        log_info "Continue anyway? (y/N): "
+        read -r response
+        if [[ ! "$response" =~ ^[Yy]$ ]]; then
+            log_info "Operation cancelled by user."
+            return 1
+        fi
+    fi
+
+    return 0
+}
+
 # Initialize and update git submodules with HTTPS alternative (using bootstrapped binary)
 ensure_git_submodules() {
     # Set up git command from bootstrapped environment
@@ -73,6 +123,11 @@ ensure_git_submodules() {
     if [ ! -d ".git" ]; then
         log_warning "No .git directory found; skipping submodule init."
         return 0
+    fi
+
+    # Check for uncommitted changes in submodules before updating
+    if ! check_submodule_changes "$git_cmd"; then
+        return 1
     fi
 
     log_info "Initializing git submodules (recursive)..."

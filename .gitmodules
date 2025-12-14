@@ -34,8 +34,8 @@
 	url = git@github.com:Independent-AI-Labs/AMI-FILES.git
 	branch = main
 	update = checkout
-[submodule "nodes"]
-	path = nodes
+[submodule "launcher"]
+	path = launcher
 	url = git@github.com:Independent-AI-Labs/AMI-NODES.git
 	branch = main
 	update = checkout

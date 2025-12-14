@@ -1,0 +1,7 @@
+# Procfile.dev - Dev Profile
+# Run with: honcho start -f Procfile.dev
+
+data-stack: docker-compose -f docker-compose.data.yml up
+openbao: COMPOSE_PROFILES=openbao OPENBAO_DEV_ROOT_TOKEN_ID=${OPENBAO_DEV_ROOT_TOKEN_ID} OPENBAO_PORT=8200 docker-compose -f docker-compose.secrets.yml up
+secrets-broker: cd base && SECRETS_BROKER_HOST=0.0.0.0 SECRETS_BROKER_PORT=8700 ../scripts/ami-uv run --python 3.12 scripts/run_secrets_broker.py
+searxng: COMPOSE_PROFILES=searxng SEARXNG_PORT=8888 SEARXNG_SECRET=change-me SEARXNG_LIMITER=true docker-compose -f docker-compose.services.yml up

@@ -1,0 +1,5 @@
+# Procfile.git-server - Git Server Profile
+# Run with: honcho start -f Procfile.git-server
+
+git-sshd: SSH_PORT=2222 .venv/bin/sshd-venv start
+git-daemon: GIT_EXEC_PATH=.venv/git/libexec/git-core GIT_DAEMON_PORT=9418 bash -c 'BASE_PATH="${GIT_SERVER_BASE_PATH:-$HOME/git-repos}"; exec .venv/bin/git daemon --reuseaddr --base-path="$BASE_PATH/repos" --export-all --enable=receive-pack --verbose "$BASE_PATH/repos"'

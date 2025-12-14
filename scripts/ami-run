@@ -22,6 +22,7 @@ if [[ "$#" -gt 0 && ("$1" == "-h" || "$1" == "--help") ]]; then
     echo "  npm [args...]        Execute NPM from bootstrapped environment"
     echo "  npx [args...]        Execute NPX from bootstrapped environment"
     echo "  java [args...]       Execute Java from system installation (if available)"
+    echo "  ... and other utility scripts"
     echo ""
     echo "Examples:"
     echo "  ami-run script.py                    # Run Python script (nearest .venv)"
@@ -108,11 +109,20 @@ case "$SUBCOMMAND" in
                 # Run specific module setup using root venv python
                 MODULE="${ORIGINAL_ARGS[0]}"
                 ORIGINAL_ARGS=("${ORIGINAL_ARGS[@]:1}")  # remove first element
-                if [[ -f "$ROOT_DIR/$MODULE/module_setup.py" ]]; then
-                    exec "$ROOT_VENV_PYTHON" "$ROOT_DIR/$MODULE/module_setup.py" "${ORIGINAL_ARGS[@]}"
-                else
-                    echo "Error: module_setup.py not found in $MODULE" >&2
-                    exit 1
+
+                # Check if module venv exists
+                MODULE_VENV_DIR="$ROOT_DIR/$MODULE/.venv"
+                if [[ ! -d "$MODULE_VENV_DIR" ]]; then
+                    # ... inside the block where venv is missing ...
+                    if [[ -f "$ROOT_DIR/$MODULE/Makefile" ]]; then
+                        echo "Error: Virtual environment not found for $MODULE." >&2
+                        echo "Please run 'make -C $MODULE setup' to initialize the environment." >&2
+                        exit 1
+                    else
+                        echo "Error: Virtual environment not found for $MODULE and no Makefile detected." >&2
+                        echo "Please initialize the environment manually." >&2
+                        exit 1
+                    fi
                 fi
             fi
         fi

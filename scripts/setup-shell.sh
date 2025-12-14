@@ -49,7 +49,7 @@
 #   Core Wrappers:    ami-run, ami-uv, ami-agent, ami-repo
 #   Service Mgmt:     ami-services, ami-start, ami-stop, ami-restart, ami-profile
 #   Testing:          ami-test with auto-discovery of modules
-#   Setup/Install:    ami-install, ami-setup for modules
+#   Setup/Install:    ami-install, ami-setup for modules (via Makefiles)
 #   Code Quality:     ami-codecheck for pre-commit hooks
 #   Git Operations:   ami-status, ami-diff, ami-log with module auto-detection
 #   Navigation:       ami-base, ami-browser, etc. for quick directory access
@@ -186,14 +186,14 @@ fi
 if [[ -d "$AMI_ROOT/.venv/bin" ]]; then
     export PATH="$AMI_ROOT/.venv/bin:$PATH"
     if [[ $? -ne 0 ]]; then
-        echo -e "${YELLOW}⚠${NC} Warning: root .venv/bin not found. Run 'module_setup.py' to create venv."
+        echo -e "${YELLOW}⚠${NC} Warning: root .venv/bin not found. Run 'make setup-base' (or 'module_setup.py' for legacy modules) to create venv."
         echo -e "  ${CYAN}→${NC} Expected location: $AMI_ROOT/.venv/bin"
     else
         echo -e "${GREEN}✓${NC} Added root .venv/bin to PATH"
         echo -e "  ${CYAN}→${NC} Access to: python, pytest, podman, claude, fastmcp, uvicorn, ruff, mypy, etc."
     fi
 else
-    echo -e "${YELLOW}⚠${NC} Warning: root .venv/bin not found. Run 'module_setup.py' to create venv."
+    echo -e "${YELLOW}⚠${NC} Warning: root .venv/bin not found. Run 'make setup-base' (or 'module_setup.py' for legacy modules) to create venv."
     echo -e "  ${CYAN}→${NC} Expected location: $AMI_ROOT/.venv/bin"
 fi
 
@@ -250,21 +250,21 @@ _find_module_root() {
     echo "$AMI_ROOT/base"
 }
 
-_find_nearest_module_setup() {
-    # Walk up from PWD looking for module_setup.py
-    # Returns path to module_setup.py or AMI_ROOT/base/module_setup.py as default
+_find_nearest_setup_file() {
+    # Walk up from PWD looking for Makefile
+    # Returns path to Makefile or AMI_ROOT/Makefile as default
     local current="$PWD"
 
     while [[ "$current" != "/" ]]; do
-        if [[ -f "$current/module_setup.py" ]]; then
-            echo "$current/module_setup.py"
+        if [[ -f "$current/Makefile" ]]; then
+            echo "$current/Makefile"
             return 0
         fi
         current="$(dirname "$current")"
     done
 
-    # Default to base module setup
-    echo "$AMI_ROOT/base/module_setup.py"
+    # Default to root Makefile
+    echo "$AMI_ROOT/Makefile"
 }
 
 # ============================================================================
@@ -371,18 +371,16 @@ ami-qwen() {
 # These commands control the nodes module's process management system
 
 ami-services() {
-    # Service orchestration with multiple subcommands
-    # Handles process management, profiles, and multi-module operations
+    # Service orchestration wrapper
+    # Delegates to standard Makefile targets or honcho
+    
     if [[ $# -eq 0 ]]; then
-        echo -e "${RED}Error: No command provided${NC}"
-        echo -e "Usage: ami-services [command] [args...]"
-        echo -e "Available commands:"
-        echo -e "  start <profile>        - Start processes/profiles with visual feedback"
-        echo -e "  stop <profile>         - Stop processes/profiles with visual feedback"
-        echo -e "  restart <profile>      - Restart processes/profiles with visual feedback"
-        echo -e "  profile [args...]      - Manage coordinated service profiles"
-        echo -e "  status                 - List status of all managed processes"
-        return 1
+        echo -e "${BLUE}AMI Services${NC}"
+        echo -e "Legacy 'ami-services' is deprecated. Use standard Make targets:"
+        echo -e "  make start           - Start all services"
+        echo -e "  make start-cms       - Start CMS profile"
+        echo -e "  make start-dev       - Start Dev profile"
+        return 0
     fi
 
     local cmd="$1"
@@ -390,85 +388,15 @@ ami-services() {
 
     case "$cmd" in
         start)
-            echo -e "${BLUE}Starting process/profile:${NC} $*"
-            # Determine if the argument is a profile or a process
-            if [[ $# -gt 0 ]]; then
-                local target="$1"
-                # Test if it's a valid profile by trying to list profiles
-                if ami-run nodes/scripts/setup_service.py profile info "$target" >/dev/null 2>&1; then
-                    # It's a profile
-                    ami-run nodes/scripts/setup_service.py profile start "$@"
-                else
-                    # Assume it's a process
-                    ami-run nodes/scripts/setup_service.py process start "$@"
-                fi
+            if [[ $# -eq 0 ]]; then
+                (cd "$AMI_ROOT" && make start)
             else
-                echo -e "${RED}Error: No profile or process name provided${NC}"
-                return 1
+                local profile="$1"
+                (cd "$AMI_ROOT" && make "start-$profile")
             fi
-            ;;
-        stop)
-            echo -e "${YELLOW}Stopping process/profile:${NC} $*"
-            # Determine if the argument is a profile or a process
-            if [[ $# -gt 0 ]]; then
-                local target="$1"
-                # Test if it's a valid profile by trying to list profiles
-                if ami-run nodes/scripts/setup_service.py profile info "$target" >/dev/null 2>&1; then
-                    # It's a profile
-                    ami-run nodes/scripts/setup_service.py profile stop "$@"
-                else
-                    # Assume it's a process
-                    ami-run nodes/scripts/setup_service.py process stop "$@"
-                fi
-            else
-                echo -e "${RED}Error: No profile or process name provided${NC}"
-                return 1
-            fi
-            ;;
-        restart)
-            echo -e "${YELLOW}Restarting process/profile:${NC} $*"
-            # Determine if the argument is a profile or a process
-            if [[ $# -gt 0 ]]; then
-                local target="$1"
-                # Test if it's a valid profile by trying to list profiles
-                if ami-run nodes/scripts/setup_service.py profile info "$target" >/dev/null 2>&1; then
-                    # It's a profile - stop then start
-                    ami-run nodes/scripts/setup_service.py profile stop "$@"
-                    sleep 2
-                    ami-run nodes/scripts/setup_service.py profile start "$@"
-                else
-                    # Assume it's a process - stop then start
-                    ami-run nodes/scripts/setup_service.py process stop "$@"
-                    sleep 2
-                    ami-run nodes/scripts/setup_service.py process start "$@"
-                fi
-            else
-                echo -e "${RED}Error: No profile or process name provided${NC}"
-                return 1
-            fi
-            ;;
-        profile)
-            echo -e "${BLUE}Managing profile:${NC} $*"
-            # Check if it's a list command to use human output
-            if [[ "$1" == "list" ]]; then
-                AMI_SERVICES_HUMAN_OUTPUT=1 ami-run nodes/scripts/setup_service.py profile "$@"
-            else
-                ami-run nodes/scripts/setup_service.py profile "$@"
-            fi
-            ;;
-        status)
-            echo -e "${BLUE}Listing all managed processes status:${NC}"
-            AMI_SERVICES_HUMAN_OUTPUT=1 ami-run nodes/scripts/setup_service.py process list
             ;;
         *)
-            echo -e "${RED}Error: Unknown command '$cmd'${NC}"
-            echo -e "Usage: ami-services [command] [args...]"
-            echo -e "Available commands:"
-            echo -e "  start <profile>        - Start processes/profiles with visual feedback"
-            echo -e "  stop <profile>         - Stop processes/profiles with visual feedback"
-            echo -e "  restart <profile>      - Restart processes/profiles with visual feedback"
-            echo -e "  profile [args...]      - Manage coordinated service profiles"
-            echo -e "  status                 - List status of all managed processes"
+            echo -e "${RED}Unknown command. Please use 'make start' or 'honcho'.${NC}"
             return 1
             ;;
     esac
@@ -493,36 +421,40 @@ ami-test() {
 
 ami-setup() {
     # Run module setup for a module with automatic module detection
-    # Takes optional module path as parameter: ami-setup [module] [setup-args]
-    # If no module specified, finds nearest module_setup.py in directory hierarchy
-    # Handles dependencies, virtual environment setup, and git hook installation
+    # Takes optional module path as parameter: ami-setup [module]
+    # If no module specified, finds nearest Makefile in directory hierarchy
     if [[ $# -gt 0 && ( "$1" == "-h" || "$1" == "--help" ) ]]; then
         echo -e "${BLUE}AMI Module Setup${NC}"
-        echo -e "Usage: ami-setup [module] [args...]"
+        echo -e "Usage: ami-setup [module]"
         echo -e "  module    Optional module name (auto-detected if not specified)"
-        echo -e "  args...   Arguments passed to module_setup.py"
         echo -e ""
-        echo -e "Runs module setup (module_setup.py) for a specific module with auto-detection."
-        echo -e "If no module is specified, finds the nearest module_setup.py in directory hierarchy."
-    elif [[ $# -gt 0 && -f "$AMI_ROOT/$1/module_setup.py" ]]; then
+        echo -e "Runs 'make setup' for a specific module."
+        echo -e "If no module is specified, finds the nearest Makefile in directory hierarchy."
+    elif [[ $# -gt 0 ]]; then
         # Module specified
         local module="$1"
         shift
-        echo -e "${BLUE}Running module_setup.py for:${NC} $module"
-        ami-run "$module/module_setup.py" "$@"
+        
+        if [[ -f "$AMI_ROOT/$module/Makefile" ]]; then
+             echo -e "${BLUE}Running 'make setup' for:${NC} $module"
+             (cd "$AMI_ROOT/$module" && make setup)
+        else
+             echo -e "${RED}Error: No Makefile found for module: $module${NC}"
+             return 1
+        fi
     else
-        # Find nearest module_setup.py
-        local setup_path="$(_find_nearest_module_setup)"
+        # Find nearest setup file (Makefile)
+        local setup_path="$(_find_nearest_setup_file)"
         local module_dir="$(dirname "$setup_path")"
         local module_name="${module_dir#$AMI_ROOT/}"
 
         if [[ "$module_name" == "$module_dir" || "$module_name" == "." ]]; then
             echo -e "${BLUE}Running orchestrator setup${NC}"
         else
-            echo -e "${BLUE}Running module_setup.py for:${NC} $module_name"
+            echo -e "${BLUE}Running 'make setup' for:${NC} $module_name"
         fi
 
-        ami-run "$setup_path" "$@"
+        (cd "$module_dir" && make setup)
     fi
 }
 
@@ -540,7 +472,7 @@ ami-install() {
         echo -e ""
         echo -e "Runs the comprehensive system installation via the install script."
         echo -e "This includes: git submodule initialization, environment bootstrapping,"
-        echo -e "node agent installation, testing, and recursive module setup."
+        echo -e "node agent installation, testing, and recursive module setup via Makefiles."
         "$AMI_ROOT/install" --help 2>/dev/null || true
     else
         echo -e "${BLUE}Running comprehensive system installation via install script${NC}"
@@ -792,6 +724,28 @@ ami-info() {
 # ============================================================================
 # 12. SUMMARY OUTPUT
 # ============================================================================
+
+# Production orchestration aliases
+ami-prod() {
+    # Production command controller - unified interface for all production operations
+    # Usage: ami-prod [command] [options]
+    # Commands: deploy, deploy-dry, analyze, checks, monitor, status, stop, rollback, perf, health, load-test, backup, restore
+    ami-run "$AMI_ROOT/launcher/production/__main__.py" "$@"
+}
+
+# Short aliases for common production operations
+alias dep="ami-prod deploy"           # Deploy to production (technology-agnostic)
+alias deproll="ami-prod deploy-dry"   # Deploy dry run
+alias analyze="ami-prod analyze"      # Analyze project technology stack
+alias pmon="ami-prod monitor"         # Start production monitoring
+alias pstat="ami-prod status"         # Check production status
+alias pstop="ami-prod stop"           # Stop production services
+alias roll="ami-prod rollback"        # Rollback production
+alias pbench="ami-prod perf"          # Performance benchmark
+alias pcheck="ami-prod health"        # Health check
+alias pload="ami-prod load-test"      # Load test
+alias pbak="ami-prod backup"          # Create backup
+alias prest="ami-prod restore"        # Restore from backup
 
 # Add text input CLI alias
 alias @="ami-run scripts/cli_components/text_input_cli.py"

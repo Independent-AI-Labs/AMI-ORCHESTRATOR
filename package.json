@@ -1,7 +1,0 @@
-{
-  "dependencies": {
-    "@anthropic-ai/claude-code": "2.0.58",
-    "@google/gemini-cli": "0.19.1",
-    "@qwen-code/qwen-code": "0.3.0"
-  }
-}

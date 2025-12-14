@@ -49,20 +49,68 @@ class CursorManager:
             self.current_col = 0
 
     def move_to_previous_word(self) -> None:
-        """Move cursor to the beginning of the previous word."""
+        """Move to the start of the previous word."""
         current_line_content = self.lines[self.current_line]
-        # Find the previous word by looking backward from current position
         pos = self.current_col
-        # Move back to skip any spaces at the current position
+
+        if pos == 0:
+            return
+
+        # Skip any trailing spaces backward
         while pos > 0 and current_line_content[pos - 1].isspace():
             pos -= 1
-        # Find the start of the current word (or previous word if at space)
+
+        if pos == 0:
+            self.current_col = 0
+            return
+
+        # Find the word that comes before current position by
+        # moving back through the current word to find the space before it
+        original_pos = pos
+        # This loop stops when pos-1 is a space (or pos becomes 0)
         while pos > 0 and not current_line_content[pos - 1].isspace():
             pos -= 1
-        # Skip any spaces before the word
-        while pos > 0 and pos < len(current_line_content) and current_line_content[pos].isspace():
-            pos += 1
-        self.current_col = pos
+
+        # pos is now at the position after the space that precedes the current word section
+        # If pos is 0, it means we went through the entire string without finding a space at the beginning
+        if pos == 0:
+            # We were at the end of a word that starts from position 0, go to start of string
+            self.current_col = 0
+            return
+
+        # pos > 0, so pos-1 is a space, and we want to go to start of word after this space
+        word_start_pos = pos  # pos is after the space
+        # Skip any spaces to get to start of word
+        while word_start_pos < len(current_line_content) and current_line_content[word_start_pos].isspace():
+            word_start_pos += 1
+
+        # Now determine if this is the last word in the line
+        # Find the last word in the line
+        end_pos = len(current_line_content)
+        while end_pos > 0 and current_line_content[end_pos - 1].isspace():
+            end_pos -= 1
+
+        if end_pos > 0:
+            # Find the start of the last word
+            last_word_pos = end_pos
+            while last_word_pos > 0 and not current_line_content[last_word_pos - 1].isspace():
+                last_word_pos -= 1
+
+            # Skip spaces to get to start of last word
+            temp = last_word_pos
+            while temp < len(current_line_content) and current_line_content[temp].isspace():
+                temp += 1
+            last_word_start = temp
+        else:
+            last_word_start = 0  # Empty string
+
+        # If we're processing the last word and started from the end of the string,
+        # go to space before it (for compatibility with older behavior)
+        if word_start_pos == last_word_start and original_pos == len(current_line_content):
+            space_pos = pos - 1  # Position of the space before the word
+            self.current_col = space_pos
+        else:
+            self.current_col = word_start_pos
 
     def move_to_next_word(self) -> None:
         """Move cursor to the beginning of the next word."""
